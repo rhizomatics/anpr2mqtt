@@ -16,6 +16,7 @@ If there's no config at all, the command can be configured entirely from the com
 ```bash
  uv run tools ocr_file  20241230152519495_Z374TST_VEHICLE_DETECTION.jpg --ocr.crop.x 0 --ocr.crop.y 100 --ocr.crop.h 200 --ocr.crop.w 400 --ocr.invert False
  ```
+ 
 If `file_system.watch_path` can't be resolved from the configuration, then the image will be looked for in the current working directory.
 
 ## Directory Listing
