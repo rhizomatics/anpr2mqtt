@@ -87,7 +87,6 @@ Make sure `anpr2mqtt` is publishing to the same broker, the [MQTT Integration](h
 
 The `homeassistant` default topic prefix matches the default ANPR2MQTT config, if its changed in HomeAssistant, then the ANPR2MQTT config must be changed to match.
 
-![Home Assistant updates in Settings](assets/images/ha_update_page.png "Home Assistant Updates")
 
 ## Device Creation
 
