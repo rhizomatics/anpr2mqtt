@@ -7,7 +7,7 @@ from anpr2mqtt.settings import Settings
 
 EXAMPLES_ROOT = "examples"
 
-examples = [str(p.name) for p in pathlib.Path(EXAMPLES_ROOT).iterdir() if p.name.endswith(".yaml")]
+examples = [str(p.name) for p in pathlib.Path(EXAMPLES_ROOT).iterdir() if p.name.startswith("anpr2mqtt.yaml")]
 
 
 @pytest.mark.parametrize("config_name", examples)

@@ -36,6 +36,8 @@ class DVLA(APIClient):
                     headers={"x-api-key": self.api_key, "Content-Type": "application/json"},
                     json={"registrationNumber": reg.upper()},
                 )
+                if response.extensions.get("hishel_from_cache"):
+                    log.debug("DVLA API cached response")
                 if response.status_code == 200:
                     return response.json()
 

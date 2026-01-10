@@ -16,7 +16,12 @@ log = structlog.get_logger()
 
 
 def post_discovery_message(
-    client: mqtt.Client, discovery_topic_prefix: str, state_topic: str, image_topic: str, camera: str
+    client: mqtt.Client,
+    discovery_topic_prefix: str,
+    state_topic: str,
+    image_topic: str,
+    camera: str,
+    device_creation: bool = True,
 ) -> None:
     topic = f"{discovery_topic_prefix}/sensor/{camera}/anpr/config"
     payload: dict[str, Any] = {
@@ -32,13 +37,14 @@ def post_discovery_message(
         "json_attributes_topic": state_topic,
         "icon": "mdi:car-back",
         "name": f"ANPR {camera} Plate",
-        "dev": {
+    }
+    if device_creation:
+        payload["dev"] = {
             "name": f"anpr2mqtt on {camera}",
             "sw_version": anpr2mqtt.version,  # pyright: ignore[reportAttributeAccessIssue]
             "manufacturer": "rhizomatics",
             "identifiers": [f"{camera}.anpr2mqtt"],
-        },
-    }
+        }
     client.publish(topic, payload=json.dumps(payload), qos=0, retain=True)
     log.info("Published HA MQTT sensor Discovery message to %s", topic)
 
@@ -55,13 +61,14 @@ def post_discovery_message(
         "json_attributes_topic": state_topic,
         "icon": "mdi:car-back",
         "name": f"ANPR {camera} Snapshot",
-        "dev": {
+    }
+    if device_creation:
+        payload["dev"] = {
             "name": f"anpr2mqtt on {camera}",
             "sw_version": anpr2mqtt.version,  # pyright: ignore[reportAttributeAccessIssue]
             "manufacturer": "rhizomatics",
             "identifiers": [f"{camera}.anpr2mqtt"],
-        },
-    }
+        }
     client.publish(topic, payload=json.dumps(payload), qos=0, retain=True)
     log.info("Published HA MQTT Discovery message to %s", topic)
 

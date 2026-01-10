@@ -20,25 +20,27 @@ A simple way to integrate CCTV cameras with built-in ANPR (Automatic Number Plat
 
 ## Features
 
-- Watches directory for ANPR camera images using [Watchdog](https://python-watchdog.readthedocs.io/en/stable/index.html) (inotify on Linux, or equiv on other os)
-- Extracts license plate information from filenames
-- OCR-based direction detection (Forward/Reverse)
-- Publishes events to MQTT for Home Assistant
-- Auto-discovery configuration for Home Assistant
-- Creates MQTT Image Entities on Home Assistant for image snapshot, so no web access to ftp needed
-- Tracks and counts previous sightings
-- Configurable to classify plates as known, to be ignored or as a potential threat
-- Regular expression based corrections, for known plates that the ANPR sometimes mis-reads
-- UK Only
-  - DVLA Lookup if API_KEY provided, for detailed MOT and tax information
-
-
-
+* File System Integration
+    - Watches directory for ANPR camera images using [Watchdog](https://python-watchdog.readthedocs.io/en/stable/index.html)
+        - Uses [inotify](https://www.man7.org/linux/man-pages/man7/inotify.7.html) on Linux, or equiv on other operating systems for efficient listening to file system events without continual polling
+    - Extracts license plate information from filenames
+* Home Assistant Integration. 
+    - Publishes events to MQTT for Home Assistant as a [MQTT Sensor Entity](https://www.home-assistant.io/integrations/sensor.mqtt/)
+    - Auto-discovery configuration for Home Assistant
+    - Creates [MQTT Image Entity](https://www.home-assistant.io/integrations/image.mqtt/) on Home Assistant for image snapshot, so no web access to ftp needed
+* Plate Enrichment
+    - OCR-based direction detection (Forward/Reverse) using [tesseract-ocr](https://github.com/tesseract-ocr/tesseract)
+    - Tracks and counts previous sightings
+    - Configurable to classify plates as known, to be ignored or as a potential threat
+    - Regular expression based corrections, for known plates that the ANPR sometimes mis-reads
+    - UK Only
+        - DVLA Lookup if API_KEY provided, for detailed MOT and tax information
+        - Lookups cached for configurable time
 
 
 ## Docker Deployment
 
-Build and run with Docker:
+Build and run with Docker, or use the example [docker-compose.yaml](examples/docker-compose.yaml)
 
 ```bash
 docker build -t anpr2mqtt .
@@ -98,56 +100,7 @@ See [PIL Coordinate System](https://pillow.readthedocs.io/en/stable/handbook/con
 
 ## Home Assistant Integration
 
-The service auto-configures a sensor in Home Assistant via MQTT discovery:
-
-- **Entity ID**: `sensor.anpr_<camera>`
-- **Attributes**: `plate`, `last_seen`, `url`, `direction`
-
-And an image entity
-
-- **Entity ID**: `image.anpr_<camera>`
-
-The image entity reuses all the attributes from the sensor entity.
-
-
-## Example Automation
-
-```yaml
-alias: Driveway ANPR Alert
-description: ""
-triggers:
-  - trigger: state
-    entity_id:
-      - sensor.driveway_anpr
-conditions: []
-actions:
-  - action: notify.supernotifier
-    metadata: {}
-    data:
-      message: >-
-        {{ trigger.to_state.attributes.description }} with {{
-        trigger.to_state.attributes.plate }} spotted at {{
-        trigger.to_state.attributes.camera }} camera in an
-        {{ trigger.to_state.attributes.direction }} direction.
-
-        {% if trigger.to_state.attributes.previous_sightings == 0 %} Not
-        previously sighted  {% else %}  {{
-        trigger.to_state.attributes.previous_sightings }} previous sightings,
-        last seen on {{ trigger.to_state.attributes.last_sighting[:10] }} at {{
-        trigger.to_state.attributes.last_sighting[11:16] }}   {% endif %}
-
-        {% if trigger.to_state.attributes.reginfo is defined %}  
-        DVLA info: 
-        {{ trigger.to_state.attributes.reginfo }}  
-        {% endif %}
-      title: >-
-        {{ trigger.to_state.attributes.description }} spotted on {{
-        trigger.to_state.attributes.camera }} camera
-      data:
-        priority: "{{ trigger.to_state.attributes.priority }}"
-        media:
-          camera_entity_id: "image.anpr_{{trigger.to_state.attributes.camera}}"
-```
+See [Home Assistant Integration](home_assistant.md) for configuration and example notification automation.
 
 ## Distribution
 

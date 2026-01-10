@@ -32,6 +32,7 @@ class FileSystemSettings(BaseModel):
 
 class HomeAssistantSettings(BaseModel):
     discovery_topic_root: str = "homeassistant"
+    device_creation: bool = True
 
 
 class DVLASettings(BaseModel):

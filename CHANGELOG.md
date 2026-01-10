@@ -1,3 +1,5 @@
+# 0.4.2
+- Device creation optional
 # 0.4.1
 - Improve CLI handling for tools
 - File name parsing now more forgiving of regexp format

@@ -1,0 +1,10 @@
+services:
+  anpr2mqtt:
+    container_name: anpr2mqtt
+    image: ghcr.io/rhizomatics/anpr2mqtt:release
+    volumes:
+      - ./config:/config  # Config file lives at /config/anpr2mqtt.yaml inside the container
+    restart: always
+    env_file: ./.env  # Optional environment variables file
+
+

@@ -79,7 +79,14 @@ def run() -> None:
         client.loop_start()
         log.info(f"Connected to MQTT at {settings.mqtt.host}:{settings.mqtt.port} as {settings.mqtt.user}")
         log.info(f"Publishing at {settings.mqtt.topic_root}/{settings.camera}")
-        post_discovery_message(client, settings.homeassistant.discovery_topic_root, state_topic, image_topic, settings.camera)
+        post_discovery_message(
+            client,
+            settings.homeassistant.discovery_topic_root,
+            state_topic=state_topic,
+            image_topic=image_topic,
+            camera=settings.camera,
+            device_creation=settings.homeassistant.device_creation,
+        )
     except Exception as e:
         log.error("Failed to connect to MQTT: %s", e, exc_info=1)
         sys.exit(-500)
