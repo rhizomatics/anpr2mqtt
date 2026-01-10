@@ -1,3 +1,5 @@
+# 0.6.1
+- Log state topic at startup
 # 0.6.0
 - Multiple events now supported, e.g. face detection or line crossing
 - OCR field definitions can be reused across events, or different crop definitions for the same value

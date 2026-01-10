@@ -10,7 +10,7 @@ theme:
   name: material
   highlightjs: true
   language: en
-  logo: assets/images/anpr2mqtt-dark-256x256.png
+  logo: docs/assets/images/anpr2mqtt-dark-256x256.png
   icon:
     repo: fontawesome/brands/github
   features:
@@ -50,7 +50,7 @@ plugins:
   - meta-descriptions
   - social:
       cards_layout_options:
-        logo: docs/assets/images/icon.png
+        logo: docs/assets/images/anpr2mqttdark-256x256.png
         background_image: docs/assets/images/logo-dim-social-640x320.png
         background_color: transparent
   - mike:
