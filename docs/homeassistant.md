@@ -83,11 +83,11 @@ In general, no configuration is needed, if Home Assistant is already running wit
 
 Make sure `anpr2mqtt` is publishing to the same broker, the [MQTT Integration](https://www.home-assistant.io/integrations/mqtt/) is installed and automatic discovery is not disabled.
 
-![Home Assistant MQTT Integration configuration](images/ha_mqtt_discovery.png "Home Assistant MQTT Discovery")
+![Home Assistant MQTT Integration configuration](assets/images/ha_mqtt_discovery.png "Home Assistant MQTT Discovery")
 
 The `homeassistant` default topic prefix matches the default ANPR2MQTT config, if its changed in HomeAssistant, then the ANPR2MQTT config must be changed to match.
 
-![Home Assistant updates in Settings](images/ha_update_page.png "Home Assistant Updates")
+![Home Assistant updates in Settings](assets/images/ha_update_page.png "Home Assistant Updates")
 
 ## Device Creation
 
@@ -116,7 +116,7 @@ From the [Entities View](https://www.home-assistant.io/docs/configuration/entiti
 [Developer Tools](https://www.home-assistant.io/docs/tools/dev-tools/), filter
 the entities by `anpr.` 
 
-![Home Assistant Entities](images/ha_entities.png){width=640}
+![Home Assistant Entities](assets/images/ha_entities.png){width=640}
 
 ## More Home Assistant information
 
