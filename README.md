@@ -16,8 +16,7 @@
 
 # ANPR MQTT Bridge
 
-A simple way to integrate CCTV cameras with built-in ANPR (Automatic Number Plate Recognition, aka Automatic Licence Plate Recognitio) to MQTT for Home Assistant integration, or any other MQTT consumer. All that is needed is for the camera to
-be configured to upload images on plate recognition, by ftp, NAS or whatever else. ANPR2MQTT monitors the directory where the images lands and publishes plate information to MQTT.
+A simple way to integrate CCTV cameras with built-in ANPR (Automatic Number Plate Recognition, aka Automatic Licence Plate Recognition) to MQTT for Home Assistant integration, or any other MQTT consumer. All that is needed is for the camera to be configured to upload images on plate recognition, by ftp, NAS or whatever else. ANPR2MQTT monitors the directory where the images lands and publishes plate information to MQTT.
 
 ## Features
 
