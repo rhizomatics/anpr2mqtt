@@ -2,16 +2,31 @@ from pytestshellutils.shell import Subprocess
 
 
 def test_ocr_file_default_dir(shell: Subprocess) -> None:
-
     ret = shell.run("uv", "run", "tools", "ocr_file", "fixtures/20250602103045407_B4DM3N_VEHICLE_DETECTION.jpg")
     assert ret.returncode == 0
     assert "{'vehicle_direction': 'Forward'}" in ret.stdout
 
 
 def test_ocr_file_alt_crop(shell: Subprocess) -> None:
-
-    ret = shell.run("uv", "run", "tools", "ocr_file", "fixtures/20250602103045407_B4DM3N_VEHICLE_DETECTION.jpg",
-                    "--ocr.crop.x", "850", "--ocr.crop.y", "0", "--ocr.crop.h", "30", "--ocr.crop.w", "650", "--ocr.invert", "True", "--log_level", "DEBUG")
+    ret = shell.run(
+        "uv",
+        "run",
+        "tools",
+        "ocr_file",
+        "fixtures/20250602103045407_B4DM3N_VEHICLE_DETECTION.jpg",
+        "--ocr.crop.x",
+        "850",
+        "--ocr.crop.y",
+        "0",
+        "--ocr.crop.h",
+        "30",
+        "--ocr.crop.w",
+        "650",
+        "--ocr.invert",
+        "True",
+        "--log_level",
+        "DEBUG",
+    )
 
     assert ret.returncode == 0
     assert "{'ocr_field': 'Forward'}" in ret.stdout
