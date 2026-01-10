@@ -107,7 +107,7 @@ See [OCR](ocr.md) for explanation and examples.
 
 ## Home Assistant Integration
 
-See [Home Assistant Integration](home_assistant.md) for configuration and example notification automation.
+See [Home Assistant Integration](homeassistant.md) for configuration and example notification automation.
 
 ## Distribution
 
