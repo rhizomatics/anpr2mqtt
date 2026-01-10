@@ -116,6 +116,7 @@ def main_loop() -> None:
                 event_config=event_config,
                 device_creation=settings.homeassistant.device_creation,
             )
+            log.info("Publishing %s %s state to %s", event_config.event, event_config.camera, state_topic)
         except Exception as e:
             log.error("Failed to schedule event %s %s watchdog: %s", event_config.event, event_config.camera, e)
 
