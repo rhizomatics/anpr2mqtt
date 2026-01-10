@@ -1,0 +1,41 @@
+# IDE
+.vscode/
+.idea/
+data/
+
+# Python virtual environments
+.venv/
+venv/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Build artifacts
+*.egg-info/
+dist/
+build/
+cov.xml
+lcov.info
+.coverage
+junit/
+.cache/
+site/
+
+# macOS
+.DS_Store
+
+# Coverage
+.coverage
+htmlcov/
+
+# uv (keep uv.lock in version control)
+.python-version
+
+examples/mine.yaml

@@ -1,0 +1,23 @@
+
+---
+log_level: debug
+camera: driveway
+file_system:
+  watch_path: /ftp/Driveway
+mqtt:
+  host: 192.168.1.100
+  user: anpr2mqtt
+  password: topsecret901
+plates:
+  known:
+    TJ912UKL: joe's mini
+    P001PAT: Postman
+    AM40PRM: Amazon Prime Delivery
+  dangerous:
+    B4DM3N: Rural watch reported vehicle
+  correction:
+    UN001TST:
+      - UN\d+1TST
+      - UN001TSK
+  ignore:
+    - ^I\dZ$ # mis-read of tanker logo

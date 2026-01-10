@@ -1,0 +1,96 @@
+site_name: ANPR2MQTT
+site_url: 'https://anpr2mqtt.rhizomatics.org.uk'
+site_description: Simple ANPR Camera Integration using File System and MQTT
+
+repo_name: rhizomatics/anpr2mqtt
+repo_url: https://github.com/rhizomatics/anpr2mqtt
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  highlightjs: true
+  language: en
+  logo: assets/images/logo-blank-256x256.png
+  icon:
+    repo: fontawesome/brands/github
+  features:
+    - content.action.edit
+    - content.action.view
+    - content.code.copy
+    - content.code.select
+    - content.code.annotate
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - navigation.path
+    - navigation.indexes
+    - navigation.top
+    - search.suggest
+    - search
+    - search.share
+    - toc.follow
+    - toc.integrate
+
+extra:
+  version:
+    provider: mike
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/rhizomatics
+
+plugins:
+  - search
+  - autorefs
+  - pagetree
+  - optimize
+  - tags
+  - meta-descriptions
+  - social:
+      cards_layout_options:
+        logo: docs/assets/images/icon.png
+        background_image: docs/assets/images/logo-dim-social-640x320.png
+        background_color: transparent
+  - mike:
+      alias_type: symlink
+      canonical_version: latest
+      version_selector: true
+  - minify:
+      minify_html: true
+  - git-revision-date-localized:
+      enable_creation_date: true
+      type: timeago
+  - coverage:
+      page_path: developer/coverage
+      html_report_dir: htmlcov
+  - mkdocstrings:
+      handlers:
+      # See: https://mkdocstrings.github.io/python/usage/
+        python:
+          options:
+            show_source: false
+            show_root_heading: true
+            summary: true
+            show_inheritance_diagram: true
+            docstring_section_style: spacy
+
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - attr_list
+  - md_in_html
+  - pymdownx.blocks.caption
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - toc:
+      permalink: true
+  - sane_lists
+  - pymdownx.snippets:
+      check_paths: true

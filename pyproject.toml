@@ -1,0 +1,189 @@
+[project]
+name = "anpr2mqtt"
+version = "0.4.1"
+description = "ANPR MQTT bridge for Home Assistant"
+authors = [
+    { name = "jey burrows", email = "jrb@rhizomatics.org.uk" }
+]
+
+readme = "README.md"
+requires-python = ">=3.13"
+license="Apache-2.0"
+dependencies = [
+    "paho-mqtt>=2.1.0",
+    "pillow>=12.0.0",
+    "pytesseract>=0.3.13",
+    "structlog>=25.4.0",
+    "rich>=14.0.0",
+    "watchdog>=6.0.0",
+    "tzlocal>=5.3.1",
+    "usingversion>=0.1.2",
+    "hishel[httpx]>=1.1.7",
+    "pydantic-settings>=2.12.0",
+]
+
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "License :: Other/Proprietary License",
+    "Natural Language :: English",
+    "Operating System :: OS Independent",
+    "Environment :: Console",
+    "Topic :: Home Automation",
+    "Topic :: System :: Monitoring",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: Apache Software License",
+    "Typing :: Typed",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3.13"
+]
+
+
+[project.scripts]
+anpr2mqtt = "anpr2mqtt:run"
+tools = "anpr2mqtt:tools"
+
+[tool.uv]
+compile-bytecode = true
+managed = true
+
+[tool.uv.build-backend]
+namespace = true
+module-name = "anpr2mqtt"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.13.0",
+    "pre-commit>=4.4.0",
+    "pytest>=8.0.0",
+    "pytest-mock>=3.15.0",
+    "pytest-mqtt>=0.6.0",
+    "pre-commit>=3.0.0",
+    "ruff>=0.5.0",
+    "mypy>=1.11.0",
+    "pytest-cov",
+     "coverage",
+    "icdiff",
+    "genbadge[all]",
+    "pytest-httpx"
+]
+docs=[
+    "mkdocs-material>=9.7.1",
+    "pillow>=12.0", # mkdocs-material[imaging] has elderly pillow demand
+    "cairosvg~=2.6", # mkdocs-material[imaging]
+    "mkdocstrings",
+    "mkdocstrings-python",
+    "mkdocs-minify-plugin",
+    "mkdocs-material-extensions",
+    "pymdown-extensions",
+    "mkdocs-autorefs",
+    "mkdocs-coverage",
+    "mkdocs-pagetree-plugin",
+    "mkdocs",
+    "mkdocs-git-revision-date-localized-plugin",
+    "mkdocs-minify-html-plugin",
+    "mkdocs-meta-descriptions-plugin",
+    "mike"
+]
+[build-system]
+requires = ["uv_build>=0.9.18,<0.10.0"]
+build-backend = "uv_build"
+
+[mypy]
+plugins = "pydantic.mypy"
+
+[tool.bandit]
+exclude_dirs = ["tests"]
+
+[tool.ruff]
+line-length = 128
+indent-width = 4
+target-version = "py313"
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".ipynb_checkpoints",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pyenv",
+    ".pytest_cache",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    ".vscode",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "htmlcov",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".github",
+    "node_modules",
+    "site-packages",
+    "venv",
+]
+
+[tool.ruff.lint]
+select = ["E", "C","R", "F", "B", "W", "I", "C90", "N", "D", "UP", "YTT", 
+    "RUF","PGH","PT","T20","DTZ","TD","PTH","ARG","INT","TCH","TID","SIM","PERF","ASYNC","ANN","S","A","COM","C4"]
+ignore = [
+    "W191","E111","E114","E117","D206","D300","Q000","Q001","COM812","COM819","ISC001","ISC002", # std formatter conflicts
+    "D203","D213", # other formatter clashes
+    "TD002","TD003","TD005",
+    "D103","D100","D101","D102","D104","D107","D415","D400","D415","ANN401",
+    "S101","C901","FURB113",
+    "S602","S607","S404" ] # subprocess usage
+unfixable = ["B"]
+
+
+[tool.ruff.format]
+# Like Black, use double quotes for strings.
+quote-style = "double"
+
+# Like Black, indent with spaces, rather than tabs.
+indent-style = "space"
+
+# Like Black, respect magic trailing commas.
+skip-magic-trailing-comma = false
+
+# Like Black, automatically detect the appropriate line ending.
+line-ending = "auto"
+
+
+[tool.pytest.ini_options]
+testpaths = [
+    "tests",
+]
+norecursedirs = [
+    ".git",
+    "templates",
+]
+
+pythonpath = [
+  "."
+]
+addopts = "--junitxml=junit/test-results.xml --cov --cov-report=lcov:lcov.info --cov-report=xml --cov-report=html --cov-report=term --import-mode=importlib"
+
+[tool.coverage.run]
+branch = true
+source = ["src"]
+
+[tool.coverage.report]
+fail_under=0
+
+[tool.coverage.xml]
+output="cov.xml"
+
+[tool.coverage.html]
+directory="htmlcov"
+
+[tool.mypy]
+mypy_path=["./src","./tests"]
