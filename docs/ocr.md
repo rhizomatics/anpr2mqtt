@@ -3,7 +3,7 @@
 Any number of textual fields can be scanned from the image. By default this happens for `vehicle_direction` as in this
 Hikvision example.
 
-[OCR Direction Example](assets/images/ocr-example.png){width=600}
+![OCR Direction Example](assets/images/ocr-example.png){width=600}
 
 Each field can have optional permitted values (`Unknown` returned if none of them found) and a set of corrections
 to handle occasional OCR errors, where corrections are simple strings or regular expressions.
