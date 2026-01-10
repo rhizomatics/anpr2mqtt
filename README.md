@@ -91,7 +91,7 @@ Example: `20180502174029596_A2GEO_VEHICLE_DETECTION.jpg`
 Where cameras provide an estimated direction for the vehicle, this can be captured via OCR and
 included in the response.
 
-See [OCR][ocr.md] for explanation and examples.
+See [OCR](ocr.md) for explanation and examples.
 
 ## Primary Dependencies
 
