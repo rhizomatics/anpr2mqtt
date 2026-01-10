@@ -109,8 +109,8 @@ There are 3 separate types of MQTT topic used for HomeAssisstant integration:
     - A topic is created per camera, with a name like `homeassistant/sensor/camera/anpr/config`. 
     - The `homeassistant` topic prefix can also be configured.
 - *State* to report the last plate seen and attributes
-    - `anpr/camera_name/state`
-    - `anpr/camera_name/image`
+    - `anpr2mqtt/camera_name/state`
+    - `anpr2mqtt/camera_name/image`
 
 
 ## Verifying it Works

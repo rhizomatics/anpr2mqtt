@@ -58,7 +58,6 @@ docker run -d \
   -e MQTT_PORT=1883 \
   -e MQTT_USER=username \
   -e MQTT_PASS=password \
-  -e MQTT_TOPIC=anpr/driveway \
   anpr2mqtt
 ```
 ## Configuration

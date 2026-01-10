@@ -62,7 +62,6 @@ docker run -d \
   -e MQTT_PORT=1883 \
   -e MQTT_USER=user \
   -e MQTT_PASS=pass \
-  -e MQTT_TOPIC=anpr/driveway \
   anpr2mqtt
 ```
 
