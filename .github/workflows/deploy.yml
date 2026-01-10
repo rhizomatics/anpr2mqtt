@@ -21,7 +21,7 @@ jobs:
       with:
         branch-name: badges
     - name: Install uv
-      uses: astral-sh/setup-uv@v7
+      uses: astral-sh/setup-uv@61cb8a9741eeb8a550a1b8544337180c0fc8476b
     - name: "Set up Python"
       uses: actions/setup-python@v6
       with:
@@ -62,7 +62,7 @@ jobs:
       run:  uv pip compile pyproject.toml -o requirements_docs.txt --group docs
 
     - name: Deploy docs
-      uses: mhausenblas/mkdocs-deploy-gh-pages@master
+      uses: mhausenblas/mkdocs-deploy-gh-pages@d77dd03172e96abbcdb081d8c948224762033653
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         EXTRA_PACKAGES: pngquant
