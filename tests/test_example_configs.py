@@ -15,6 +15,6 @@ def test_load_yaml(config_name: str) -> None:
     config_path = pathlib.Path(EXAMPLES_ROOT) / config_name
 
     settings = YamlConfigSettingsSource(Settings, config_path)
-    pass
+
     assert settings()["mqtt"]["password"] is not None
     assert settings()["file_system"]["watch_path"] is not None
