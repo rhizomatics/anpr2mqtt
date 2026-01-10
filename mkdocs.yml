@@ -10,7 +10,7 @@ theme:
   name: material
   highlightjs: true
   language: en
-  logo: images/anpr2mqtt-dark-256x256.png
+  logo: assets/images/anpr2mqtt-dark-256x256.png
   icon:
     repo: fontawesome/brands/github
   features:

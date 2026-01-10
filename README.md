@@ -1,4 +1,4 @@
-![anpr2mqtt](images/anpr2mqttdark-256x256.png){ align=left }
+![anpr2mqtt](assets/images/anpr2mqttdark-256x256.png){ align=left }
 
 # anpr2mqtt
 
