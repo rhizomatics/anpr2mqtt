@@ -29,7 +29,9 @@ A simple way to integrate CCTV cameras with built-in ANPR (Automatic Number Plat
     - Auto-discovery configuration for Home Assistant
     - Creates [MQTT Image Entity](https://www.home-assistant.io/integrations/image.mqtt/) on Home Assistant for image snapshot, so no web access to ftp needed
 * Plate Enrichment
-    - OCR-based direction detection (Forward/Reverse) using [tesseract-ocr](https://github.com/tesseract-ocr/tesseract)
+    - OCR-based extraction of fields using [tesseract-ocr](https://github.com/tesseract-ocr/tesseract)
+        - By default direction detection (Forward/Reverse) 
+        - Corrections by regular expression to fix OCR mis-readings
     - Tracks and counts previous sightings
     - Configurable to classify plates as known, to be ignored or as a potential threat
     - Regular expression based corrections, for known plates that the ANPR sometimes mis-reads
