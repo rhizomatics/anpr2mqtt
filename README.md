@@ -9,7 +9,7 @@
 [![Coverage](https://raw.githubusercontent.com/rhizomatics/anpr2mqtt/refs/heads/badges/badges/coverage.svg)](https://anpr2mqtt.rhizomatics.org.uk/developer/coverage/)
 ![Tests](https://raw.githubusercontent.com/rhizomatics/anpr2mqtt/refs/heads/badges/badges/tests.svg)
 [![pre-commit.ci status](https://results.pre-commit.ci/badge/github/rhizomatics/anpr2mqtt/main.svg)](https://results.pre-commit.ci/latest/github/rhizomatics/anpr2mqtt/main)
-[![Github Deploy](https://github.com/rhizomatics/anpr2mqtt/actions/workflows/python-package.yml/badge.svg?branch=main)](https://github.com/rhizomatics/anpr2mqtt/actions/workflows/python-package.yml)
+[![Github Deploy](https://github.com/rhizomatics/anpr2mqtt/actions/workflows/deploy.yml/badge.svg?branch=main)](https://github.com/rhizomatics/anpr2mqtt/actions/workflows/deploy.yml)
 [![CodeQL](https://github.com/rhizomatics/anpr2mqtt/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/rhizomatics/anpr2mqtt/actions/workflows/github-code-scanning/codeql)
 [![Dependabot Updates](https://github.com/rhizomatics/anpr2mqtt/actions/workflows/dependabot/dependabot-updates/badge.svg)](https://github.com/rhizomatics/anpr2mqtt/actions/workflows/dependabot/dependabot-updates)
 
