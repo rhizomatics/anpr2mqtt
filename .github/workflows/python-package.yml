@@ -23,7 +23,9 @@ jobs:
       with:
         python-version-file: "pyproject.toml"
     - name: Install dependencies
-      run: uv sync --locked --all-extras --dev
+      run: |
+        sudo apt-get install tesseract-ocr-eng libyaml-dev 
+        uv sync --locked --all-extras --dev
        
     - name: Ruff
       uses:  astral-sh/ruff-action@v3
