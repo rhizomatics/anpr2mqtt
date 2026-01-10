@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import structlog
@@ -8,10 +9,11 @@ from pydantic_settings import (
     CliApp,
     CliPositionalArg,
     CliSubCommand,
+    SettingsConfigDict,
 )
 
-from anpr2mqtt.event_handler import determine_anpr_direction, examine_file
-from anpr2mqtt.settings import FileSystemSettings, OCRSettings
+from anpr2mqtt.event_handler import examine_file, scan_ocr_fields
+from anpr2mqtt.settings import FileSystemSettings, OCRFieldSettings, OCRSettings
 
 if TYPE_CHECKING:
     from anpr2mqtt.const import ImageInfo
@@ -20,15 +22,19 @@ log = structlog.get_logger()
 
 
 class OCRTool(BaseModel):
-    file_system: FileSystemSettings
-    ocr: OCRSettings = OCRSettings()
+    file_system: FileSystemSettings | None = None
+    ocr: OCRFieldSettings | None = None
     image_file: CliPositionalArg[str]
 
     def cli_cmd(self) -> None:
-        coordinates: list[int] | None = [int(v) for v in self.ocr.direction_box.split(",")] if self.ocr.direction_box else None
-        image: Image.Image | None = Image.open(self.file_system.watch_path / self.image_file)
+        image_path: Path = self.file_system.watch_path if self.file_system is not None else Path()
+        image: Image.Image | None = Image.open(image_path / self.image_file)
+        if self.ocr is not None:
+            ocr_settings: OCRSettings = OCRSettings(fields={"test": self.ocr})
+        else:
+            ocr_settings = OCRSettings()
         if image:
-            print(determine_anpr_direction(image, coordinates))  # noqa: T201
+            print(scan_ocr_fields(image, ocr_settings))  # noqa: T201
         else:
             print("Image can't be loaded")  # noqa: T201
 
@@ -44,6 +50,12 @@ class ListTool(BaseModel):
 
 
 class Tools(BaseSettings, cli_parse_args=True, cli_exit_on_error=True):
+    model_config = SettingsConfigDict(
+        yaml_file="/config/anpr2mqtt.yaml",
+        env_nested_delimiter="__",
+        env_ignore_empty=True,
+        cli_avoid_json=True,
+    )
     ocr_file: CliSubCommand[OCRTool]
     list_dir: CliSubCommand[ListTool]
 

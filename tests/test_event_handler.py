@@ -1,6 +1,5 @@
 import datetime as dt
 import json
-import re
 from pathlib import Path
 from unittest.mock import ANY, Mock, call
 
@@ -8,42 +7,24 @@ from PIL import Image
 
 from anpr2mqtt.const import ImageInfo
 from anpr2mqtt.event_handler import EventHandler, process_image
-from anpr2mqtt.settings import DVLASettings, FileSystemSettings, ImageSettings, OCRSettings, PlateSettings, TrackerSettings
 
 
-def test_eventhandler_handles_reg_plate_event(tmp_path: Path) -> None:
-    client = Mock()
-    uut = EventHandler(
-        client,
-        camera="testcam",
-        state_topic="test/topic",
-        image_topic="test/images",
-        dvla_config=DVLASettings(),
-        plate_config=PlateSettings(),
-        image_config=ImageSettings(),
-        tracker_config=TrackerSettings(data_dir=tmp_path),
-        ocr_config=OCRSettings(direction_box="850,0,650,30"),
-        file_system_config=FileSystemSettings(
-            image_url_base="http://127.0.0.1/images",
-            image_name_re=re.compile(r"(?P<dt>[0-9]{17})_(?P<plate>[A-Z0-9]+)_VEHICLE_DETECTION\.(?P<ext>jpg|png|gif|jpeg)"),
-            watch_path=Path("/fixtures"),
-        ),
-    )
+def test_eventhandler_handles_reg_plate_event(event_handler: EventHandler) -> None:
     event = Mock()
     event.src_path = "fixtures/20250602103045407_B4DM3N_VEHICLE_DETECTION.jpg"
     event.event_type = "closed"
     event.is_directory = False
-    uut.on_closed(event)
-    client.publish.assert_has_calls(
+    event_handler.on_closed(event)
+    event_handler.client.publish.assert_has_calls(  # type: ignore[attr-defined]
         [
             call(
                 "test/topic",
                 payload=json.dumps(
                     {
                         "plate": "B4DM3N",
-                        "vehicle_direction": "Forward",
                         "reg_info": None,
-                        "camera": "testcam",
+                        "vehicle_direction": "Forward",
+                        "camera": "test_cam",
                         "event_image_url": "http://127.0.0.1/images/20250602103045407_B4DM3N_VEHICLE_DETECTION.jpg",
                         "file_path": "fixtures/20250602103045407_B4DM3N_VEHICLE_DETECTION.jpg",
                         "orig_plate": "B4DM3N",
@@ -65,44 +46,26 @@ def test_eventhandler_handles_reg_plate_event(tmp_path: Path) -> None:
         ],
         any_order=True,
     )
-    sightings_db_path: Path = tmp_path / "B4DM3N.json"
+    sightings_db_path: Path = event_handler.tracker_config.data_dir / "B4DM3N.json"
     assert sightings_db_path.exists()
     with sightings_db_path.open("r") as f:
         sightings = json.load(f)
         assert sightings == ["2025-06-02T10:30:45.000407+00:00"]
 
 
-def test_eventhandler_copes_with_malformed_reg_plate_event() -> None:
-    client = Mock()
-    uut = EventHandler(
-        client,
-        camera="test_cam",
-        state_topic="test/topic",
-        image_topic="test/images",
-        dvla_config=DVLASettings(),
-        plate_config=PlateSettings(),
-        image_config=ImageSettings(),
-        tracker_config=TrackerSettings(),
-        ocr_config=OCRSettings(direction_box="850,0,650,30"),
-        file_system_config=FileSystemSettings(
-            image_url_base="http://127.0.0.1/images",
-            image_name_re=re.compile(r"(?P<dt>[0-9]{17})_(?P<plate>[A-Z0-9]+)_VEHICLE_DETECTION\.(?P<ext>jpg|png|gif|jpeg)"),
-            watch_path=Path("/fixtures"),
-        ),
-    )
-
+def test_eventhandler_copes_with_malformed_reg_plate_event(event_handler: EventHandler) -> None:
     event = Mock()
     event.src_path = "fixtures/2024110312013232013_P99JHG_VEHICLE_DETECTION.jpeg"
     event.event_type = "closed"
     event.is_directory = False
-    uut.on_closed(event)
-    client.publish.assert_called_once_with(
+    event_handler.on_closed(event)
+    event_handler.client.publish.assert_called_once_with(  # type: ignore[attr-defined]
         "test/topic",
         payload=json.dumps(
             {
                 "plate": "",
-                "vehicle_direction": "Unknown",
                 "reg_info": None,
+                "vehicle_direction": "Unknown",
                 "camera": "test_cam",
                 "event_image_url": "http://127.0.0.1/images/2024110312013232013_P99JHG_VEHICLE_DETECTION.jpeg",
                 "file_path": "fixtures/2024110312013232013_P99JHG_VEHICLE_DETECTION.jpeg",

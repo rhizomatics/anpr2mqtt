@@ -1,5 +1,7 @@
-# 0.4.2
+# 0.5.0
 - Device creation optional
+- Simplified OCR coordinates
+- Flexible OCR field capture
 # 0.4.1
 - Improve CLI handling for tools
 - File name parsing now more forgiving of regexp format

@@ -4,10 +4,48 @@ log_level: debug
 camera: driveway
 file_system:
   watch_path: /ftp/Driveway
+  image_name_re: (?P<dt>[0-9]{17})_(?P<plate>[A-Z0-9]+)_VEHICLE_DETECTION\.(?P<ext>jpg|png|gif|jpeg)
+  image_url_base: http://192.168.10.10/CCTV
+
 mqtt:
   host: 192.168.1.100
+  port: 1883
   user: anpr2mqtt
   password: topsecret901
+  topic_root: anpr
+homeassistant:
+  discovery_topic_root: homeassistant
+  device_creation: true
+ocr:
+  fields:
+    vehicle_direction:
+      values: Reverse, Forward
+      invert: true
+      crop: 
+        x: 0
+        y: 850
+        h: 30
+        w: 650
+      correction:
+        Forward:
+        - F.*wd
+        Reverse:
+        - R.*v.*se
+        - Back.*
+image:
+  jpeg_opts:
+    quality: 30
+    progressive: true
+    optimize: true
+  png_opts:
+    quality: 30
+    dpi: "(60, 90)"
+    optimize: true
+tracker:
+  data_dir: /data
+dvla:
+  cache_ttl: 86400
+  api_key: MY6676SECRET787KEY
 plates:
   known:
     TJ912UKL: joe's mini
@@ -21,3 +59,6 @@ plates:
       - UN001TSK
   ignore:
     - ^I\dZ$ # mis-read of tanker logo
+
+
+

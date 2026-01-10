@@ -77,8 +77,8 @@ def post_state_message(
     client: mqtt.Client,
     topic: str,
     plate: str | None,
+    ocr_fields: dict[str, str | None],
     image_info: ImageInfo | None = None,
-    direction: str | None = None,
     camera: str | None = None,
     classification: dict[str, Any] | None = None,
     previous_sightings: int | None = None,
@@ -88,8 +88,8 @@ def post_state_message(
     file_path: Path | None = None,
     reg_info: Any = None,
 ) -> None:
-    payload: dict[str, Any] = {"plate": "", "vehicle_direction": direction or "Unknown", "reg_info": reg_info}
-
+    payload: dict[str, Any] = {"plate": "", "reg_info": reg_info}
+    payload.update(ocr_fields)
     if error:
         payload["error"] = error
     payload["camera"] = camera or "UNKNOWN"

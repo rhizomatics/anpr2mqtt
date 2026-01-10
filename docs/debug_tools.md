@@ -4,20 +4,19 @@ ANPR2MQTT has additional command line options to help debug file system integrat
 
 ## OCR
 
-This will load the image, run the OCR on the (optionally cropped and inverted image) and report the value.
+This will load the image, run the OCR on the (optionally cropped and inverted image) and report the value. It can run either with a configured `anpr2mqtt` setup, or entirely stand-alone. The latter can be useful for quick feedback cycle with a local image and bounding boxes.
 
-In this example, the directory of the image comes from an existing config file or env var.
 
 ```bash
  uv run tools ocr_file 20241230152519495_N74DYX_VEHICLE_DETECTION.jpg
 ```
 
-If there's no config at all, the command can be configured entirely from the command line, and this allows any other defaults to be changed, such as the OCR box
+If there's no config at all, the command can be configured entirely from the command line, and a specific OCR field configured
 
 ```bash
- uv run tools ocr_file --file_system.watch_path /ftp/Driveway --ocr.direction_box 0,100,200,400 20241230152519495_Z374TST_VEHICLE_DETECTION.jpg
+ uv run tools ocr_file  20241230152519495_Z374TST_VEHICLE_DETECTION.jpg --ocr.crop.x 0 --ocr.crop.y 100 --ocr.crop.h 200 --ocr.crop.w 400 --ocr.invert False
  ```
-
+If `file_system.watch_path` can't be resolved from the configuration, then the image will be looked for in the current working directory.
 
 ## Directory Listing
 

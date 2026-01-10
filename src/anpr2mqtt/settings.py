@@ -49,11 +49,33 @@ class ImageSettings(BaseModel):
     png_opts: dict = Field(default={"quality": 30, "dpi": (60, 90), "optimize": True})
 
 
-class OCRSettings(BaseModel):
-    direction_box: str = Field(
-        default="850,0,650,30", description="Box to crop for vehicle direction, horz, vert, width, height"
-    )
+class DimensionSettings(BaseModel):
+    x: int = Field(description="Horizontal position of crop box, measured from image left side")
+    y: int = Field(description="Vertical position of crop box, measured from image bottom side")
+    h: int = Field(description="Height of crop box in pixels")
+    w: int = Field(description="Width of crop box in pixels")
+
+
+class OCRFieldSettings(BaseModel):
+    crop: DimensionSettings | None
     invert: bool = True
+    correction: dict[str, list[re.Pattern | str]] = Field(default_factory=lambda: {})
+    values: list[str] | None = None
+
+
+class OCRSettings(BaseModel):
+    """Defaults for reading `direction` for the Hikvision DS-2CD4A25FWD-IZS"""
+
+    fields: dict[str, OCRFieldSettings] = Field(
+        default_factory=lambda: {
+            "vehicle_direction": OCRFieldSettings(
+                invert=True,
+                crop=DimensionSettings(x=850, y=0, h=30, w=650),
+                values=["Forward", "Reverse"],
+                correction={"Forward": [r"Fo.*rd"], "Reverse": [r"Re.*rse", r"Bac.*rd"]},
+            )
+        }
+    )
 
 
 class PlateSettings(BaseModel):
@@ -69,7 +91,7 @@ class Settings(BaseSettings):
         yaml_file="/config/anpr2mqtt.yaml",
         env_nested_delimiter="__",
         env_ignore_empty=True,
-        cli_avoid_json=True,
+        cli_avoid_json=False,
     )
 
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"

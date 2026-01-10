@@ -16,7 +16,14 @@ from watchdog.events import DirCreatedEvent, FileClosedEvent, FileCreatedEvent, 
 from anpr2mqtt.api_client import DVLA, APIClient
 from anpr2mqtt.const import ImageInfo
 from anpr2mqtt.hass import post_image_message, post_state_message
-from anpr2mqtt.settings import DVLASettings, FileSystemSettings, ImageSettings, OCRSettings, PlateSettings, TrackerSettings
+from anpr2mqtt.settings import (
+    DVLASettings,
+    FileSystemSettings,
+    ImageSettings,
+    OCRSettings,
+    PlateSettings,
+    TrackerSettings,
+)
 
 log = structlog.get_logger()
 
@@ -50,19 +57,7 @@ class EventHandler(RegexMatchingEventHandler):
         if file_system_config.image_url_base:
             log.info("Images available from web server with prefix %s", file_system_config.image_url_base)
         self.image_topic: str | None = image_topic
-        self.coordinates: list[int] | None = (
-            [int(v) for v in ocr_config.direction_box.split(",")] if ocr_config.direction_box else None
-        )
-        if self.coordinates:
-            log.debug(
-                "Configured to crop image to (x,y)=%s,%s with width %s and height %s",
-                self.coordinates[0],
-                self.coordinates[1],
-                self.coordinates[2],
-                self.coordinates[3],
-            )
-        else:
-            log.debug("Image uncropped for direction checking")
+
         if dvla_config.api_key:
             log.info("Configured gov API lookup")
             self.api_client: APIClient | None = DVLA(dvla_config.api_key, cache_ttl=dvla_config.cache_ttl)
@@ -95,6 +90,8 @@ class EventHandler(RegexMatchingEventHandler):
             if self.file_system_config.image_url_base and file_path
             else None
         )
+        ocr_fields: dict[str, str | None] = dict.fromkeys(self.ocr_config.fields, "Unknown")
+
         try:
             image_info: ImageInfo | None = examine_file(file_path, self.file_system_config.image_name_re)
             if image_info is not None:
@@ -105,10 +102,8 @@ class EventHandler(RegexMatchingEventHandler):
                     file_path.absolute(), image_info, jpeg_opts=self.image_config.jpeg_opts, png_opts=self.image_config.png_opts
                 )
 
-                if image and self.coordinates:
-                    direction: str | None = determine_anpr_direction(image, self.coordinates, self.ocr_config.invert)
-                else:
-                    direction = None
+                if image and self.ocr_config:
+                    ocr_fields = scan_ocr_fields(image, self.ocr_config)
 
                 classification: dict[str, Any] = self.classify_plate(plate)
                 if classification["plate"] != plate:
@@ -131,7 +126,7 @@ class EventHandler(RegexMatchingEventHandler):
                     self.state_topic,
                     plate=plate,
                     image_info=image_info,
-                    direction=direction,
+                    ocr_fields=ocr_fields,
                     classification=classification,
                     previous_sightings=visit_count,
                     last_sighting=last_seen,
@@ -151,6 +146,7 @@ class EventHandler(RegexMatchingEventHandler):
                 post_state_message(
                     self.client,
                     self.state_topic,
+                    ocr_fields=ocr_fields,
                     plate=None,
                     url=url,
                     camera=self.camera,
@@ -159,7 +155,15 @@ class EventHandler(RegexMatchingEventHandler):
 
         except Exception as e:
             log.error("Failed to parse file event %s: %s", event, e, exc_info=1)
-            post_state_message(self.client, self.state_topic, plate=None, camera=self.camera, error=str(e), file_path=file_path)
+            post_state_message(
+                self.client,
+                self.state_topic,
+                plate=None,
+                ocr_fields=ocr_fields,
+                camera=self.camera,
+                error=str(e),
+                file_path=file_path,
+            )
 
     def track_plate(self, plate: str, event_dt: dt.datetime | None) -> tuple[int, dt.datetime | None]:
         plate = plate or "UNKNOWN"
@@ -276,48 +280,68 @@ def examine_file(file_path: Path, image_name_re: re.Pattern) -> ImageInfo | None
     return None
 
 
-def determine_anpr_direction(image: Image.Image, coordinates: list[int] | None, invert: bool = True) -> str:
+def scan_ocr_fields(image: Image.Image, ocr_config: OCRSettings) -> dict[str, str | None]:
+    results: dict[str, str | None] = {}
     try:
         width, height = image.size
-
-        """
-        The Python Imaging Library uses a Cartesian pixel coordinate system, with (0,0) in the upper left corner.
-        Note that the coordinates refer to the implied pixel corners; the centre of a pixel addressed as (0, 0)
-        actually lies at (0.5, 0.5).
-
-        Coordinates are usually passed to the library as 2-tuples (x, y).
-        Rectangles are represented as 4-tuples, (x1, y1, x2, y2), with the upper left corner given first.
-        """
-        if coordinates:
-            x1: int = coordinates[0]  # top-left x
-            y1: int = height - coordinates[3]  # top-left y [ 0 == top of image]
-            x2: int = x1 + coordinates[2]  # bottom-right x
-            y2: int = height - coordinates[1]  # bottom-right y [ 0 == top of image]
-            log.debug("Cropping %s by %s image using PIL to %s", height, width, (x1, y1, x2, y2))
-            # region = im.crop((850, height - 30, 1500, height)) "850,30,650,30"
-            region: Image.Image = image.crop((x1, y1, x2, y2))
-        else:
-            log.debug("No image crop")
-            region = image
-        if invert:
-            region = PIL.ImageOps.invert(region)
-        txt = pytesseract.image_to_string(region, config=r"")
-        log.debug("Tesseract found text %s", txt)
-        parsed = txt.split(":", 1)
-        if len(parsed) > 1:
-            candidate: str = parsed[1].strip()
-            if candidate in ("Forward", "Reverse"):
-                return candidate
-            if re.match(r"Fo.*rd", candidate, flags=re.IGNORECASE):  # codespell:ignore
-                log.debug("Auto-correcting %s", candidate)
-                return "Forward"
-            if re.match(r"Bac.*rd", candidate, flags=re.IGNORECASE) or re.match(r"Revers.*", candidate, flags=re.IGNORECASE):
-                log.debug("Auto-correcting %s", candidate)
-                return "Reverse"
-            log.warning("Unmatched direction: %s", candidate)
-        else:
-            log.warning("Unparsable direction: %s", txt)
-        return "Unknown"
     except Exception as e:
-        log.error("OCR fail on image:%s", e, exc_info=1)
-        return "Error"
+        log.error("OCR fail loading image:%s", e)
+        results["IMAGE_ERROR"] = str(e)
+        return results
+
+    """
+    The Python Imaging Library uses a Cartesian pixel coordinate system, with (0,0) in the upper left corner.
+    Note that the coordinates refer to the implied pixel corners; the centre of a pixel addressed as (0, 0)
+    actually lies at (0.5, 0.5).
+
+    Coordinates are usually passed to the library as 2-tuples (x, y).
+    Rectangles are represented as 4-tuples, (x1, y1, x2, y2), with the upper left corner given first.
+    """
+    for field_name, field_settings in ocr_config.fields.items():
+        try:
+            if field_settings.crop:
+                x1: int = field_settings.crop.x  # top-left x
+                y1: int = height - (field_settings.crop.y + field_settings.crop.h)  # top-left y [ 0 == top of image]
+                x2: int = x1 + field_settings.crop.w  # bottom-right x
+                y2: int = height - field_settings.crop.y  # bottom-right y [ 0 == top of image]
+                log.debug("Cropping %s by %s image using PIL to %s", height, width, (x1, y1, x2, y2))
+                # region = im.crop((850, height - 30, 1500, height)) "850,30,650,30"
+                region: Image.Image = image.crop((x1, y1, x2, y2))
+            else:
+                log.debug("No image crop")
+                region = image
+            if field_settings.invert:
+                region = PIL.ImageOps.invert(region)
+            txt = pytesseract.image_to_string(region, config=r"")
+            if txt:
+                log.debug("Tesseract found text %s", txt)
+                parsed: list[str] = txt.split(":", 1)
+            else:
+                log.debug("Tesseract found nothing")
+                parsed = []
+
+            if len(parsed) > 1:
+                candidate: str = parsed[1].strip()
+                if field_settings.correction and candidate not in field_settings.correction:
+                    for correct_to, correct_patterns in field_settings.correction.items():
+                        if any(re.match(pat, candidate) for pat in correct_patterns):
+                            log.debug("Auto-correcting %s from %s to %s", field_name, candidate, correct_to)
+                            candidate = correct_to
+                if candidate and field_settings.values:
+                    for v in field_settings.values:
+                        if candidate.upper() == v.upper():
+                            log.debug("OCR case correcting field %s from %s to %s", field_name, candidate, v)
+                            candidate = v
+                if field_settings.values is None or candidate in field_settings.values:
+                    results[field_name] = candidate
+                else:
+                    log.warning("Unknown value %s for OCR field %s", candidate, field_name)
+                    results[field_name] = "Unknown"
+            else:
+                log.warning("Unparsable field %s: %s", field_name, txt)
+
+        except Exception as e:
+            log.error("OCR fail on image:%s", e, exc_info=1)
+            results["OCR_ERROR"] = f"field:{field_name}, error:{e}"
+
+    return results

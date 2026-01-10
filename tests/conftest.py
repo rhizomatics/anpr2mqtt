@@ -6,7 +6,16 @@ from unittest.mock import Mock
 import pytest
 
 from anpr2mqtt.event_handler import EventHandler
-from anpr2mqtt.settings import DVLASettings, FileSystemSettings, ImageSettings, OCRSettings, PlateSettings, TrackerSettings
+from anpr2mqtt.settings import (
+    DimensionSettings,
+    DVLASettings,
+    FileSystemSettings,
+    ImageSettings,
+    OCRFieldSettings,
+    OCRSettings,
+    PlateSettings,
+    TrackerSettings,
+)
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -15,7 +24,7 @@ def set_tz_env_variable() -> None:
 
 
 @pytest.fixture
-def event_handler() -> EventHandler:
+def event_handler(tmp_path: Path) -> EventHandler:
     return EventHandler(
         Mock(),
         camera="test_cam",
@@ -24,8 +33,10 @@ def event_handler() -> EventHandler:
         dvla_config=DVLASettings(),
         plate_config=PlateSettings(),
         image_config=ImageSettings(),
-        tracker_config=TrackerSettings(),
-        ocr_config=OCRSettings(direction_box="850,0,650,30"),
+        tracker_config=TrackerSettings(data_dir=tmp_path),
+        ocr_config=OCRSettings(
+            fields={"vehicle_direction": OCRFieldSettings(invert=True, crop=DimensionSettings(x=850, y=0, h=30, w=650))}
+        ),
         file_system_config=FileSystemSettings(
             image_url_base="http://127.0.0.1/images",
             image_name_re=re.compile(r"(?P<dt>[0-9]{17})_(?P<plate>[A-Z0-9]+)_VEHICLE_DETECTION\.(?P<ext>jpg|png|gif|jpeg)"),
