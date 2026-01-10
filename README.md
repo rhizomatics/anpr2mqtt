@@ -1,3 +1,20 @@
+![anpr2mqtt](images/anpr2mqttdark-256x256.png){ align=left }
+
+# anpr2mqtt
+
+[![Rhizomatics Open Source](https://img.shields.io/badge/rhizomatics%20open%20source-lightseagreen)](https://github.com/rhizomatics)
+
+
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/rhizomatics/anpr2mqtt)
+[![Coverage](https://raw.githubusercontent.com/rhizomatics/anpr2mqtt/refs/heads/badges/badges/coverage.svg)](https://anpr2mqtt.rhizomatics.org.uk/developer/coverage/)
+![Tests](https://raw.githubusercontent.com/rhizomatics/anpr2mqtt/refs/heads/badges/badges/tests.svg)
+[![pre-commit.ci status](https://results.pre-commit.ci/badge/github/rhizomatics/anpr2mqtt/main.svg)](https://results.pre-commit.ci/latest/github/rhizomatics/anpr2mqtt/main)
+[![Publish Python 🐍 distribution 📦 to PyPI and TestPyPI](https://github.com/rhizomatics/anpr2mqtt/actions/workflows/pypi-publish.yml/badge.svg)](https://github.com/rhizomatics/anpr2mqtt/actions/workflows/pypi-publish.yml)
+[![Github Deploy](https://github.com/rhizomatics/anpr2mqtt/actions/workflows/python-package.yml/badge.svg?branch=main)](https://github.com/rhizomatics/anpr2mqtt/actions/workflows/python-package.yml)
+[![CodeQL](https://github.com/rhizomatics/anpr2mqtt/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/rhizomatics/anpr2mqtt/actions/workflows/github-code-scanning/codeql)
+[![Dependabot Updates](https://github.com/rhizomatics/anpr2mqtt/actions/workflows/dependabot/dependabot-updates/badge.svg)](https://github.com/rhizomatics/anpr2mqtt/actions/workflows/dependabot/dependabot-updates)
+
+
 # ANPR MQTT Bridge
 
 A simple way to integrate CCTV cameras with built-in ANPR (Automatic Number Plate Recognition, aka Automatic Licence Plate Recognitio) to MQTT for Home Assistant integration, or any other MQTT consumer. All that is needed is for the camera to
