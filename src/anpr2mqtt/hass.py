@@ -9,6 +9,7 @@ import structlog
 from PIL import Image
 
 import anpr2mqtt
+from anpr2mqtt.settings import EventSettings
 
 from .const import ImageInfo
 
@@ -20,10 +21,11 @@ def post_discovery_message(
     discovery_topic_prefix: str,
     state_topic: str,
     image_topic: str,
-    camera: str,
+    event_config: EventSettings,
     device_creation: bool = True,
 ) -> None:
-    topic = f"{discovery_topic_prefix}/sensor/{camera}/anpr/config"
+    topic = f"{discovery_topic_prefix}/sensor/{event_config.camera}/{event_config.event}/config"
+    name: str = event_config.description or f"{event_config.event} {event_config.camera}"
     payload: dict[str, Any] = {
         "o": {
             "name": "anpr2mqtt",
@@ -31,24 +33,19 @@ def post_discovery_message(
             "url": "https://anpt2mqtt.rhizomatics.org.uk",
         },
         "device_class": None,
-        "value_template": "{{ value_json.plate }}",
-        "unique_id": f"anpr_{camera}",
+        "value_template": "{{ value_json.target }}",
+        "unique_id": f"{event_config.event}_{event_config.camera}",
         "state_topic": state_topic,
         "json_attributes_topic": state_topic,
         "icon": "mdi:car-back",
-        "name": f"ANPR {camera} Plate",
+        "name": name,
     }
     if device_creation:
-        payload["dev"] = {
-            "name": f"anpr2mqtt on {camera}",
-            "sw_version": anpr2mqtt.version,  # pyright: ignore[reportAttributeAccessIssue]
-            "manufacturer": "rhizomatics",
-            "identifiers": [f"{camera}.anpr2mqtt"],
-        }
+        add_device_info(payload, event_config)
     client.publish(topic, payload=json.dumps(payload), qos=0, retain=True)
     log.info("Published HA MQTT sensor Discovery message to %s", topic)
 
-    topic = f"{discovery_topic_prefix}/image/{camera}/anpr/config"
+    topic = f"{discovery_topic_prefix}/image/{event_config.camera}/{event_config.event}/config"
     payload = {
         "o": {
             "name": "anpr2mqtt",
@@ -56,30 +53,36 @@ def post_discovery_message(
             "url": "https://anpt2mqtt.rhizomatics.org.uk",
         },
         "device_class": None,
-        "unique_id": f"anpr_{camera}",
+        "unique_id": f"{event_config.event}_{event_config.camera}",
         "image_topic": image_topic,
         "json_attributes_topic": state_topic,
         "icon": "mdi:car-back",
-        "name": f"ANPR {camera} Snapshot",
+        "name": name,
     }
     if device_creation:
-        payload["dev"] = {
-            "name": f"anpr2mqtt on {camera}",
-            "sw_version": anpr2mqtt.version,  # pyright: ignore[reportAttributeAccessIssue]
-            "manufacturer": "rhizomatics",
-            "identifiers": [f"{camera}.anpr2mqtt"],
-        }
+        add_device_info(payload, event_config)
     client.publish(topic, payload=json.dumps(payload), qos=0, retain=True)
     log.info("Published HA MQTT Discovery message to %s", topic)
+
+
+def add_device_info(payload: dict[str, Any], event_config: EventSettings) -> None:
+    payload["dev"] = {
+        "name": f"anpr2mqtt on {event_config.camera}",
+        "sw_version": anpr2mqtt.version,  # pyright: ignore[reportAttributeAccessIssue]
+        "manufacturer": "rhizomatics",
+        "identifiers": [f"{event_config.event}_{event_config.camera}.anpr2mqtt"],
+    }
+    if event_config.area:
+        payload["dev"]["suggested_area"] = event_config.area
 
 
 def post_state_message(
     client: mqtt.Client,
     topic: str,
-    plate: str | None,
+    target: str | None,
+    event_config: EventSettings,
     ocr_fields: dict[str, str | None],
     image_info: ImageInfo | None = None,
-    camera: str | None = None,
     classification: dict[str, Any] | None = None,
     previous_sightings: int | None = None,
     last_sighting: dt.datetime | None = None,
@@ -88,11 +91,18 @@ def post_state_message(
     file_path: Path | None = None,
     reg_info: Any = None,
 ) -> None:
-    payload: dict[str, Any] = {"plate": "", "reg_info": reg_info}
+    payload: dict[str, Any] = {
+        "target": target,
+        "target_type": event_config.target_type,
+        event_config.target_type: target,
+        "event": event_config.event,
+        "camera": event_config.camera or "UNKNOWN",
+        "area": event_config.area,
+        "reg_info": reg_info,
+    }
     payload.update(ocr_fields)
     if error:
         payload["error"] = error
-    payload["camera"] = camera or "UNKNOWN"
     if url is not None:
         payload["event_image_url"] = url
     if file_path is not None:
@@ -109,7 +119,7 @@ def post_state_message(
             payload.update(
                 {
                     "event_time": image_info.timestamp.isoformat(),
-                    "plate": plate,
+                    "image_event": image_info.event,
                     "ext": image_info.ext,
                     "image_size": image_info.size,
                 }

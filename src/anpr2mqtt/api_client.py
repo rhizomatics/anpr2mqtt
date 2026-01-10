@@ -1,5 +1,5 @@
 import re
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import structlog
 from hishel.httpx import SyncCacheClient
@@ -39,7 +39,7 @@ class DVLA(APIClient):
                 if response.extensions.get("hishel_from_cache"):
                     log.debug("DVLA API cached response")
                 if response.status_code == 200:
-                    return response.json()
+                    return cast("dict[str,Any]", response.json())
 
                 log.error("DVLA API FAIL: %s", response.json())
                 return {"api_errors": response.json()["errors"], "api_status": response.status_code}

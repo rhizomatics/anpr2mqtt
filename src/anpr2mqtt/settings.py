@@ -1,6 +1,6 @@
 import re
 from pathlib import Path
-from typing import Literal
+from typing import Final, Literal
 
 from pydantic import BaseModel, Field
 from pydantic_settings import (
@@ -12,22 +12,32 @@ from pydantic_settings import (
     YamlConfigSettingsSource,
 )
 
+TARGET_TYPE_PLATE: Final[str] = "plate"
+
 
 class MQTTSettings(BaseModel):
-    topic_root: str = "anpr"
+    topic_root: str = "anpr2mqtt"
     host: str = Field(default="localhost", description="MQTT broker IP address or hostname")
     port: int = Field(default=1883, description="MQTT broker port number")
     user: str
     password: str = Field(alias="pass", description="MQTT account password")
 
 
-class FileSystemSettings(BaseModel):
-    watch_path: Path = Field(default=Path("/ftp"), description="File system directory to watch")
+class EventSettings(BaseModel):
+    camera: str = Field(default="driveway", description="Camera Identifier, used to build MQTT topic names")
+    event: str = Field(default="anpr", description="Identifier of the event, used in MQTT topic description")
+    area: str | None = Field(default=None, description="Home Assistant area ID")
+    description: str | None = Field(default=None, description="Free text description of event")
+    target_type: str = Field(default="plate", description="Type of target for this event, 'plate' if ANPR")
+    watch_path: Path = Field(default=Path(), description="File system directory to watch")
     image_name_re: re.Pattern[str] = Field(
-        default=re.compile(r"(?P<dt>[0-9]{17})_(?P<plate>[A-Z0-9]+)_VEHICLE_DETECTION\.(?P<ext>jpg|png|gif|jpeg)"),
-        description="Regular expression to find date and plate from image name",
+        default=re.compile(r"(?P<dt>[0-9]{17})_(?P<target>[A-Z0-9]+)_(?P<event>VEHICLE_DETECTION)\.(?P<ext>jpg|png|gif|jpeg)"),
+        description="Regular expression to find datetime, file extension and target from image name",
     )
     image_url_base: str | None = Field(default=None, description="Base URL to turn a file name into a web link")
+    ocr_field_ids: list[str] = Field(
+        default_factory=lambda: ["hik_direction"], description="OCR field definitions to find in image"
+    )
 
 
 class HomeAssistantSettings(BaseModel):
@@ -57,7 +67,8 @@ class DimensionSettings(BaseModel):
 
 
 class OCRFieldSettings(BaseModel):
-    crop: DimensionSettings | None
+    label: str = "ocr_field"
+    crop: DimensionSettings | None = None
     invert: bool = True
     correction: dict[str, list[re.Pattern | str]] = Field(default_factory=lambda: {})
     values: list[str] | None = None
@@ -68,7 +79,8 @@ class OCRSettings(BaseModel):
 
     fields: dict[str, OCRFieldSettings] = Field(
         default_factory=lambda: {
-            "vehicle_direction": OCRFieldSettings(
+            "hik_direction": OCRFieldSettings(
+                label="vehicle_direction",
                 invert=True,
                 crop=DimensionSettings(x=850, y=0, h=30, w=650),
                 values=["Forward", "Reverse"],
@@ -78,7 +90,7 @@ class OCRSettings(BaseModel):
     )
 
 
-class PlateSettings(BaseModel):
+class TargetSettings(BaseModel):
     known: dict[str, str | None] = Field(default_factory=lambda: {})
     dangerous: dict[str, str | None] = Field(default_factory=lambda: {})
     ignore: list[str] = Field(default_factory=list)
@@ -95,15 +107,14 @@ class Settings(BaseSettings):
     )
 
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
-    camera: str = "anpr"
+    events: list[EventSettings] = Field(default_factory=lambda: [])
     image: ImageSettings = ImageSettings()
-    plates: PlateSettings = PlateSettings()
+    targets: dict[str, TargetSettings] = Field(default_factory=lambda: {})
     tracker: TrackerSettings = TrackerSettings()
     mqtt: MQTTSettings
     dvla: DVLASettings = DVLASettings()
     homeassistant: HomeAssistantSettings = HomeAssistantSettings()
     ocr: OCRSettings = OCRSettings()
-    file_system: FileSystemSettings = FileSystemSettings()
 
     @classmethod
     def settings_customise_sources(

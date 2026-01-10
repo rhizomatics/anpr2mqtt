@@ -7,8 +7,10 @@ import structlog
 from paho.mqtt.enums import CallbackAPIVersion, MQTTErrorCode
 from paho.mqtt.properties import Properties
 from paho.mqtt.reasoncodes import ReasonCode
+from pydantic_settings import CliApp
 from watchdog.observers import Observer
 
+import anpr2mqtt
 from anpr2mqtt.event_handler import EventHandler
 from anpr2mqtt.hass import post_discovery_message
 from anpr2mqtt.settings import Settings
@@ -47,23 +49,22 @@ def on_disconnect(
         log.warning("Disconnect failure from broker", result_code=rc)
 
 
-def run() -> None:
+def main_loop() -> None:
     """Watch a directory, post any matching files to MQTT after optionally analyzing the image"""
     structlog.configure(wrapper_class=structlog.make_filtering_bound_logger(logging.INFO))
     settings: Settings = Settings()  # type: ignore[call-arg]
     if settings.log_level != "INFO":
         structlog.configure(wrapper_class=structlog.make_filtering_bound_logger(getattr(logging, str(settings.log_level))))
-    log.info("ANPR2MQTT Starting up")
-    log.info(
-        "ANPR2MQRR %s known vehicles, %s alert vehicles, %s corrections, %s ignore patterns",
-        len(settings.plates.known),
-        len(settings.plates.dangerous),
-        len(settings.plates.correction),
-        len(settings.plates.ignore),
-    )
+    log.info("ANPR2MQTT %s starting up", anpr2mqtt.version)  # pyright: ignore[reportAttributeAccessIssue]
+    for target_type in settings.targets:
+        log.info(
+            "ANPR2MQTT %s known vehicles, %s alert vehicles, %s corrections, %s ignore patterns",
+            len(settings.targets[target_type].known),
+            len(settings.targets[target_type].dangerous),
+            len(settings.targets[target_type].correction),
+            len(settings.targets[target_type].ignore),
+        )
 
-    state_topic = f"{settings.mqtt.topic_root}/{settings.camera}/state"
-    image_topic = f"{settings.mqtt.topic_root}/{settings.camera}/image"
     client: mqtt.Client
     try:
         client = mqtt.Client(
@@ -78,38 +79,45 @@ def run() -> None:
         log.info("Client connection requested", result_code=rc)
         client.loop_start()
         log.info(f"Connected to MQTT at {settings.mqtt.host}:{settings.mqtt.port} as {settings.mqtt.user}")
-        log.info(f"Publishing at {settings.mqtt.topic_root}/{settings.camera}")
-        post_discovery_message(
-            client,
-            settings.homeassistant.discovery_topic_root,
-            state_topic=state_topic,
-            image_topic=image_topic,
-            camera=settings.camera,
-            device_creation=settings.homeassistant.device_creation,
-        )
+        log.info(f"Publishing at {settings.mqtt.topic_root}")
+
     except Exception as e:
         log.error("Failed to connect to MQTT: %s", e, exc_info=1)
         sys.exit(-500)
 
     try:
-        event_handler = EventHandler(
-            client=client,
-            camera=settings.camera,
-            state_topic=state_topic,
-            image_topic=image_topic,
-            file_system_config=settings.file_system,
-            plate_config=settings.plates,
-            ocr_config=settings.ocr,
-            image_config=settings.image,
-            dvla_config=settings.dvla,
-            tracker_config=settings.tracker,
-        )  # ty:ignore[invalid-argument-type]
         observer = Observer()
-        log.debug("Scheduling watchdog for %s", settings.file_system.watch_path)
-        observer.schedule(event_handler, str(settings.file_system.watch_path), recursive=False)  # ty:ignore[invalid-argument-type]
     except Exception as e:
         log.error("Failed to setup file system watchdog: %s", e)
         sys.exit(-400)
+
+    for event_config in settings.events:
+        try:
+            state_topic = f"{settings.mqtt.topic_root}/{event_config.event}/{event_config.camera}/state"
+            image_topic = f"{settings.mqtt.topic_root}/{event_config.event}/{event_config.camera}/image"
+            event_handler = EventHandler(
+                client=client,
+                event_config=event_config,
+                state_topic=state_topic,
+                image_topic=image_topic,
+                target_config=settings.targets.get(event_config.target_type),
+                ocr_config=settings.ocr,
+                image_config=settings.image,
+                dvla_config=settings.dvla,
+                tracker_config=settings.tracker,
+            )  # ty:ignore[invalid-argument-type]
+            log.debug("Scheduling watchdog for %s", event_config.watch_path)
+            observer.schedule(event_handler, str(event_config.watch_path), recursive=False)  # ty:ignore[invalid-argument-type]
+            post_discovery_message(
+                client,
+                settings.homeassistant.discovery_topic_root,
+                state_topic=state_topic,
+                image_topic=image_topic,
+                event_config=event_config,
+                device_creation=settings.homeassistant.device_creation,
+            )
+        except Exception as e:
+            log.error("Failed to schedule event %s %s watchdog: %s", event_config.event, event_config.camera, e)
 
     observer.start()
     try:
@@ -126,4 +134,8 @@ def run() -> None:
 
 class Anpr2MQTT(Settings):
     def cli_cmd(self) -> None:
-        run()
+        main_loop()
+
+
+def run() -> None:
+    CliApp.run(model_cls=Anpr2MQTT)

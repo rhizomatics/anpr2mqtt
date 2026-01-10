@@ -4,7 +4,8 @@ from dataclasses import dataclass
 
 @dataclass
 class ImageInfo:
-    plate: str
+    target: str
+    event: str | None
     timestamp: datetime.datetime
     ext: str | None
     size: int

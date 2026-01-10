@@ -16,7 +16,9 @@
 
 # ANPR MQTT Bridge
 
-A simple way to integrate CCTV cameras with built-in ANPR (Automatic Number Plate Recognition, aka Automatic Licence Plate Recognition) to MQTT for Home Assistant integration, or any other MQTT consumer. All that is needed is for the camera to be configured to upload images on plate recognition, by ftp, NAS or whatever else. ANPR2MQTT monitors the directory where the images lands and publishes plate information to MQTT.
+A simple way to integrate CCTV cameras with built-in **ANPR** (**Automatic Number Plate Recognition**, aka **ALPR** or **Automatic Licence Plate Recognition**) to MQTT for Home Assistant integration, or any other MQTT consumer. All that is needed is for the camera to be configured to upload images on plate recognition, by ftp, NAS or whatever else. ANPR2MQTT monitors the directory where the images lands and publishes plate information to MQTT.
+
+While intended for vehicle plate detection, it can be used to watch for and analyze any file, so for example uploaded face detection or line crossing images.
 
 ## Features
 
@@ -71,11 +73,9 @@ environment variables in config sections. For example, `MQTT__HOST` means set th
 |-------------------------------|-------------|---------|
 | `MQTT__HOST`                  | MQTT broker hostname | `localhost` |
 | `MQTT__PORT`                  | MQTT broker port | `1883` |
-| `MQTT__TOPIC_ROOT`            | MQTT topic for events | `anpr/driveway` |
+| `MQTT__TOPIC_ROOT`            | MQTT topic for events | `anpr2mqtt` |
 | `MQTT__USER`                  | MQTT username | - |
 | `MQTT__PASS`                  | MQTT password | - |
-| `FILE_SYSTEM__WATCH_PATH`     | Directory to watch | - |
-| `FILE_SYSTEM__IMAGE_URL_BASE` | Optional HTTP Base URL to prepend to file name | - |
 | `LOG_LEVEL`                   | Python logging level | INFO |
 | `DVLA__API_KEY`               | API Key for Gov API Lookup | - |
 

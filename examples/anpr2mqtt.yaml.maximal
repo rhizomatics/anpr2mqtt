@@ -1,10 +1,23 @@
 
 ---
 log_level: debug
-camera: driveway
-file_system:
+
+events:
+- camera: driveway
+  area: driveway
+  event: anpr
+  description: Vehicle identified at driveway camera
   watch_path: /ftp/Driveway
-  image_name_re: (?P<dt>[0-9]{17})_(?P<plate>[A-Z0-9]+)_VEHICLE_DETECTION\.(?P<ext>jpg|png|gif|jpeg)
+  image_name_re: (?P<dt>[0-9]{17})_(?P<target>[A-Z0-9]+)_(?P<event>VEHICLE_DETECTION)\.(?P<ext>jpg|png|gif|jpeg)
+  image_url_base: http://192.168.10.10/CCTV
+  ocr_field_ids:
+    - hik_direction
+- camera: shed
+  area: back_garden
+  event: line_crossing
+  watch_path: /ftp/shedcam
+  description: Entry to back garden gate
+  image_name_re: (?P<dt>[0-9]{17})_(?P<event>LINE_CROSSING)\.(?P<ext>jpg|png|gif|jpeg)
   image_url_base: http://192.168.10.10/CCTV
 
 mqtt:
@@ -12,26 +25,26 @@ mqtt:
   port: 1883
   user: anpr2mqtt
   password: topsecret901
-  topic_root: anpr
+  topic_root: anpr2mqtt
 homeassistant:
   discovery_topic_root: homeassistant
   device_creation: true
 ocr:
-  fields:
-    vehicle_direction:
-      values: Reverse, Forward
-      invert: true
-      crop: 
-        x: 0
-        y: 850
-        h: 30
-        w: 650
-      correction:
-        Forward:
-        - F.*wd
-        Reverse:
-        - R.*v.*se
-        - Back.*
+  hik_direction:
+    label: vehicle_direction
+    values: Reverse, Forward
+    invert: true
+    crop: 
+      x: 0
+      y: 850
+      h: 30
+      w: 650
+    correction:
+      Forward:
+      - F.*wd
+      Reverse:
+      - R.*v.*se
+      - Back.*
 image:
   jpeg_opts:
     quality: 30
@@ -46,19 +59,20 @@ tracker:
 dvla:
   cache_ttl: 86400
   api_key: MY6676SECRET787KEY
-plates:
-  known:
-    TJ912UKL: joe's mini
-    P001PAT: Postman
-    AM40PRM: Amazon Prime Delivery
-  dangerous:
-    B4DM3N: Rural watch reported vehicle
-  correction:
-    UN001TST:
-      - UN\d+1TST
-      - UN001TSK
-  ignore:
-    - ^I\dZ$ # mis-read of tanker logo
+targets:
+  plate:
+    known:
+      TJ912UKL: joe's mini
+      P001PAT: Postman
+      AM40PRM: Amazon Prime Delivery
+    dangerous:
+      B4DM3N: Rural watch reported vehicle
+    correction:
+      UN001TST:
+        - UN\d+1TST
+        - UN001TSK
+    ignore:
+      - ^I\dZ$ # mis-read of tanker logo
 
 
 

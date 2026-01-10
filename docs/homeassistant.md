@@ -6,27 +6,34 @@
 
 ## Attributes
 
-Both the `sensor` and `image` attributes have the same extensive set of attributes
+Both the `sensor` and `image` attributes have the same extensive set of attributes.
 
-| Attribute          | Example                                                      |
-|--------------------|--------------------------------------------------------------|
-| plate              | J23TST                                                       |
-| vehicle_direction  | Forward                                                      |
-| reg_info           | null                                                         |
-| camera             | driveway                                                     |
-| file_path          | /ftp/Driveway/20260108141528320_J23TST_VEHICLE_DETECTION.jpg |
+The target value will also appear in a field named after `target_type`, for example, `plate` for
+easier to read Home Assistant automations.
+
+| Attribute          | Example                                                                                |
+|--------------------|----------------------------------------------------------------------------------------|
+| target             | J23TST                                                                                 |
+| target_type        | plate                                                                                  |
+| `target_type`      | J23TST                                                                                 |
+| vehicle_direction  | Forward                                                                                |
+| reg_info           | null                                                                                   |
+| area               | driveway                                                                               |
+| camera             | drivewacam                                                                             |
+| file_path          | /ftp/Driveway/20260108141528320_J23TST_VEHICLE_DETECTION.jpg                           |
 | event_image_url    | http://192.168.10.10/cctv//ftp/Driveway/20260108141528320_J23TST_VEHICLE_DETECTION.jpg |
-| orig_plate         | J23TST                                                       |
-| ignore             | false                                                        |
-| known              | true                                                         |
-| dangerous          | false                                                        |
-| priority           | medium                                                       |
-| description        | Amazon Prime                                                 |
-| previous_sightings | 15                                                           |
-| last_sighting      | 2026-01-08T14:15:28.000319+00:00                             |
-| event_time         | 2026-01-08T14:15:28.000320+00:00                             |
-| ext                | jpg                                                          |
-| image_size         | 124907                                                       |
+| orig_plate         | J23TST                                                                                 |
+| ignore             | false                                                                                  |
+| known              | true                                                                                   |
+| dangerous          | false                                                                                  |
+| priority           | medium                                                                                 |
+| description        | Amazon Prime                                                                           |
+| previous_sightings | 15                                                                                     |
+| last_sighting      | 2026-01-08T14:15:28.000319+00:00                                                       |
+| event_time         | 2026-01-08T14:15:28.000320+00:00                                                       |
+| image_event        | VEHICLE DETECTION                                                                      |
+| ext                | jpg                                                                                    |
+| image_size         | 124907                                                                                 |
 
 The `reg_info` will be populated with the licence plate API lookup, for example UK DVLA,
 if provided.

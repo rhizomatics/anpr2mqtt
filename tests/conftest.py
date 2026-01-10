@@ -9,11 +9,11 @@ from anpr2mqtt.event_handler import EventHandler
 from anpr2mqtt.settings import (
     DimensionSettings,
     DVLASettings,
-    FileSystemSettings,
+    EventSettings,
     ImageSettings,
     OCRFieldSettings,
     OCRSettings,
-    PlateSettings,
+    TargetSettings,
     TrackerSettings,
 )
 
@@ -27,19 +27,27 @@ def set_tz_env_variable() -> None:
 def event_handler(tmp_path: Path) -> EventHandler:
     return EventHandler(
         Mock(),
-        camera="test_cam",
         state_topic="test/topic",
         image_topic="test/images",
         dvla_config=DVLASettings(),
-        plate_config=PlateSettings(),
+        target_config=TargetSettings(),
         image_config=ImageSettings(),
         tracker_config=TrackerSettings(data_dir=tmp_path),
         ocr_config=OCRSettings(
-            fields={"vehicle_direction": OCRFieldSettings(invert=True, crop=DimensionSettings(x=850, y=0, h=30, w=650))}
+            fields={
+                "test_direction": OCRFieldSettings(
+                    label="vehicle_direction", invert=True, crop=DimensionSettings(x=850, y=0, h=30, w=650)
+                )
+            }
         ),
-        file_system_config=FileSystemSettings(
+        event_config=EventSettings(
+            camera="test_cam",
+            event="unit_testing",
             image_url_base="http://127.0.0.1/images",
-            image_name_re=re.compile(r"(?P<dt>[0-9]{17})_(?P<plate>[A-Z0-9]+)_VEHICLE_DETECTION\.(?P<ext>jpg|png|gif|jpeg)"),
+            image_name_re=re.compile(
+                r"(?P<dt>[0-9]{17})_(?P<target>[A-Z0-9]+)_(?P<event>VEHICLE_DETECTION)\.(?P<ext>jpg|png|gif|jpeg)"
+            ),
             watch_path=Path("/fixtures"),
+            ocr_field_ids=["test_direction"],
         ),
     )

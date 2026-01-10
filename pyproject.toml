@@ -1,6 +1,6 @@
 [project]
 name = "anpr2mqtt"
-version = "0.5.0"
+version = "0.6.0"
 description = "ANPR MQTT bridge for Home Assistant"
 authors = [
     { name = "jey burrows", email = "jrb@rhizomatics.org.uk" }
@@ -64,7 +64,8 @@ dev = [
      "coverage",
     "icdiff",
     "genbadge[all]",
-    "pytest-httpx"
+    "pytest-httpx",
+    "pytest-shell-utilities"
 ]
 docs=[
     "mkdocs-material>=9.7.1",

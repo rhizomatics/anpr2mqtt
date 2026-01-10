@@ -1,51 +1,52 @@
 ---
 log_level: debug
 camera: driveway
-file_system:
-  watch_path: /ftp/Driveway
+events:
+  - watch_path: /ftp/Driveway
 mqtt:
   host: 10.111.10.111
   user: anpr2mqtt
   password: secret987
-plates:
-  known:
-    SP19TCY: jey's outlander
-    SL13UKK: wendy's subaru
-    KW12UKD: postman's wee red van
-    KU15ETA: postman's wee red van
-    KV62GJJ: postman's wee red van
-    KN62MRX: postman's wee red van
-    WP60HMK: postman's wee red van
-    KV14ZKZ: postman's wee red van
-    KN62LTK: postman's wee red van
-    BG25TZH: postman's wee red van
-    KN62MRV: other postman's wee red van
-    KR66YZP: the other postman's wee red van
-    WR16NKX: Builders van
-    SP59DTU: Builder's wee lorry
-    KW12VZR: Postman
-    NL64RYK: neil's polo
-    SB18LLF: David Eadie
-    LC21OYR: Amazon Prime
-  dangerous:
-    SF67MZU: White long wheel based van seen in Ayrshire farm thefts Dec 20
-    YF09UGN: Black Prius reported by renfrewshire rural watch
-    YM11DTF: Dodgy fiat ducato from seen locally
-    SH05FTY: White Transit van reported by renfrewshire rural watch
-    SD55KHZ: Light blue small Fiat reported by renfrewshire rural watch
-    WX70GVN: White Mitsubushi Shogun reported by renfrewshire rural watch
-  correction:
-    KW12UKD:
-      - K\d+2UKD
-      - KW12KD
-    SP19TCY:
-      - SP9TCY
-    BG25TZH:
-      - \w?G25TZH
-    LD71HVF:
-      - \w?D71HVF
-    LC21OYR:
-      - LC210YR
-  ignore:
-    - ^I\dZ$
-    - ^I\dSX$
+targets:
+  plates:
+    known:
+      SP19TCY: jey's outlander
+      SL13UKK: wendy's subaru
+      KW12UKD: postman's wee red van
+      KU15ETA: postman's wee red van
+      KV62GJJ: postman's wee red van
+      KN62MRX: postman's wee red van
+      WP60HMK: postman's wee red van
+      KV14ZKZ: postman's wee red van
+      KN62LTK: postman's wee red van
+      BG25TZH: postman's wee red van
+      KN62MRV: other postman's wee red van
+      KR66YZP: the other postman's wee red van
+      WR16NKX: Builders van
+      SP59DTU: Builder's wee lorry
+      KW12VZR: Postman
+      NL64RYK: neil's polo
+      SB18LLF: David Eadie
+      LC21OYR: Amazon Prime
+    dangerous:
+      SF67MZU: White long wheel based van seen in Ayrshire farm thefts Dec 20
+      YF09UGN: Black Prius reported by renfrewshire rural watch
+      YM11DTF: Dodgy fiat ducato from seen locally
+      SH05FTY: White Transit van reported by renfrewshire rural watch
+      SD55KHZ: Light blue small Fiat reported by renfrewshire rural watch
+      WX70GVN: White Mitsubushi Shogun reported by renfrewshire rural watch
+    correction:
+      KW12UKD:
+        - K\d+2UKD
+        - KW12KD
+      SP19TCY:
+        - SP9TCY
+      BG25TZH:
+        - \w?G25TZH
+      LD71HVF:
+        - \w?D71HVF
+      LC21OYR:
+        - LC210YR
+    ignore:
+      - ^I\dZ$
+      - ^I\dSX$

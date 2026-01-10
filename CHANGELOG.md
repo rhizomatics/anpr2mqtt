@@ -1,3 +1,8 @@
+# 0.6.0
+- Multiple events now supported, e.g. face detection or line crossing
+- OCR field definitions can be reused across events, or different crop definitions for the same value
+  - For example, `vehicle_direction` could have different bounding boxes, or even values, on different cameras
+- Suggested area provided for Home Assistant Device if configured
 # 0.5.0
 - Home Assistant Device creation optional
 - Simplified OCR coordinates

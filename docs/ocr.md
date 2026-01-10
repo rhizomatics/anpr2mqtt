@@ -23,22 +23,24 @@ Use the [OCR Tool](debug_tools.md#ocr) for quick tests of configuration with a l
 
 The configuration for this can be in the `anpr2mqtt.yaml` file, or in environment variables or command line arguments.
 
+In this example `hik_direction` is the `ocr_field_id` value that can be referenced in an event, and `label` is the
+name of the attribute that will appear in the Home Asssitant entity attributes.
 
 ```yaml
 ocr:
-  fields:
-    vehicle_direction:
-      values: Reverse, Forward
-      invert: true
-      crop: 
-        x: 0
-        y: 850
-        h: 30
-        w: 650
-      correction:
-        Forward:
-        - F.*wd
-        Reverse:
-        - R.*v.*se
-        - Back.*
+  hik_direction:
+    label: vehicle_direction
+    values: Reverse, Forward
+    invert: true
+    crop: 
+      x: 0
+      y: 850
+      h: 30
+      w: 650
+    correction:
+      Forward:
+      - F.*wd
+      Reverse:
+      - R.*v.*se
+      - Back.*
 ```

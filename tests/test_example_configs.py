@@ -17,4 +17,4 @@ def test_load_yaml(config_name: str) -> None:
     settings = YamlConfigSettingsSource(Settings, config_path)
 
     assert settings()["mqtt"]["password"] is not None
-    assert settings()["file_system"]["watch_path"] is not None
+    assert settings()["events"][0]["watch_path"] is not None

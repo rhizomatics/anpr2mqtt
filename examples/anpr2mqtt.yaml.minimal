@@ -1,6 +1,6 @@
 ---
-file_system:
-  watch_path: /ftp/hikcam2
+events:
+  - watch_path: /ftp/hikcam2
 mqtt:
   user: anpr2mqtt
   password: secret987
