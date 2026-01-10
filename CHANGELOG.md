@@ -1,5 +1,5 @@
 # 0.5.0
-- Device creation optional
+- Home Assistant Device creation optional
 - Simplified OCR coordinates
 - Flexible OCR field capture
 # 0.4.1
