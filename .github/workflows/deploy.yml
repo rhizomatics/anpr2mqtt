@@ -17,7 +17,7 @@ jobs:
     steps:
     - uses: actions/checkout@v6
     - name: Create Orphan Branch
-      uses: action-badges/create-orphan-branch@0.1.1
+      uses: action-badges/create-orphan-branch@ad8308a8dded1b6a359b067044b6d2b9bc81d810
       with:
         branch-name: badges
     - name: Install uv
@@ -32,7 +32,7 @@ jobs:
         uv sync --locked --all-extras --dev
        
     - name: Ruff
-      uses:  astral-sh/ruff-action@v3
+      uses:  astral-sh/ruff-action@57714a7c8a2e59f32539362ba31877a1957dded1
     - name: Test with pytest
       run: uv run pytest tests
     - name: Build a binary wheel and a source tarball
