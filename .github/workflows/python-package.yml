@@ -1,0 +1,67 @@
+# This workflow will install Python dependencies, run tests and lint with a variety of Python versions
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
+
+name: Github Deploy
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+    - uses: actions/checkout@v6
+    - name: Install uv
+      uses: astral-sh/setup-uv@v7
+    - name: "Set up Python"
+      uses: actions/setup-python@v6
+      with:
+        python-version-file: "pyproject.toml"
+    - name: Install dependencies
+      run: uv sync --locked --all-extras --dev
+       
+    - name: Ruff
+      uses:  astral-sh/ruff-action@v3
+    - name: Test with pytest
+      run: uv run pytest tests
+    - name: Build a binary wheel and a source tarball
+      run: uv build
+    - name: Generate badges
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        uv run genbadge coverage -i cov.xml -o badges/coverage.svg
+        uv run genbadge tests -i junit/test-results.xml -o badges/tests.svg
+
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        TEMP_DIR=$(mktemp -d)
+        cd $TEMP_DIR
+        git clone --single-branch --branch badges https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git . 2>/dev/null
+        cp -r ${{ github.workspace }}/badges .
+        git add badges
+        if git commit -m "Update badges [skip ci]"; then
+          git push origin badges --force
+          echo "Badges updated successfully"
+        else
+          echo "No changes to badges"
+        fi
+
+    - name: Prep for mkdocs
+      run:  uv pip compile pyproject.toml -o requirements_docs.txt --group docs
+
+    - name: Deploy docs
+      uses: mhausenblas/mkdocs-deploy-gh-pages@master
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        EXTRA_PACKAGES: pngquant
+        REQUIREMENTS: requirements_docs.txt
+        CUSTOM_DOMAIN: anpr2mqtt.rhizomatics.org.uk
+
+
+
