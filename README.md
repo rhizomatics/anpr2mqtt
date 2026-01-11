@@ -20,16 +20,18 @@ A simple way to integrate CCTV cameras with built-in **ANPR** (**Automatic Numbe
 
 All that is needed is for the camera to be configured to upload images on plate recognition, by ftp, NAS or whatever else. ANPR2MQTT monitors the directory where the images lands and publishes plate information to MQTT. Its simple, requires no proprietary vendor APIs ( or differing ONVIF implementations ), and Home Assistant gets a copy of the actual annotated detection image to use on dashboards or to attach to notifications.
 
-While intended for vehicle plate detection, it can be used to watch for and analyze any file, so for example uploaded face detection or line crossing images. A single `anpr2mqtt` instance can watch multiple paths and patterns for
-different cameras and events.
+While intended for vehicle plate detection, it can be used to watch for and analyze any file, so for example uploaded face detection or line crossing images. A single `anpr2mqtt` instance can watch multiple paths and patterns for different cameras and events.
 
 ## Features
 
+* Minimal configuration
+    - Ready configured to work with popular Hikvision ANPR camera settings
+       - See [Example Camera Configuration](camera.md)
 * File System Integration
     - Watches directory for ANPR camera images using [Watchdog](https://python-watchdog.readthedocs.io/en/stable/index.html)
         - Uses [inotify](https://www.man7.org/linux/man-pages/man7/inotify.7.html) on Linux, or equiv on other operating systems for efficient listening to file system events without continual polling
     - Extracts target ( for example licence plate ), timestamp and event type information from filenames
-* Home Assistant Integration. 
+* [Home Assistant Integration](homeassistant.md). 
     - Publishes events to MQTT for Home Assistant as a [MQTT Sensor Entity](https://www.home-assistant.io/integrations/sensor.mqtt/)
     - Auto-discovery configuration for Home Assistant
     - Creates [MQTT Image Entity](https://www.home-assistant.io/integrations/image.mqtt/) on Home Assistant for image snapshot, so no web access to ftp needed
@@ -41,30 +43,22 @@ different cameras and events.
     - Configurable to classify plates as known, to be ignored or as a potential threat
     - Regular expression based corrections, for known plates that the ANPR sometimes mis-reads
     - UK Only
-        - DVLA Lookup if API_KEY provided, for detailed MOT and tax information
+        - [DVLA Lookup](api.md) if API_KEY provided, for detailed MOT and tax information
         - Lookups cached for configurable time
+* [Debug Tools](debug_tools.md) built-in
 
 
 ## Docker Deployment
 
-Build and run with Docker, or use the example [docker-compose.yaml](examples/docker-compose.yaml)
+Build and run with Docker, example [docker-compose.yaml](examples/docker-compose.yaml) provided.
 
-```bash
-docker build -t anpr2mqtt .
-docker run -d \
-  --restart always \
-  -v /path/to/ftp:/ftp \
-  -e MQTT_HOST=your-mqtt-host \
-  -e MQTT_PORT=1883 \
-  -e MQTT_USER=username \
-  -e MQTT_PASS=password \
-  anpr2mqtt
-```
 ## Configuration
 
-ANPR2MQTT uses [pydantic-settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/), which means
-configuration can happen in a variety of ways, and these can be combined - yaml configuration file, environment
-variables, Docker Secrets, built-in defaults, and `.env` file or command line arguments.
+ANPR2MQTT uses [pydantic-settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/), which means configuration can happen in a variety of ways, and these can be combined - yaml configuration file, environment variables, Docker Secrets, built-in defaults, and `.env` file or command line arguments.
+
+## Home Assistant Integration
+
+See [Home Assistant Integration](homeassistant.md) for configuration and example notification automation.
 
 ### Environment Variables
 
@@ -88,26 +82,22 @@ Expected format: `YYYYMMDDHHMMSSmmm_PLATE_VEHICLE_DETECTION.jpg`
 
 Example: `20180502174029596_A2GEO_VEHICLE_DETECTION.jpg`
 
+A regular expression can be defined to match different file name formats.
+
 ## Image Box Coordinates
 
 Where cameras provide an estimated direction for the vehicle, this can be captured via OCR and
-included in the response.
-
-See [OCR](ocr.md) for explanation and examples.
+included in the response. See [OCR](ocr.md) for an explanation and examples.
 
 ## Primary Dependencies
 
+- **watchdog** - File system monitoring (cross-platform)
 - **paho-mqtt** - MQTT client
 - **Pillow** - Image processing
 - **pytesseract** - OCR for direction detection
 - **structlog** - Structured logging
 - **httpx** - API Client
 - **hishel** - API result caching
-- **watchdog** - File system monitoring (cross-platform)
-
-## Home Assistant Integration
-
-See [Home Assistant Integration](homeassistant.md) for configuration and example notification automation.
 
 ## Distribution
 

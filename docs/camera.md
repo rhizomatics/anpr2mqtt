@@ -31,17 +31,17 @@ The server name, user name and password, and upload directory for this ftp are s
 
 Some of the results of the recognition algorithm are available either on the picture and/or as part of the image file name. Direction is one that's only available with this model on the image. Its also possible to play with text colour here, although `anpr2mqtt` will optionally invert the colours pre-scan, so its possible to leave it as white text on black background to be clearer for humans to read.
 
-![Hikvision Image Fields Configuration](assets/images/hik_onscreen_config.png)
+![Hikvision Image Fields Configuration](assets/images/hik_onscreen_config.png){width=500}
 
 The file name format is configurable, it should have the licence plate included and the timestamp to work with the default `anpr2mqtt` regular expression. There's no need to include camera number if there's only one ANPR camera.
 
-![Hikvision ANPR Filename Configuration](assets/images/hik_filename_config.png)
+![Hikvision ANPR Filename Configuration](assets/images/hik_filename_config.png){width=500}
 
 ### Image Settings
 
 The Hikvision camera has a special set of image settings bundled as a **Mounting Scenario**
 
-![Hikvision Mounting Scenario](assets/images//hik_mount_scenario.png)
+![Hikvision Mounting Scenario](assets/images//hik_mount_scenario.png){width=500}
 
 One side-effect of this is that the camera can be practically useless as a general purpose CCTV camera in anything other than very bright conditions if the *Road* Mounting Scenario is chosen.
 
@@ -71,7 +71,7 @@ driveway_cam_normal:
 
 These commands can now be used in Home Assistant automations as actions, triggered by time of day, state of sun etc.
 
-![Home Assistant Automation Example](assets/images/ha_mount_scenario_automation.png)
+![Home Assistant Automation Example](assets/images/ha_mount_scenario_automation.png){width=500}
 
 ### Other Cameras
 
