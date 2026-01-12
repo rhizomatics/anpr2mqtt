@@ -24,16 +24,17 @@ def post_discovery_message(
     event_config: EventSettings,
     device_creation: bool = True,
 ) -> None:
-    topic = f"{discovery_topic_prefix}/sensor/{event_config.camera}/{event_config.event}/config"
+    
     name: str = event_config.description or f"{event_config.event} {event_config.camera}"
     payload: dict[str, Any] = {
         "o": {
             "name": "anpr2mqtt",
             "sw": anpr2mqtt.version,  # pyright: ignore[reportAttributeAccessIssue]
-            "url": "https://anpt2mqtt.rhizomatics.org.uk",
+            "url": "https://anpr2mqtt.rhizomatics.org.uk",
         },
         "device_class": None,
         "value_template": "{{ value_json.target }}",
+        "default_entity_id":f"sensor.{event_config.event}_{event_config.camera}",
         "unique_id": f"{event_config.event}_{event_config.camera}",
         "state_topic": state_topic,
         "json_attributes_topic": state_topic,
@@ -42,18 +43,19 @@ def post_discovery_message(
     }
     if device_creation:
         add_device_info(payload, event_config)
+    topic = f"{discovery_topic_prefix}/sensor/{event_config.camera}/{event_config.event}/config"
     client.publish(topic, payload=json.dumps(payload), qos=0, retain=True)
     log.info("Published HA MQTT sensor Discovery message to %s", topic)
 
-    topic = f"{discovery_topic_prefix}/image/{event_config.camera}/{event_config.event}/config"
     payload = {
         "o": {
             "name": "anpr2mqtt",
             "sw": anpr2mqtt.version,  # pyright: ignore[reportAttributeAccessIssue]
-            "url": "https://anpt2mqtt.rhizomatics.org.uk",
+            "url": "https://anpr2mqtt.rhizomatics.org.uk",
         },
         "device_class": None,
         "unique_id": f"{event_config.event}_{event_config.camera}",
+        "default_entity_id":f"image.{event_config.event}_{event_config.camera}",
         "image_topic": image_topic,
         "json_attributes_topic": state_topic,
         "icon": "mdi:car-back",
@@ -61,6 +63,7 @@ def post_discovery_message(
     }
     if device_creation:
         add_device_info(payload, event_config)
+    topic = f"{discovery_topic_prefix}/image/{event_config.camera}/{event_config.event}/config"
     client.publish(topic, payload=json.dumps(payload), qos=0, retain=True)
     log.info("Published HA MQTT Discovery message to %s", topic)
 
