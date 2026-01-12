@@ -24,7 +24,6 @@ def post_discovery_message(
     event_config: EventSettings,
     device_creation: bool = True,
 ) -> None:
-    
     name: str = event_config.description or f"{event_config.event} {event_config.camera}"
     payload: dict[str, Any] = {
         "o": {
@@ -34,7 +33,7 @@ def post_discovery_message(
         },
         "device_class": None,
         "value_template": "{{ value_json.target }}",
-        "default_entity_id":f"sensor.{event_config.event}_{event_config.camera}",
+        "default_entity_id": f"sensor.{event_config.event}_{event_config.camera}",
         "unique_id": f"{event_config.event}_{event_config.camera}",
         "state_topic": state_topic,
         "json_attributes_topic": state_topic,
@@ -55,7 +54,7 @@ def post_discovery_message(
         },
         "device_class": None,
         "unique_id": f"{event_config.event}_{event_config.camera}",
-        "default_entity_id":f"image.{event_config.event}_{event_config.camera}",
+        "default_entity_id": f"image.{event_config.event}_{event_config.camera}",
         "image_topic": image_topic,
         "json_attributes_topic": state_topic,
         "icon": "mdi:car-back",
