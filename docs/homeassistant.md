@@ -60,7 +60,7 @@ actions:
         {{ trigger.to_state.attributes.description }} with {{
         trigger.to_state.attributes.plate }} spotted at {{
         trigger.to_state.attributes.camera }} camera in an
-        {{ trigger.to_state.attributes.direction }} direction.
+        {{ trigger.to_state.attributes.vehicle_direction }} direction.
 
         {% if trigger.to_state.attributes.previous_sightings == 0 %} 
         Not previously sighted  
