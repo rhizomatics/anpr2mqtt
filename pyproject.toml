@@ -65,6 +65,7 @@ dev = [
     "icdiff",
     "genbadge[all]",
     "pytest-httpx",
+    "pytest-xdist",
     "pytest-shell-utilities"
 ]
 docs=[
