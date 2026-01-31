@@ -4,6 +4,6 @@ Example Docker Compose configuration to run *ANPR2MQTT* as a container. This als
 requires a [.env](env.md), or alternatively adding the environment variables directly into the
 compose file.
 
-``` yaml
+```yaml
 --8<-- "examples/docker-compose.yaml"
 ```

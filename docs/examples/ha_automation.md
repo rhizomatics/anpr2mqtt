@@ -6,6 +6,6 @@ This uses [Supernotify](https://supernotify.rhizomatics.org.uk) to respect prior
 
 It can be adapted to a plain notification by removing the `data` section and changing the `action`. Modern Home Assistant UI allows pasting in yaml to create automations.
 
-``` yaml
+```yaml
 --8<-- "examples/ha_automation.yaml"
 ```
