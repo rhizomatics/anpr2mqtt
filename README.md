@@ -50,7 +50,7 @@ While intended for vehicle plate detection, it can be used to watch for and anal
 
 ## Docker Deployment
 
-Build and run with Docker, example [docker-compose.yaml](examples/docker-compose.yaml) provided.
+Build and run with Docker, example [docker-compose.yaml](examples/docker_compose.md) provided.
 
 ## Configuration
 

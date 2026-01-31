@@ -45,43 +45,7 @@ alerts, such as email with ANPR image attachment, mobile push with the image and
 Frigate page, voice assistant announcement and sounding chimes. It can also be used with any of the built-in notification integrations, though without the same multiple-transport and media handling capabilities.
 
 ```yaml
-alias: Driveway ANPR Alert
-description: ""
-triggers:
-  - trigger: state
-    entity_id:
-      - sensor.driveway_anpr
-conditions: []
-actions:
-  - action: notify.supernotifier
-    metadata: {}
-    data:
-      message: >-
-        {{ trigger.to_state.attributes.description }} with {{
-        trigger.to_state.attributes.plate }} spotted at {{
-        trigger.to_state.attributes.camera }} camera in an
-        {{ trigger.to_state.attributes.vehicle_direction }} direction.
-
-        {% if trigger.to_state.attributes.previous_sightings == 0 %} 
-        Not previously sighted  
-        {% else %}  
-        {{ trigger.to_state.attributes.previous_sightings }} previous sightings,
-        last seen on {{ trigger.to_state.attributes.last_sighting[:10] }} at {{
-        trigger.to_state.attributes.last_sighting[11:16] }}   
-        {% endif %}
-
-        {% if trigger.to_state.attributes.reginfo is defined %}  
-        DVLA info: 
-        {{ trigger.to_state.attributes.reginfo }}  
-        {% endif %}
-      title: >-
-        {{ trigger.to_state.attributes.description }} spotted on {{
-        trigger.to_state.attributes.camera }} camera
-      data:
-        priority: "{{ trigger.to_state.attributes.priority }}"
-        media:
-          camera_entity_id: "image.anpr_{{trigger.to_state.attributes.camera}}"
-          snapshot_url: "{{ trigger.to_state.attributes.event_image_url }}"
+--8<-- "examples/ha_automation.yaml"
 ```
 
 ## Configuration

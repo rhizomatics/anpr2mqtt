@@ -37,4 +37,5 @@ actions:
           - unknown_vehicle
         media:
           camera_entity_id: image.anpr_{{trigger.to_state.attributes.camera}}
+          snapshot_url: "{{ trigger.to_state.attributes.event_image_url }}"
 mode: single
