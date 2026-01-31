@@ -1,3 +1,6 @@
+# 0.6.2
+## Examples
+- Added an example Home Assistant automation to generate notifications using details and priority from MQTT event
 # 0.6.1
 - Log state topic at startup
 # 0.6.0
