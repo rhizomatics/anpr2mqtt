@@ -6,7 +6,7 @@ triggers:
       - sensor.anpr_driveway
 conditions: []
 actions:
-  - action: notify.supernotifier
+  - action: notify.supernotify
     metadata: {}
     data:
       message: >-
