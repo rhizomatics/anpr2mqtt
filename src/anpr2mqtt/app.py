@@ -81,7 +81,7 @@ def main_loop() -> None:
         client.loop_start()
         log.info(f"Connected to MQTT at {settings.mqtt.host}:{settings.mqtt.port} as {settings.mqtt.user}")
         log.info(f"Publishing at {settings.mqtt.topic_root}")
-        publisher = HomeAssistantPublisher(client, "homeassistant.status")
+        publisher = HomeAssistantPublisher(client, settings.homeassistant.status_topic)
 
     except Exception as e:
         log.error("Failed to connect to MQTT: %s", e, exc_info=1)

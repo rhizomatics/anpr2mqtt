@@ -42,6 +42,7 @@ class EventSettings(BaseModel):
 
 class HomeAssistantSettings(BaseModel):
     discovery_topic_root: str = "homeassistant"
+    status_topic: str = "homeassistant/status"
     device_creation: bool = True
 
 
