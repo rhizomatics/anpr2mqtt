@@ -12,7 +12,7 @@ from watchdog.observers import Observer
 
 import anpr2mqtt
 from anpr2mqtt.event_handler import EventHandler
-from anpr2mqtt.hass import post_discovery_message
+from anpr2mqtt.hass import HomeAssistantPublisher
 from anpr2mqtt.settings import Settings
 
 log = structlog.get_logger()
@@ -66,6 +66,7 @@ def main_loop() -> None:
         )
 
     client: mqtt.Client
+    publisher: HomeAssistantPublisher
     try:
         client = mqtt.Client(
             callback_api_version=CallbackAPIVersion.VERSION2,
@@ -80,6 +81,7 @@ def main_loop() -> None:
         client.loop_start()
         log.info(f"Connected to MQTT at {settings.mqtt.host}:{settings.mqtt.port} as {settings.mqtt.user}")
         log.info(f"Publishing at {settings.mqtt.topic_root}")
+        publisher = HomeAssistantPublisher(client, "homeassistant.status")
 
     except Exception as e:
         log.error("Failed to connect to MQTT: %s", e, exc_info=1)
@@ -96,7 +98,7 @@ def main_loop() -> None:
             state_topic = f"{settings.mqtt.topic_root}/{event_config.event}/{event_config.camera}/state"
             image_topic = f"{settings.mqtt.topic_root}/{event_config.event}/{event_config.camera}/image"
             event_handler = EventHandler(
-                client=client,
+                publisher=publisher,
                 event_config=event_config,
                 state_topic=state_topic,
                 image_topic=image_topic,
@@ -108,8 +110,7 @@ def main_loop() -> None:
             )  # ty:ignore[invalid-argument-type]
             log.debug("Scheduling watchdog for %s", event_config.watch_path)
             observer.schedule(event_handler, str(event_config.watch_path), recursive=False)  # ty:ignore[invalid-argument-type]
-            post_discovery_message(
-                client,
+            publisher.post_discovery_message(
                 settings.homeassistant.discovery_topic_root,
                 state_topic=state_topic,
                 image_topic=image_topic,

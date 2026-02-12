@@ -5,7 +5,6 @@ from io import BytesIO
 from pathlib import Path
 from typing import Any
 
-import paho.mqtt.client as mqtt
 import PIL.ImageOps
 import pytesseract
 import structlog
@@ -15,7 +14,7 @@ from watchdog.events import DirCreatedEvent, FileClosedEvent, FileCreatedEvent, 
 
 from anpr2mqtt.api_client import DVLA, APIClient
 from anpr2mqtt.const import ImageInfo
-from anpr2mqtt.hass import post_image_message, post_state_message
+from anpr2mqtt.hass import HomeAssistantPublisher
 from anpr2mqtt.settings import (
     TARGET_TYPE_PLATE,
     DVLASettings,
@@ -33,7 +32,7 @@ log = structlog.get_logger()
 class EventHandler(RegexMatchingEventHandler):
     def __init__(
         self,
-        client: mqtt.Client,
+        publisher: HomeAssistantPublisher,
         state_topic: str,
         image_topic: str,
         event_config: EventSettings,
@@ -46,7 +45,7 @@ class EventHandler(RegexMatchingEventHandler):
         fqre = f"{event_config.watch_path.resolve() / event_config.image_name_re.pattern}"
         super().__init__(regexes=[fqre], ignore_directories=True, case_sensitive=True)
         log.debug("Listening for images matching %s", fqre)
-        self.client: mqtt.Client = client
+        self.publisher = publisher
         self.state_topic: str = state_topic
         self.event_config: EventSettings = event_config
         self.tracker_config: TrackerSettings = tracker_config
@@ -122,8 +121,7 @@ class EventHandler(RegexMatchingEventHandler):
                     log.info("Skipping MQTT publication for ignored %s", target)
                     return
 
-                post_state_message(
-                    self.client,
+                self.publisher.post_state_message(
                     self.state_topic,
                     target=target,
                     event_config=self.event_config,
@@ -140,14 +138,13 @@ class EventHandler(RegexMatchingEventHandler):
                     img_format = image_info.ext.upper() if image_info.ext else None
                     img_format = "JPEG" if img_format == "JPG" else img_format
                     if img_format:
-                        post_image_message(self.client, self.image_topic, image, img_format)
+                        self.publisher.post_image_message(self.image_topic, image, img_format)
                     else:
                         log.warn("Unknown image format for %s", file_path)
             else:
                 ocr_fields = scan_ocr_fields(None, self.event_config, self.ocr_config)
 
-                post_state_message(
-                    self.client,
+                self.publisher.post_state_message(
                     self.state_topic,
                     event_config=self.event_config,
                     ocr_fields=ocr_fields,
@@ -158,8 +155,7 @@ class EventHandler(RegexMatchingEventHandler):
 
         except Exception as e:
             log.error("Failed to parse file event %s: %s", event, e, exc_info=1)
-            post_state_message(
-                self.client,
+            self.publisher.post_state_message(
                 self.state_topic,
                 event_config=self.event_config,
                 target=None,

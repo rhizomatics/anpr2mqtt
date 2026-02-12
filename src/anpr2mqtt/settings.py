@@ -55,8 +55,10 @@ class TrackerSettings(BaseModel):
 
 
 class ImageSettings(BaseModel):
-    jpeg_opts: dict = Field(default={"quality": 30, "progressive": True, "optimize": True})
-    png_opts: dict = Field(default={"quality": 30, "dpi": (60, 90), "optimize": True})
+    jpeg_opts: dict[str, int | bool | float | str | tuple] = Field(
+        default={"quality": 30, "progressive": True, "optimize": True}
+    )
+    png_opts: dict[str, int | bool | float | str | tuple] = Field(default={"quality": 30, "dpi": (60, 90), "optimize": True})
 
 
 class DimensionSettings(BaseModel):

@@ -16,7 +16,7 @@ def test_eventhandler_handles_reg_plate_event(event_handler: EventHandler) -> No
     event.event_type = "closed"
     event.is_directory = False
     event_handler.on_closed(event)
-    event_handler.client.publish.assert_has_calls(  # type: ignore[attr-defined]
+    event_handler.publisher.client.publish.assert_has_calls(  # type: ignore[attr-defined]
         [
             call(
                 "test/topic",
@@ -65,7 +65,7 @@ def test_eventhandler_copes_with_malformed_reg_plate_event(event_handler: EventH
     event.event_type = "closed"
     event.is_directory = False
     event_handler.on_closed(event)
-    event_handler.client.publish.assert_called_once_with(  # type: ignore[attr-defined]
+    event_handler.publisher.client.publish.assert_called_once_with(  # type: ignore[attr-defined]
         "test/topic",
         payload=json.dumps(
             {

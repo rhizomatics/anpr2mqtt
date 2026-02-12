@@ -6,6 +6,7 @@ from unittest.mock import Mock
 import pytest
 
 from anpr2mqtt.event_handler import EventHandler
+from anpr2mqtt.hass import HomeAssistantPublisher
 from anpr2mqtt.settings import (
     DimensionSettings,
     DVLASettings,
@@ -26,7 +27,7 @@ def set_tz_env_variable() -> None:
 @pytest.fixture
 def event_handler(tmp_path: Path) -> EventHandler:
     return EventHandler(
-        Mock(),
+        HomeAssistantPublisher(Mock(), "status_test_topic"),
         state_topic="test/topic",
         image_topic="test/images",
         dvla_config=DVLASettings(),
