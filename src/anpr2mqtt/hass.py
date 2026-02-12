@@ -22,6 +22,7 @@ class HomeAssistantPublisher:
     def __init__(self, client: mqtt.Client, hass_status_topic: str) -> None:
         self.client = client
         self.hass_status_topic = hass_status_topic
+        log.info("Subscribing to Home Assistant birth and last will at %s", self.hass_status_topic)
         self.client.subscribe(self.hass_status_topic)
         self.client.on_message = self.on_message
         self.client.on_subscribe = self.on_subscribe
