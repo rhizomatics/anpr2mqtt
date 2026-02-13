@@ -4,7 +4,7 @@ from typing import Any
 
 import paho.mqtt.client as mqtt
 import structlog
-from paho.mqtt.enums import CallbackAPIVersion, MQTTErrorCode
+from paho.mqtt.enums import CallbackAPIVersion, MQTTErrorCode, MQTTProtocolVersion
 from paho.mqtt.properties import Properties
 from paho.mqtt.reasoncodes import ReasonCode
 from pydantic_settings import CliApp
@@ -67,11 +67,24 @@ def main_loop() -> None:
 
     client: mqtt.Client
     publisher: HomeAssistantPublisher
+    protocol: MQTTProtocolVersion
+    if settings.mqtt.protocol in ("3", "3.11"):
+        protocol = MQTTProtocolVersion.MQTTv311
+    elif settings.mqtt.protocol == "3.1":
+        protocol = MQTTProtocolVersion.MQTTv31
+    elif settings.mqtt.protocol in ("5", "5.0"):
+        protocol = MQTTProtocolVersion.MQTTv5
+    else:
+        log.info("No valid MQTT protocol version found (%s), setting to default v3.11", settings.mqtt.protocol)
+        protocol = MQTTProtocolVersion.MQTTv311
+    log.debug("MQTT protocol set to %r", protocol)
+
     try:
         client = mqtt.Client(
             callback_api_version=CallbackAPIVersion.VERSION2,
-            clean_session=True,
+            clean_session=True if protocol != MQTTProtocolVersion.MQTTv5 else None,
             client_id="anpr2mqtt",
+            protocol=protocol,
         )
         client.on_connect = on_connect
         client.on_disconnect = on_disconnect

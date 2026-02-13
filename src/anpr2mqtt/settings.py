@@ -20,6 +20,7 @@ class MQTTSettings(BaseModel):
     host: str = Field(default="localhost", description="MQTT broker IP address or hostname")
     port: int = Field(default=1883, description="MQTT broker port number")
     user: str
+    protocol: str = Field(default="3.11", description="MQTT protocol version, v3 and v5 supported")
     password: str = Field(alias="pass", description="MQTT account password")
 
 

@@ -2,7 +2,10 @@
 ## Home Assistant Integration
 - Now subscribes to the HA 'birth' and 'last will' messages to re-publish on HA restart
 - State always published at startup
+## Directory Scanning
 - `watch_tree` can be set to recursively watch all subdirectories below `watch_path`
+## MQTT
+- MQTT protocol can now be set up to v5 or down to v3, defaults to v3.11
 # 0.6.2
 ## Examples
 - Added an example Home Assistant automation to generate notifications using details and priority from MQTT event
