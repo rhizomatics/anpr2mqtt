@@ -11,7 +11,7 @@ from paho.mqtt.reasoncodes import ReasonCode
 from PIL import Image
 
 import anpr2mqtt
-from anpr2mqtt.settings import EventSettings
+from anpr2mqtt.settings import EventSettings, HomeAssistantSettings
 
 from .const import ImageInfo
 
@@ -19,9 +19,11 @@ log = structlog.get_logger()
 
 
 class HomeAssistantPublisher:
-    def __init__(self, client: mqtt.Client, hass_status_topic: str) -> None:
-        self.client = client
-        self.hass_status_topic = hass_status_topic
+    def __init__(self, client: mqtt.Client, cfg: HomeAssistantSettings) -> None:
+        self.client: mqtt.Client = client
+        self.hass_status_topic: str = cfg.status_topic
+        self.discovery_topic_prefix: str = cfg.discovery_topic_root
+        self.device_creation: bool = cfg.device_creation
         log.info("Subscribing to Home Assistant birth and last will at %s", self.hass_status_topic)
         self.client.subscribe(self.hass_status_topic)
         self.client.on_message = self.on_message
@@ -62,14 +64,7 @@ class HomeAssistantPublisher:
             else:
                 log.warn("Unknown Home Assistant status payload: %s", msg.payload)
 
-    def post_discovery_message(
-        self,
-        discovery_topic_prefix: str,
-        state_topic: str,
-        image_topic: str,
-        event_config: EventSettings,
-        device_creation: bool = True,
-    ) -> None:
+    def post_discovery_message(self, state_topic: str, image_topic: str, event_config: EventSettings) -> None:
         name: str = event_config.description or f"{event_config.event} {event_config.camera}"
         payload: dict[str, Any] = {
             "o": {
@@ -86,9 +81,9 @@ class HomeAssistantPublisher:
             "icon": "mdi:car-back",
             "name": name,
         }
-        if device_creation:
+        if self.device_creation:
             self.add_device_info(payload, event_config)
-        topic: str = f"{discovery_topic_prefix}/sensor/{event_config.camera}/{event_config.event}/config"
+        topic: str = f"{self.discovery_topic_prefix}/sensor/{event_config.camera}/{event_config.event}/config"
         msg: str = json.dumps(payload)
         self.client.publish(topic, payload=msg, qos=0, retain=True)
         self.republish[topic] = msg
@@ -108,9 +103,9 @@ class HomeAssistantPublisher:
             "icon": "mdi:car-back",
             "name": name,
         }
-        if device_creation:
+        if self.device_creation:
             self.add_device_info(payload, event_config)
-        topic = f"{discovery_topic_prefix}/image/{event_config.camera}/{event_config.event}/config"
+        topic = f"{self.discovery_topic_prefix}/image/{event_config.camera}/{event_config.event}/config"
         msg = json.dumps(payload)
         self.client.publish(topic, payload=msg, qos=0, retain=True)
         self.republish[topic] = msg
@@ -131,7 +126,7 @@ class HomeAssistantPublisher:
         topic: str,
         target: str | None,
         event_config: EventSettings,
-        ocr_fields: dict[str, str | None],
+        ocr_fields: dict[str, str | None] | None = None,
         image_info: ImageInfo | None = None,
         classification: dict[str, Any] | None = None,
         previous_sightings: int | None = None,
@@ -150,7 +145,8 @@ class HomeAssistantPublisher:
             "area": event_config.area,
             "reg_info": reg_info,
         }
-        payload.update(ocr_fields)
+        if ocr_fields:
+            payload.update(ocr_fields)
         if error:
             payload["error"] = error
         if url is not None:

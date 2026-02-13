@@ -81,7 +81,7 @@ def main_loop() -> None:
         client.loop_start()
         log.info(f"Connected to MQTT at {settings.mqtt.host}:{settings.mqtt.port} as {settings.mqtt.user}")
         log.info(f"Publishing at {settings.mqtt.topic_root}")
-        publisher = HomeAssistantPublisher(client, settings.homeassistant.status_topic)
+        publisher = HomeAssistantPublisher(client, settings.homeassistant)
 
     except Exception as e:
         log.error("Failed to connect to MQTT: %s", e, exc_info=1)
@@ -109,13 +109,17 @@ def main_loop() -> None:
                 tracker_config=settings.tracker,
             )  # ty:ignore[invalid-argument-type]
             log.debug("Scheduling watchdog for %s", event_config.watch_path)
-            observer.schedule(event_handler, str(event_config.watch_path), recursive=False)  # ty:ignore[invalid-argument-type]
+            observer.schedule(event_handler, str(event_config.watch_path), recursive=event_config.watch_tree)  # ty:ignore[invalid-argument-type]
             publisher.post_discovery_message(
-                settings.homeassistant.discovery_topic_root,
                 state_topic=state_topic,
                 image_topic=image_topic,
                 event_config=event_config,
-                device_creation=settings.homeassistant.device_creation,
+            )
+            # post initial empty state message
+            publisher.post_state_message(
+                state_topic,
+                target=None,
+                event_config=event_config,
             )
             log.info("Publishing %s %s state to %s", event_config.event, event_config.camera, state_topic)
         except Exception as e:

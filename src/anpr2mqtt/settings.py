@@ -30,6 +30,9 @@ class EventSettings(BaseModel):
     description: str | None = Field(default=None, description="Free text description of event")
     target_type: str = Field(default="plate", description="Type of target for this event, 'plate' if ANPR")
     watch_path: Path = Field(default=Path(), description="File system directory to watch")
+    watch_tree: bool = Field(
+        default=False, description="Watch directory tree at path, or false for only the root watch_path directory"
+    )
     image_name_re: re.Pattern[str] = Field(
         default=re.compile(r"(?P<dt>[0-9]{17})_(?P<target>[A-Z0-9]+)_(?P<event>VEHICLE_DETECTION)\.(?P<ext>jpg|png|gif|jpeg)"),
         description="Regular expression to find datetime, file extension and target from image name",

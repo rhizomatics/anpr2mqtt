@@ -1,3 +1,8 @@
+# 0.7.0
+## Home Assistant Integration
+- Now subscribes to the HA 'birth' and 'last will' messages to re-publish on HA restart
+- State always published at startup
+- `watch_tree` can be set to recursively watch all subdirectories below `watch_path`
 # 0.6.2
 ## Examples
 - Added an example Home Assistant automation to generate notifications using details and priority from MQTT event

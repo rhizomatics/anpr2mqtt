@@ -159,7 +159,6 @@ class EventHandler(RegexMatchingEventHandler):
                 self.state_topic,
                 event_config=self.event_config,
                 target=None,
-                ocr_fields={},
                 error=str(e),
                 file_path=file_path,
             )

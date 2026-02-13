@@ -11,6 +11,7 @@ from anpr2mqtt.settings import (
     DimensionSettings,
     DVLASettings,
     EventSettings,
+    HomeAssistantSettings,
     ImageSettings,
     OCRFieldSettings,
     OCRSettings,
@@ -27,7 +28,7 @@ def set_tz_env_variable() -> None:
 @pytest.fixture
 def event_handler(tmp_path: Path) -> EventHandler:
     return EventHandler(
-        HomeAssistantPublisher(Mock(), "status_test_topic"),
+        HomeAssistantPublisher(Mock(), HomeAssistantSettings(status_topic="status_test_topic")),
         state_topic="test/topic",
         image_topic="test/images",
         dvla_config=DVLASettings(),
