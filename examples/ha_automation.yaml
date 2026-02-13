@@ -1,10 +1,17 @@
 alias: Driveway ANPR Alert
-description: ""
+description: "Notify via email, chime, Alexa and mobile push when a vehicle identified"
 triggers:
   - trigger: state
     entity_id:
       - sensor.anpr_driveway
-conditions: []
+conditions:
+  - condition: not
+    conditions:
+      - condition: state
+        entity_id: sensor.anpr_driveway
+        state:
+          - unavailable
+          - unknown
 actions:
   - action: notify.supernotify
     metadata: {}
