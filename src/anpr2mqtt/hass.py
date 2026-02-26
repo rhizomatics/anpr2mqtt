@@ -54,9 +54,10 @@ class HomeAssistantPublisher:
     def on_message(self, _client: mqtt.Client, _userdata: Any, msg: mqtt.MQTTMessage) -> None:
         """Callback for incoming MQTT messages"""  # noqa: D401
         if msg.topic == self.hass_status_topic:
-            if msg.payload == "offline":
+            decoded: str | None = msg.payload.decode("utr-8") if msg.payload else None
+            if decoded == "offline":
                 log.warn("Home Assistant gone offline")
-            elif msg.payload == "online":
+            elif decoded == "online":
                 log.info("Home Assistant now online")
                 for topic, payload in self.republish.items():
                     log.debug("Republishing to %s", topic)
@@ -65,7 +66,7 @@ class HomeAssistantPublisher:
                 log.warn("Unknown Home Assistant status payload: %s", msg.payload)
 
     def post_discovery_message(self, state_topic: str, image_topic: str, event_config: EventSettings) -> None:
-        name: str = event_config.description or f"{event_config.event} {event_config.camera}"
+        name: str = event_config.description or f"{event_config.event} {event_config.camera.name}"
         payload: dict[str, Any] = {
             "o": {
                 "name": "anpr2mqtt",
@@ -74,8 +75,8 @@ class HomeAssistantPublisher:
             },
             "device_class": None,
             "value_template": "{{ value_json.target }}",
-            "default_entity_id": f"sensor.{event_config.event}_{event_config.camera}",
-            "unique_id": f"{event_config.event}_{event_config.camera}",
+            "default_entity_id": f"sensor.{event_config.event}_{event_config.camera.name}",
+            "unique_id": f"{event_config.event}_{event_config.camera.name}",
             "state_topic": state_topic,
             "json_attributes_topic": state_topic,
             "icon": "mdi:car-back",
@@ -83,7 +84,7 @@ class HomeAssistantPublisher:
         }
         if self.device_creation:
             self.add_device_info(payload, event_config)
-        topic: str = f"{self.discovery_topic_prefix}/sensor/{event_config.camera}/{event_config.event}/config"
+        topic: str = f"{self.discovery_topic_prefix}/sensor/{event_config.camera.name}/{event_config.event}/config"
         msg: str = json.dumps(payload)
         self.client.publish(topic, payload=msg, qos=0, retain=True)
         self.republish[topic] = msg
@@ -96,8 +97,8 @@ class HomeAssistantPublisher:
                 "url": "https://anpr2mqtt.rhizomatics.org.uk",
             },
             "device_class": None,
-            "unique_id": f"{event_config.event}_{event_config.camera}",
-            "default_entity_id": f"image.{event_config.event}_{event_config.camera}",
+            "unique_id": f"{event_config.event}_{event_config.camera.name}",
+            "default_entity_id": f"image.{event_config.event}_{event_config.camera.name}",
             "image_topic": image_topic,
             "json_attributes_topic": state_topic,
             "icon": "mdi:car-back",
@@ -105,7 +106,7 @@ class HomeAssistantPublisher:
         }
         if self.device_creation:
             self.add_device_info(payload, event_config)
-        topic = f"{self.discovery_topic_prefix}/image/{event_config.camera}/{event_config.event}/config"
+        topic = f"{self.discovery_topic_prefix}/image/{event_config.camera.name}/{event_config.event}/config"
         msg = json.dumps(payload)
         self.client.publish(topic, payload=msg, qos=0, retain=True)
         self.republish[topic] = msg
@@ -113,13 +114,13 @@ class HomeAssistantPublisher:
 
     def add_device_info(self, payload: dict[str, Any], event_config: EventSettings) -> None:
         payload["dev"] = {
-            "name": f"anpr2mqtt on {event_config.camera}",
+            "name": f"anpr2mqtt on {event_config.camera.name}",
             "sw_version": anpr2mqtt.version,  # pyright: ignore[reportAttributeAccessIssue]
             "manufacturer": "rhizomatics",
-            "identifiers": [f"{event_config.event}_{event_config.camera}.anpr2mqtt"],
+            "identifiers": [f"{event_config.camera.name}.anpr2mqtt"],
         }
-        if event_config.area:
-            payload["dev"]["suggested_area"] = event_config.area
+        if event_config.camera.area:
+            payload["dev"]["suggested_area"] = event_config.camera.area
 
     def post_state_message(
         self,
@@ -141,8 +142,8 @@ class HomeAssistantPublisher:
             "target_type": event_config.target_type,
             event_config.target_type: target,
             "event": event_config.event,
-            "camera": event_config.camera or "UNKNOWN",
-            "area": event_config.area,
+            "camera": event_config.camera.name or "UNKNOWN",
+            "area": event_config.camera.area,
             "reg_info": reg_info,
         }
         if ocr_fields:

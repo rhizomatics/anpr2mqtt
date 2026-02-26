@@ -1,6 +1,6 @@
 import logging
 import sys
-from typing import Any
+from typing import Any, cast
 
 import paho.mqtt.client as mqtt
 import structlog
@@ -27,7 +27,7 @@ def on_connect(
     _props: Properties | None = None,
 ) -> None:
     log.debug("on_connect, MQTT result code " + str(rc))
-    if rc.getName() == "Not authorized":
+    if cast("str", rc.getName()) == "Not authorized":
         log.error("Invalid MQTT credentials", result_code=rc)
         return
     if rc != 0:
@@ -108,8 +108,8 @@ def main_loop() -> None:
 
     for event_config in settings.events:
         try:
-            state_topic = f"{settings.mqtt.topic_root}/{event_config.event}/{event_config.camera}/state"
-            image_topic = f"{settings.mqtt.topic_root}/{event_config.event}/{event_config.camera}/image"
+            state_topic = f"{settings.mqtt.topic_root}/{event_config.event}/{event_config.camera.name}/state"
+            image_topic = f"{settings.mqtt.topic_root}/{event_config.event}/{event_config.camera.name}/image"
             event_handler = EventHandler(
                 publisher=publisher,
                 event_config=event_config,
@@ -134,9 +134,9 @@ def main_loop() -> None:
                 target=None,
                 event_config=event_config,
             )
-            log.info("Publishing %s %s state to %s", event_config.event, event_config.camera, state_topic)
+            log.info("Publishing %s %s state to %s", event_config.event, event_config.camera.name, state_topic)
         except Exception as e:
-            log.error("Failed to schedule event %s %s watchdog: %s", event_config.event, event_config.camera, e)
+            log.error("Failed to schedule event %s %s watchdog: %s", event_config.event, event_config.camera.name, e)
 
     observer.start()
     try:

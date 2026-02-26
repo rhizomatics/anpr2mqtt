@@ -1,8 +1,8 @@
 import re
 from pathlib import Path
-from typing import Final, Literal
+from typing import Any, Final, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic_settings import (
     BaseSettings,
     CliSettingsSource,
@@ -19,15 +19,22 @@ class MQTTSettings(BaseModel):
     topic_root: str = "anpr2mqtt"
     host: str = Field(default="localhost", description="MQTT broker IP address or hostname")
     port: int = Field(default=1883, description="MQTT broker port number")
-    user: str
+    user: str = Field(description="MQTT account user name")
     protocol: str = Field(default="3.11", description="MQTT protocol version, v3 and v5 supported")
     password: str = Field(alias="pass", description="MQTT account password")
 
 
-class EventSettings(BaseModel):
-    camera: str = Field(default="driveway", description="Camera Identifier, used to build MQTT topic names")
-    event: str = Field(default="anpr", description="Identifier of the event, used in MQTT topic description")
+class CameraSettings(BaseModel):
+    name: str = Field(default="driveway", description="Camera Identifier, used to build MQTT topic names")
     area: str | None = Field(default=None, description="Home Assistant area ID")
+    live_url: str | None = Field(default=None, description="URL to watch camera feed live")
+
+
+class EventSettings(BaseModel):
+    camera: CameraSettings = Field(
+        default_factory=lambda: CameraSettings(name="driveway"), description="Camera name or settings"
+    )
+    event: str = Field(default="anpr", description="Identifier of the event, used in MQTT topic description")
     description: str | None = Field(default=None, description="Free text description of event")
     target_type: str = Field(default="plate", description="Type of target for this event, 'plate' if ANPR")
     watch_path: Path = Field(default=Path(), description="File system directory to watch")
@@ -43,16 +50,25 @@ class EventSettings(BaseModel):
         default_factory=lambda: ["hik_direction"], description="OCR field definitions to find in image"
     )
 
+    @field_validator("camera", mode="before")
+    @classmethod
+    def coerce_camera(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            return CameraSettings(name=v)
+        return v
+
 
 class HomeAssistantSettings(BaseModel):
     discovery_topic_root: str = "homeassistant"
     status_topic: str = "homeassistant/status"
-    device_creation: bool = True
+    device_creation: bool = Field(
+        default=True, description="Create a Home Assistant Device and associate the event sensors and images to it"
+    )
 
 
 class DVLASettings(BaseModel):
-    api_key: str | None = None
-    cache_ttl: int = 86400
+    api_key: str | None = Field(default=None, description="DVLA issued API key")
+    cache_ttl: int = Field(default=86400, description="Time to live for cached DVLA API results, in seconds")
 
 
 class TrackerSettings(BaseModel):
@@ -114,6 +130,7 @@ class Settings(BaseSettings):
     )
 
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
+    cameras: dict[str, CameraSettings] = Field(default_factory=dict)
     events: list[EventSettings] = Field(default_factory=lambda: [])
     image: ImageSettings = ImageSettings()
     targets: dict[str, TargetSettings] = Field(default_factory=lambda: {})
@@ -140,3 +157,10 @@ class Settings(BaseSettings):
             YamlConfigSettingsSource(settings_cls),
             init_settings,
         )
+
+    @model_validator(mode="after")
+    def resolve_event_cameras(self) -> "Settings":
+        for event in self.events:
+            if event.camera.name in self.cameras:
+                event.camera = self.cameras[event.camera.name]
+        return self

@@ -4,7 +4,6 @@ log_level: debug
 
 events:
 - camera: driveway
-  area: driveway
   event: anpr
   description: Vehicle identified at driveway camera
   watch_path: /ftp/Driveway
@@ -20,6 +19,10 @@ events:
   image_name_re: (?P<dt>[0-9]{17})_(?P<event>LINE_CROSSING)\.(?P<ext>jpg|png|gif|jpeg)
   image_url_base: http://192.168.10.10/CCTV
 
+cameras:
+  driveway:
+    area: Driveway
+    live_url: http://frigate.local/driveway
 mqtt:
   host: 192.168.1.100
   port: 1883
