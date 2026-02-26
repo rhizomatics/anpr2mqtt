@@ -51,7 +51,9 @@ class EventSettings(BaseModel):
 
 class HomeAssistantSettings(BaseModel):
     discovery_topic_root: str = "homeassistant"
-    status_topic: str = "homeassistant/status"
+    status_topic: str = Field(
+        default="homeassistant/status", description="HomeAssistant status topic, where birth and will messages are posted"
+    )
     device_creation: bool = Field(
         default=True, description="Create a Home Assistant Device and associate the event sensors and images to it"
     )

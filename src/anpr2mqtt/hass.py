@@ -1,5 +1,7 @@
 import datetime as dt
 import json
+import random
+import time
 from io import BytesIO
 from pathlib import Path
 from typing import Any
@@ -25,10 +27,12 @@ class HomeAssistantPublisher:
         self.discovery_topic_prefix: str = cfg.discovery_topic_root
         self.device_creation: bool = cfg.device_creation
         log.info("Subscribing to Home Assistant birth and last will at %s", self.hass_status_topic)
-        self.client.subscribe(self.hass_status_topic)
+
         self.client.on_message = self.on_message
         self.client.on_subscribe = self.on_subscribe
         self.client.on_unsubscribe = self.on_unsubscribe
+        self.client.subscribe(self.hass_status_topic)
+
         self.republish: dict[str, Any] = {}
 
     def on_subscribe(
@@ -54,16 +58,20 @@ class HomeAssistantPublisher:
     def on_message(self, _client: mqtt.Client, _userdata: Any, msg: mqtt.MQTTMessage) -> None:
         """Callback for incoming MQTT messages"""  # noqa: D401
         if msg.topic == self.hass_status_topic:
-            decoded: str | None = msg.payload.decode("utr-8") if msg.payload else None
+            decoded: str | None = msg.payload.decode("utf-8") if msg.payload else None
             if decoded == "offline":
                 log.warn("Home Assistant gone offline")
             elif decoded == "online":
                 log.info("Home Assistant now online")
                 for topic, payload in self.republish.items():
                     log.debug("Republishing to %s", topic)
+                    # add jitter to republish to reduce herd load on HA after restart
+                    time.sleep(random.randint(1, 10))  # noqa: S311
                     self.client.publish(topic, payload)
             else:
                 log.warn("Unknown Home Assistant status payload: %s", msg.payload)
+        else:
+            log.debug("Unknown message on %s", msg.topic)
 
     def publish_sensor_discovery(self, state_topic: str, event_config: EventSettings, camera: CameraSettings) -> None:
         name: str = event_config.description or f"{event_config.event} {camera.name}"

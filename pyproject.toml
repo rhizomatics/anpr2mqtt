@@ -95,6 +95,7 @@ plugins = "pydantic.mypy"
 
 [tool.bandit]
 exclude_dirs = ["tests"]
+skips = ["B311"]
 
 [tool.ruff]
 line-length = 128

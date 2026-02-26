@@ -14,9 +14,10 @@ from watchdog.events import DirCreatedEvent, FileClosedEvent, FileCreatedEvent, 
 
 from anpr2mqtt.api_client import DVLA, APIClient
 from anpr2mqtt.const import ImageInfo
-from anpr2mqtt.hass import CameraSettings, HomeAssistantPublisher
+from anpr2mqtt.hass import HomeAssistantPublisher
 from anpr2mqtt.settings import (
     TARGET_TYPE_PLATE,
+    CameraSettings,
     DVLASettings,
     EventSettings,
     ImageSettings,
