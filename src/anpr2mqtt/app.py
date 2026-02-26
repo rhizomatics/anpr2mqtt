@@ -150,7 +150,9 @@ def main_loop() -> None:
                 e,
             )
 
+    publisher.start()
     observer.start()
+
     try:
         log.info("Starting observer loop")
         while observer.is_alive():

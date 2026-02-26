@@ -26,14 +26,14 @@ class HomeAssistantPublisher:
         self.hass_status_topic: str = cfg.status_topic
         self.discovery_topic_prefix: str = cfg.discovery_topic_root
         self.device_creation: bool = cfg.device_creation
-        log.info("Subscribing to Home Assistant birth and last will at %s", self.hass_status_topic)
+        self.republish: dict[str, Any] = {}
 
+    def start(self) -> None:
+        log.info("Subscribing to Home Assistant birth and last will at %s", self.hass_status_topic)
         self.client.on_message = self.on_message
         self.client.on_subscribe = self.on_subscribe
         self.client.on_unsubscribe = self.on_unsubscribe
         self.client.subscribe(self.hass_status_topic)
-
-        self.republish: dict[str, Any] = {}
 
     def on_subscribe(
         self,
