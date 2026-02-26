@@ -64,12 +64,12 @@ class HomeAssistantPublisher:
                 log.warn("Home Assistant gone offline")
                 self.hass_online = False
             elif decoded == "online":
-                log.info("Home Assistant now online")
-
                 if self.hass_online is False:
+                    log.info("Home Assistant back online")
                     self.hass_online = True
                     self.republish_discovery()
                 else:
+                    log.info("Home Assistant online")
                     self.hass_online = True
             else:
                 log.warn("Unknown Home Assistant status payload: %s", msg.payload)
