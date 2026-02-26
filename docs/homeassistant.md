@@ -70,7 +70,8 @@ will then group the relevant entities together on this device page. Use `device_
 There are 3 separate types of MQTT topic used for HomeAssisstant integration:
 
 - *Config* to support auto discovery. 
-    - A topic is created per camera, with a name like `homeassistant/sensor/camera/anpr/config`. 
+    - A topic is created per camera, with a name like `homeassistant/sensor/driveway/anpr/config`. 
+    - Optionally a `image` and `camera` topic can be created
     - The `homeassistant` topic prefix can also be configured.
 - *State* to report the last plate seen and attributes
     - `anpr2mqtt/camera_name/state`
@@ -87,6 +88,14 @@ From the [Entities View](https://www.home-assistant.io/docs/configuration/entiti
 the entities by `anpr.` 
 
 ![Home Assistant Entities](assets/images/ha_entities.png){width=640}
+
+## Republishing on Home Assistant restart
+
+Home Assistant's MQTT integration can publish the status of Home Assistant itself to
+*birth* and *last will and testament* topics. Current default for this is `homeassistant/status`,
+though older installations may have `hass/status` - if its non-default, override in the
+config under `homeassistant: status_topic`.
+
 
 ## More Home Assistant information
 
