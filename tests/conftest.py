@@ -8,6 +8,7 @@ import pytest
 from anpr2mqtt.event_handler import EventHandler
 from anpr2mqtt.hass import HomeAssistantPublisher
 from anpr2mqtt.settings import (
+    CameraSettings,
     DimensionSettings,
     DVLASettings,
     EventSettings,
@@ -33,6 +34,7 @@ def event_handler(tmp_path: Path) -> EventHandler:
         image_topic="test/images",
         dvla_config=DVLASettings(),
         target_config=TargetSettings(),
+        camera=CameraSettings(name="test_cam"),
         image_config=ImageSettings(),
         tracker_config=TrackerSettings(data_dir=tmp_path),
         ocr_config=OCRSettings(

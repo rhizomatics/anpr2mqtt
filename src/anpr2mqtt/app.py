@@ -13,7 +13,7 @@ from watchdog.observers import Observer
 import anpr2mqtt
 from anpr2mqtt.event_handler import EventHandler
 from anpr2mqtt.hass import HomeAssistantPublisher
-from anpr2mqtt.settings import Settings
+from anpr2mqtt.settings import CameraSettings, Settings
 
 log = structlog.get_logger()
 # run like docker run --restart always -d -v /ftp:/ftp d4d8dea7d1e3
@@ -107,13 +107,20 @@ def main_loop() -> None:
         sys.exit(-400)
 
     for event_config in settings.events:
+        camera: CameraSettings | None = None
         try:
-            state_topic = f"{settings.mqtt.topic_root}/{event_config.event}/{event_config.camera.name}/state"
-            image_topic = f"{settings.mqtt.topic_root}/{event_config.event}/{event_config.camera.name}/image"
+            for camera_config in settings.cameras:
+                if camera_config.name == event_config.camera:
+                    camera = camera_config
+            if camera is None:
+                camera = CameraSettings(name=event_config.camera)
+            state_topic = f"{settings.mqtt.topic_root}/{event_config.event}/{camera.name}/state"
+            image_topic = f"{settings.mqtt.topic_root}/{event_config.event}/{camera.name}/image"
             event_handler = EventHandler(
                 publisher=publisher,
                 event_config=event_config,
                 state_topic=state_topic,
+                camera=camera,
                 image_topic=image_topic,
                 target_config=settings.targets.get(event_config.target_type),
                 ocr_config=settings.ocr,
@@ -123,20 +130,25 @@ def main_loop() -> None:
             )  # ty:ignore[invalid-argument-type]
             log.debug("Scheduling watchdog for %s", event_config.watch_path)
             observer.schedule(event_handler, str(event_config.watch_path), recursive=event_config.watch_tree)  # ty:ignore[invalid-argument-type]
-            publisher.post_discovery_message(
-                state_topic=state_topic,
-                image_topic=image_topic,
-                event_config=event_config,
-            )
+            publisher.publish_sensor_discovery(state_topic=state_topic, event_config=event_config, camera=camera)
+            if settings.homeassistant.image_entity:
+                publisher.publish_image_discovery(
+                    state_topic=state_topic, image_topic=image_topic, event_config=event_config, camera=camera
+                )
+            if settings.homeassistant.camera_entity:
+                publisher.publish_camera_discovery(
+                    state_topic=state_topic, image_topic=image_topic, event_config=event_config, camera=camera
+                )
             # post initial empty state message
-            publisher.post_state_message(
-                state_topic,
-                target=None,
-                event_config=event_config,
-            )
-            log.info("Publishing %s %s state to %s", event_config.event, event_config.camera.name, state_topic)
+            publisher.post_state_message(state_topic, target=None, event_config=event_config, camera=camera)
+            log.info("Publishing %s %s state to %s", event_config.event, camera.name, state_topic)
         except Exception as e:
-            log.error("Failed to schedule event %s %s watchdog: %s", event_config.event, event_config.camera.name, e)
+            log.error(
+                "Failed to schedule event %s %s watchdog: %s",
+                event_config.event,
+                camera.name if camera else "unknown camera",
+                e,
+            )
 
     observer.start()
     try:

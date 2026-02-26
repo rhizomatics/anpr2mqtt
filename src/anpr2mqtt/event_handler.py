@@ -14,7 +14,7 @@ from watchdog.events import DirCreatedEvent, FileClosedEvent, FileCreatedEvent, 
 
 from anpr2mqtt.api_client import DVLA, APIClient
 from anpr2mqtt.const import ImageInfo
-from anpr2mqtt.hass import HomeAssistantPublisher
+from anpr2mqtt.hass import CameraSettings, HomeAssistantPublisher
 from anpr2mqtt.settings import (
     TARGET_TYPE_PLATE,
     DVLASettings,
@@ -36,6 +36,7 @@ class EventHandler(RegexMatchingEventHandler):
         state_topic: str,
         image_topic: str,
         event_config: EventSettings,
+        camera: CameraSettings,
         target_config: TargetSettings | None,
         ocr_config: OCRSettings,
         image_config: ImageSettings,
@@ -48,6 +49,7 @@ class EventHandler(RegexMatchingEventHandler):
         self.publisher = publisher
         self.state_topic: str = state_topic
         self.event_config: EventSettings = event_config
+        self.camera: CameraSettings = camera
         self.tracker_config: TrackerSettings = tracker_config
         self.target_config: TargetSettings | None = target_config
         self.ocr_config: OCRSettings = ocr_config
@@ -55,7 +57,7 @@ class EventHandler(RegexMatchingEventHandler):
         self.dvla_config: DVLASettings = dvla_config
         if event_config.image_url_base:
             log.info("Images available from web server with prefix %s", event_config.image_url_base)
-        self.image_topic: str | None = image_topic
+        self.image_topic: str = image_topic
 
         if dvla_config.api_key and event_config.target_type == TARGET_TYPE_PLATE:
             log.info("Configured gov API lookup")
@@ -125,6 +127,7 @@ class EventHandler(RegexMatchingEventHandler):
                     self.state_topic,
                     target=target,
                     event_config=self.event_config,
+                    camera=self.camera,
                     image_info=image_info,
                     ocr_fields=ocr_fields,
                     classification=classification,
@@ -134,7 +137,7 @@ class EventHandler(RegexMatchingEventHandler):
                     reg_info=reg_info,
                     file_path=file_path,
                 )
-                if self.image_topic and image:
+                if image:
                     img_format = image_info.ext.upper() if image_info.ext else None
                     img_format = "JPEG" if img_format == "JPG" else img_format
                     if img_format:
@@ -147,6 +150,7 @@ class EventHandler(RegexMatchingEventHandler):
                 self.publisher.post_state_message(
                     self.state_topic,
                     event_config=self.event_config,
+                    camera=self.camera,
                     ocr_fields=ocr_fields,
                     target=None,
                     url=url,
@@ -158,6 +162,7 @@ class EventHandler(RegexMatchingEventHandler):
             self.publisher.post_state_message(
                 self.state_topic,
                 event_config=self.event_config,
+                camera=self.camera,
                 target=None,
                 error=str(e),
                 file_path=file_path,

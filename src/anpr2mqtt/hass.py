@@ -11,7 +11,7 @@ from paho.mqtt.reasoncodes import ReasonCode
 from PIL import Image
 
 import anpr2mqtt
-from anpr2mqtt.settings import EventSettings, HomeAssistantSettings
+from anpr2mqtt.settings import CameraSettings, EventSettings, HomeAssistantSettings
 
 from .const import ImageInfo
 
@@ -65,8 +65,8 @@ class HomeAssistantPublisher:
             else:
                 log.warn("Unknown Home Assistant status payload: %s", msg.payload)
 
-    def post_discovery_message(self, state_topic: str, image_topic: str, event_config: EventSettings) -> None:
-        name: str = event_config.description or f"{event_config.event} {event_config.camera.name}"
+    def publish_sensor_discovery(self, state_topic: str, event_config: EventSettings, camera: CameraSettings) -> None:
+        name: str = event_config.description or f"{event_config.event} {camera.name}"
         payload: dict[str, Any] = {
             "o": {
                 "name": "anpr2mqtt",
@@ -75,21 +75,25 @@ class HomeAssistantPublisher:
             },
             "device_class": None,
             "value_template": "{{ value_json.target }}",
-            "default_entity_id": f"sensor.{event_config.event}_{event_config.camera.name}",
-            "unique_id": f"{event_config.event}_{event_config.camera.name}",
+            "default_entity_id": f"sensor.{event_config.event}_{event_config.camera}",
+            "unique_id": f"{event_config.event}_{event_config.camera}",
             "state_topic": state_topic,
             "json_attributes_topic": state_topic,
             "icon": "mdi:car-back",
             "name": name,
         }
         if self.device_creation:
-            self.add_device_info(payload, event_config)
-        topic: str = f"{self.discovery_topic_prefix}/sensor/{event_config.camera.name}/{event_config.event}/config"
+            self.add_device_info(payload, camera)
+        topic: str = f"{self.discovery_topic_prefix}/sensor/{event_config.camera}/{event_config.event}/config"
         msg: str = json.dumps(payload)
         self.client.publish(topic, payload=msg, qos=0, retain=True)
         self.republish[topic] = msg
         log.info("Published HA MQTT sensor Discovery message to %s", topic)
 
+    def publish_image_discovery(
+        self, state_topic: str, image_topic: str, event_config: EventSettings, camera: CameraSettings
+    ) -> None:
+        name: str = event_config.description or f"{event_config.event} {event_config.camera}"
         payload = {
             "o": {
                 "name": "anpr2mqtt",
@@ -97,36 +101,63 @@ class HomeAssistantPublisher:
                 "url": "https://anpr2mqtt.rhizomatics.org.uk",
             },
             "device_class": None,
-            "unique_id": f"{event_config.event}_{event_config.camera.name}",
-            "default_entity_id": f"image.{event_config.event}_{event_config.camera.name}",
+            "unique_id": f"{event_config.event}_{event_config.camera}",
+            "default_entity_id": f"image.{event_config.event}_{event_config.camera}",
             "image_topic": image_topic,
             "json_attributes_topic": state_topic,
             "icon": "mdi:car-back",
             "name": name,
         }
         if self.device_creation:
-            self.add_device_info(payload, event_config)
-        topic = f"{self.discovery_topic_prefix}/image/{event_config.camera.name}/{event_config.event}/config"
+            self.add_device_info(payload, camera)
+        topic = f"{self.discovery_topic_prefix}/image/{event_config.camera}/{event_config.event}/config"
         msg = json.dumps(payload)
         self.client.publish(topic, payload=msg, qos=0, retain=True)
         self.republish[topic] = msg
         log.info("Published HA MQTT Discovery message to %s", topic)
 
-    def add_device_info(self, payload: dict[str, Any], event_config: EventSettings) -> None:
+    def publish_camera_discovery(
+        self, state_topic: str, image_topic: str, event_config: EventSettings, camera: CameraSettings
+    ) -> None:
+        name: str = event_config.description or f"{event_config.event} {event_config.camera}"
+        payload = {
+            "o": {
+                "name": "anpr2mqtt",
+                "sw": anpr2mqtt.version,  # pyright: ignore[reportAttributeAccessIssue]
+                "url": "https://anpr2mqtt.rhizomatics.org.uk",
+            },
+            "device_class": None,
+            "unique_id": f"{event_config.event}_{camera.name}",
+            "default_entity_id": f"image.{event_config.event}_{camera.name}",
+            "topic": image_topic,
+            "json_attributes_topic": state_topic,
+            "icon": "mdi:car-back",
+            "name": name,
+        }
+        if self.device_creation:
+            self.add_device_info(payload, camera)
+        topic = f"{self.discovery_topic_prefix}/camera/{camera.name}/{event_config.event}/config"
+        msg = json.dumps(payload)
+        self.client.publish(topic, payload=msg, qos=0, retain=True)
+        self.republish[topic] = msg
+        log.info("Published HA MQTT Discovery message to %s", topic)
+
+    def add_device_info(self, payload: dict[str, Any], camera: CameraSettings) -> None:
         payload["dev"] = {
-            "name": f"anpr2mqtt on {event_config.camera.name}",
+            "name": f"anpr2mqtt on {camera.name}",
             "sw_version": anpr2mqtt.version,  # pyright: ignore[reportAttributeAccessIssue]
             "manufacturer": "rhizomatics",
-            "identifiers": [f"{event_config.camera.name}.anpr2mqtt"],
+            "identifiers": [f"{camera.name}.anpr2mqtt"],
         }
-        if event_config.camera.area:
-            payload["dev"]["suggested_area"] = event_config.camera.area
+        if camera.area:
+            payload["dev"]["suggested_area"] = camera.area
 
     def post_state_message(
         self,
         topic: str,
         target: str | None,
         event_config: EventSettings,
+        camera: CameraSettings,
         ocr_fields: dict[str, str | None] | None = None,
         image_info: ImageInfo | None = None,
         classification: dict[str, Any] | None = None,
@@ -142,8 +173,9 @@ class HomeAssistantPublisher:
             "target_type": event_config.target_type,
             event_config.target_type: target,
             "event": event_config.event,
-            "camera": event_config.camera.name or "UNKNOWN",
-            "area": event_config.camera.area,
+            "camera": camera.name or "UNKNOWN",
+            "area": camera.area,
+            "live_url": camera.live_url,
             "reg_info": reg_info,
         }
         if ocr_fields:

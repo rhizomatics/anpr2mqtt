@@ -1,8 +1,8 @@
 import re
 from pathlib import Path
-from typing import Any, Final, Literal
+from typing import Final, Literal
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field
 from pydantic_settings import (
     BaseSettings,
     CliSettingsSource,
@@ -31,9 +31,7 @@ class CameraSettings(BaseModel):
 
 
 class EventSettings(BaseModel):
-    camera: CameraSettings = Field(
-        default_factory=lambda: CameraSettings(name="driveway"), description="Camera name or settings"
-    )
+    camera: str = Field(default="driveway", description="Camera name")
     event: str = Field(default="anpr", description="Identifier of the event, used in MQTT topic description")
     description: str | None = Field(default=None, description="Free text description of event")
     target_type: str = Field(default="plate", description="Type of target for this event, 'plate' if ANPR")
@@ -50,13 +48,6 @@ class EventSettings(BaseModel):
         default_factory=lambda: ["hik_direction"], description="OCR field definitions to find in image"
     )
 
-    @field_validator("camera", mode="before")
-    @classmethod
-    def coerce_camera(cls, v: Any) -> Any:
-        if isinstance(v, str):
-            return CameraSettings(name=v)
-        return v
-
 
 class HomeAssistantSettings(BaseModel):
     discovery_topic_root: str = "homeassistant"
@@ -64,6 +55,8 @@ class HomeAssistantSettings(BaseModel):
     device_creation: bool = Field(
         default=True, description="Create a Home Assistant Device and associate the event sensors and images to it"
     )
+    image_entity: bool = Field(default=True, description="Create an Image entity via MQTT discovery")
+    camera_entity: bool = Field(default=True, description="Create a Camera entity via MQTT discovery")
 
 
 class DVLASettings(BaseModel):
@@ -130,7 +123,7 @@ class Settings(BaseSettings):
     )
 
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
-    cameras: dict[str, CameraSettings] = Field(default_factory=dict)
+    cameras: list[CameraSettings] = Field(default_factory=list)
     events: list[EventSettings] = Field(default_factory=lambda: [])
     image: ImageSettings = ImageSettings()
     targets: dict[str, TargetSettings] = Field(default_factory=lambda: {})
@@ -157,10 +150,3 @@ class Settings(BaseSettings):
             YamlConfigSettingsSource(settings_cls),
             init_settings,
         )
-
-    @model_validator(mode="after")
-    def resolve_event_cameras(self) -> "Settings":
-        for event in self.events:
-            if event.camera.name in self.cameras:
-                event.camera = self.cameras[event.camera.name]
-        return self
