@@ -106,7 +106,7 @@ class OCRSettings(BaseModel):
                 label="vehicle_direction",
                 invert=True,
                 crop=DimensionSettings(x=850, y=0, h=30, w=650),
-                values=["Forward", "Reverse"],
+                values=["Forward", "Reverse", "Unknown"],
                 correction={"Forward": [r"Fo.*rd"], "Reverse": [r"Re.*rse", r"Bac.*rd"]},
             )
         }
