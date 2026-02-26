@@ -144,7 +144,6 @@ class HomeAssistantPublisher:
                 "sw": anpr2mqtt.version,  # pyright: ignore[reportAttributeAccessIssue]
                 "url": "https://anpr2mqtt.rhizomatics.org.uk",
             },
-            "device_class": None,
             "unique_id": f"{event_config.event}_{camera.name}",
             "default_entity_id": f"camera.{event_config.event}_{camera.name}_anpr",
             "topic": image_topic,
