@@ -136,7 +136,7 @@ class HomeAssistantPublisher:
             },
             "device_class": None,
             "unique_id": f"{event_config.event}_{camera.name}",
-            "default_entity_id": f"image.{event_config.event}_{camera.name}",
+            "default_entity_id": f"image.{event_config.event}_{camera.name}_anpr",
             "topic": image_topic,
             "json_attributes_topic": state_topic,
             "icon": "mdi:car-back",
