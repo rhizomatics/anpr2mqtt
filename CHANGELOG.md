@@ -1,7 +1,9 @@
-# 0.7.0
+# 0.7.1
 ## Home Assistant Integration
 - Now subscribes to the HA 'birth' and 'last will' messages to re-publish on HA restart
 - State always published at startup
+- Camera settings can be added, to add `area` and `live_url` to the message
+- Camera Entity can now be added, and option to switch this and/or the Image entity creation
 ## Directory Scanning
 - `watch_tree` can be set to recursively watch all subdirectories below `watch_path`
 ## MQTT
