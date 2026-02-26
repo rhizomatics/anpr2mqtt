@@ -27,6 +27,7 @@ class HomeAssistantPublisher:
         self.discovery_topic_prefix: str = cfg.discovery_topic_root
         self.device_creation: bool = cfg.device_creation
         self.republish: dict[str, Any] = {}
+        self.hass_online: bool | None = None
 
     def start(self) -> None:
         log.info("Subscribing to Home Assistant birth and last will at %s", self.hass_status_topic)
@@ -61,17 +62,26 @@ class HomeAssistantPublisher:
             decoded: str | None = msg.payload.decode("utf-8") if msg.payload else None
             if decoded == "offline":
                 log.warn("Home Assistant gone offline")
+                self.hass_online = False
             elif decoded == "online":
                 log.info("Home Assistant now online")
-                for topic, payload in self.republish.items():
-                    log.debug("Republishing to %s", topic)
-                    # add jitter to republish to reduce herd load on HA after restart
-                    time.sleep(random.randint(1, 10))  # noqa: S311
-                    self.client.publish(topic, payload)
+
+                if self.hass_online is False:
+                    self.hass_online = True
+                    self.republish_discovery()
+                else:
+                    self.hass_online = True
             else:
                 log.warn("Unknown Home Assistant status payload: %s", msg.payload)
         else:
             log.debug("Unknown message on %s", msg.topic)
+
+    def republish_discovery(self) -> None:
+        for topic, payload in self.republish.items():
+            log.debug("Republishing to %s", topic)
+            # add jitter to republish to reduce herd load on HA after restart
+            time.sleep(random.randint(1, 10))  # noqa: S311
+            self.client.publish(topic, payload)
 
     def publish_sensor_discovery(self, state_topic: str, event_config: EventSettings, camera: CameraSettings) -> None:
         name: str = event_config.description or f"{event_config.event} {camera.name}"
