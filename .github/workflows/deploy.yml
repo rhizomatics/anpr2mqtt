@@ -32,7 +32,7 @@ jobs:
         uv sync --locked --all-extras --dev
        
     - name: Ruff
-      uses:  astral-sh/ruff-action@57714a7c8a2e59f32539362ba31877a1957dded1
+      uses:  astral-sh/ruff-action@4919ec5cf1f49eff0871dbcea0da843445b837e6
     - name: Test with pytest
       run: uv run pytest tests
     - name: Build a binary wheel and a source tarball
