@@ -33,7 +33,7 @@ uv remove package-name    # Remove a dependency
 uv lock                   # Update lockfile after manual pyproject.toml edits
 
 # Python version management
-uv python install 3.13    # Install Python 3.12
+uv python install 3.14    # Install Python 3.14
 uv python list            # List installed Python versions
 uv venv                   # Create virtual environment
 ```

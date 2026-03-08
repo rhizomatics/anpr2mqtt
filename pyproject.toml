@@ -1,6 +1,6 @@
 [project]
 name = "anpr2mqtt"
-version = "0.7.1"
+version = "0.7.2"
 description = "ANPR MQTT bridge for Home Assistant"
 authors = [
     { name = "jey burrows", email = "jrb@rhizomatics.org.uk" }
@@ -34,7 +34,7 @@ classifiers = [
     "License :: OSI Approved :: Apache Software License",
     "Typing :: Typed",
     "Programming Language :: Python",
-    "Programming Language :: Python :: 3.13"
+    "Programming Language :: Python :: 3.14"
 ]
 
 

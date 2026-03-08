@@ -1,3 +1,7 @@
+# 0.7.2
+- Python moved to 3.14 for docker image
+## Home Assistant Integration
+- Remove state republication on HA restart
 # 0.7.1
 ## Home Assistant Integration
 - Now subscribes to the HA 'birth' and 'last will' messages to re-publish on HA restart

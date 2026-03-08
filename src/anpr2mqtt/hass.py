@@ -222,7 +222,6 @@ class HomeAssistantPublisher:
                 )
             msg: str = json.dumps(payload)
             self.client.publish(topic, payload=msg, qos=0, retain=True)
-            self.republish[topic] = msg
             log.debug("Published HA MQTT State message to %s: %s", topic, payload)
         except Exception as e:
             log.error("Failed to publish event %s: %s", payload, e, exc_info=1)
@@ -234,7 +233,6 @@ class HomeAssistantPublisher:
             img_bytes = img_byte_arr.getvalue()
 
             self.client.publish(topic, payload=img_bytes, qos=0, retain=True)
-            self.republish[topic] = img_bytes
             log.debug("Published HA MQTT Image message to %s: %s bytes", topic, len(img_bytes))
         except Exception as e:
             log.error("Failed to publish image entity: %s", e, exc_info=1)
