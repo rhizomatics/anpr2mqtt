@@ -69,9 +69,9 @@ dev = [
     "pytest-shell-utilities"
 ]
 docs=[
+    "mkdocs<2.0.0",
+    "mkdocs-material[imaging]",
     "mkdocs-material>=9.7.1",
-    "pillow>=12.0", # mkdocs-material[imaging] has elderly pillow demand
-    "cairosvg~=2.6", # mkdocs-material[imaging]
     "mkdocstrings",
     "mkdocstrings-python",
     "mkdocs-minify-plugin",
@@ -84,7 +84,8 @@ docs=[
     "mkdocs-git-revision-date-localized-plugin",
     "mkdocs-minify-html-plugin",
     "mkdocs-meta-descriptions-plugin",
-    "mike"
+    "mike",
+    "mkdocs-htmlproofer-plugin"
 ]
 [build-system]
 requires = ["uv_build>=0.9.18,<0.11.0"]

@@ -43,6 +43,8 @@ extra:
 
 plugins:
   - search
+  - htmlproofer:
+      skip_downloads: True
   - autorefs
   - pagetree
   - optimize
@@ -95,3 +97,9 @@ markdown_extensions:
   - sane_lists
   - pymdownx.snippets:
       check_paths: true
+
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn 
