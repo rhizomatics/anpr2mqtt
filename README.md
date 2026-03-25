@@ -16,7 +16,7 @@
 
 # ANPR MQTT Bridge
 
-A simple way to integrate CCTV cameras with built-in **ANPR** (**Automatic Number Plate Recognition**, aka **ALPR** or **Automatic Licence Plate Recognition**) to MQTT for Home Assistant integration, or any other MQTT consumer. Running under Docker is preferred but not necessary.
+A simple way to integrate CCTV cameras with built-in **ANPR** (**Automatic Number Plate Recognition**, aka **ALPR** or **Automatic License Plate Recognition**) to MQTT for Home Assistant integration, or any other MQTT consumer. Running under Docker is preferred but not necessary.
 
 All that is needed is for the camera to be configured to upload images on plate recognition, by ftp, NAS or whatever else. ANPR2MQTT monitors the directory where the images lands and publishes plate information to MQTT. Its simple, requires no proprietary vendor APIs ( or differing ONVIF implementations ), and Home Assistant gets a copy of the actual annotated detection image to use on dashboards or to attach to notifications.
 
@@ -35,6 +35,7 @@ While intended for vehicle plate detection, it can be used to watch for and anal
     - Publishes events to MQTT for Home Assistant as a [MQTT Sensor Entity](https://www.home-assistant.io/integrations/sensor.mqtt/)
     - Auto-discovery configuration for Home Assistant
     - Creates [MQTT Image Entity](https://www.home-assistant.io/integrations/image.mqtt/) on Home Assistant for image snapshot, so no web access to ftp needed
+    - Optionally also creates an [MQTT Camera Entity](https://www.home-assistant.io/integrations/camera.mqtt/)
 * Plate Enrichment
     - OCR-based extraction of fields using [tesseract-ocr](https://github.com/tesseract-ocr/tesseract)
         - By default direction detection (Forward/Reverse) 
@@ -45,6 +46,7 @@ While intended for vehicle plate detection, it can be used to watch for and anal
     - UK Only
         - [DVLA Lookup](api.md) if API_KEY provided, for detailed MOT and tax information
         - Lookups cached for configurable time
+* Auto clear vehicle state optionally, after configurable time
 * [Debug Tools](debug_tools.md) built-in
 
 
@@ -88,6 +90,21 @@ A regular expression can be defined to match different file name formats.
 
 Where cameras provide an estimated direction for the vehicle, this can be captured via OCR and
 included in the response. See [OCR](ocr.md) for an explanation and examples.
+
+## Auto Clear
+
+By default, the state will be reset back to unavailable 5 minutes after a detection, while the image will
+be left present as record of last known vehicle. This behavior can be changed ( to switch off auto clear,
+or change the time lag, or also clear image ) using the `autoclear` configuration for each event.
+
+```yaml title="configuration snippet"
+- camera: shed
+  watch_path: /ftp/shedcam
+  autoclear:
+    post_event: 360
+    state: True
+    image: False
+```
 
 ## Primary Dependencies
 
