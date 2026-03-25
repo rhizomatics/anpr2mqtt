@@ -201,6 +201,15 @@ def test_process_image_missing_file(tmp_path: Path) -> None:
     assert result is None
 
 
+def test_process_image_broken_file(tmp_path: Path) -> None:
+    broken = tmp_path / "broken.jpg"
+    with broken.open("w") as f:
+        f.write("JPG")
+    image_info = ImageInfo("", "anpr", dt.datetime.now(tz=dt.UTC), size=0, ext="jpg")
+    result = process_image(broken, image_info, jpeg_opts={}, png_opts={})
+    assert result is None
+
+
 # --- examine_file ---
 
 
