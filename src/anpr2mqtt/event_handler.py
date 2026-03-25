@@ -146,6 +146,7 @@ class EventHandler(RegexMatchingEventHandler):
                     else:
                         log.warn("Unknown image format for %s", file_path)
             else:
+                log.warning("No image found for %s", file_path)
                 ocr_fields = scan_ocr_fields(None, self.event_config, self.ocr_config)
 
                 self.publisher.post_state_message(
