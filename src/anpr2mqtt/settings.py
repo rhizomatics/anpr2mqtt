@@ -30,6 +30,13 @@ class CameraSettings(BaseModel):
     live_url: str | None = Field(default=None, description="URL to watch camera feed live")
 
 
+class AutoClearSettings(BaseModel):
+    enabled: bool = Field(default=True, description="Enable auto-clear of state after last event")
+    post_event: int = Field(default=300, description="Seconds after last event to reset state")
+    state: bool = Field(default=True, description="Auto-clear state")
+    image: bool = Field(default=False, description="Auto-clear image")
+
+
 class EventSettings(BaseModel):
     camera: str = Field(default="driveway", description="Camera name")
     event: str = Field(default="anpr", description="Identifier of the event, used in MQTT topic description")
@@ -47,6 +54,7 @@ class EventSettings(BaseModel):
     ocr_field_ids: list[str] = Field(
         default_factory=lambda: ["hik_direction"], description="OCR field definitions to find in image"
     )
+    autoclear: AutoClearSettings = AutoClearSettings()
 
 
 class HomeAssistantSettings(BaseModel):

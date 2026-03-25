@@ -18,6 +18,11 @@ events:
   description: Entry to back garden gate
   image_name_re: (?P<dt>[0-9]{17})_(?P<event>LINE_CROSSING)\.(?P<ext>jpg|png|gif|jpeg)
   image_url_base: http://192.168.10.10/CCTV
+  autoclear:
+    post_event: 360
+    sensor: True
+    camera: False
+    image: False
 
 cameras:
   driveway:

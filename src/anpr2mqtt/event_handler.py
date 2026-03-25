@@ -1,6 +1,7 @@
 import datetime as dt
 import json
 import re
+import threading
 from io import BytesIO
 from pathlib import Path
 from typing import Any
@@ -66,6 +67,8 @@ class EventHandler(RegexMatchingEventHandler):
         else:
             log.info("No gov API lookup configured")
             self.api_client = None
+
+        self._autoclear_timer: threading.Timer | None = None
 
     @property
     def ignore_directories(self) -> bool:
@@ -145,6 +148,7 @@ class EventHandler(RegexMatchingEventHandler):
                         self.publisher.post_image_message(self.image_topic, image, img_format)
                     else:
                         log.warn("Unknown image format for %s", file_path)
+                self._schedule_autoclear()
             else:
                 log.warning("No image found for %s", file_path)
                 ocr_fields = scan_ocr_fields(None, self.event_config, self.ocr_config)
@@ -158,6 +162,7 @@ class EventHandler(RegexMatchingEventHandler):
                     url=url,
                     file_path=file_path,
                 )
+                self._schedule_autoclear()
 
         except Exception as e:
             log.error("Failed to parse file event %s: %s", event, e, exc_info=1)
@@ -169,6 +174,25 @@ class EventHandler(RegexMatchingEventHandler):
                 error=str(e),
                 file_path=file_path,
             )
+
+    def _schedule_autoclear(self) -> None:
+        autoclear = self.event_config.autoclear
+        if not autoclear.enabled:
+            return
+        if self._autoclear_timer is not None:
+            self._autoclear_timer.cancel()
+        self._autoclear_timer = threading.Timer(autoclear.post_event, self._do_autoclear)
+        self._autoclear_timer.daemon = True
+        self._autoclear_timer.start()
+        log.debug("Autoclear scheduled in %ss", autoclear.post_event)
+
+    def _do_autoclear(self) -> None:
+        autoclear = self.event_config.autoclear
+        log.info("Autoclear firing for %s/%s", self.event_config.event, self.event_config.camera)
+        if autoclear.state:
+            self.publisher.post_state_message(self.state_topic, target=None, event_config=self.event_config, camera=self.camera)
+        if autoclear.image:
+            self.publisher.post_image_message(self.image_topic, image=None)
 
     def track_target(self, target: str, target_type: str, event_dt: dt.datetime | None) -> tuple[int, dt.datetime | None]:
         target = target or "UNKNOWN"

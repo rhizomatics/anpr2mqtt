@@ -226,8 +226,12 @@ class HomeAssistantPublisher:
         except Exception as e:
             log.error("Failed to publish event %s: %s", payload, e, exc_info=1)
 
-    def post_image_message(self, topic: str, image: Image.Image, img_format: str = "JPEG") -> None:
+    def post_image_message(self, topic: str, image: Image.Image | None, img_format: str = "JPEG") -> None:
         try:
+            if image is None:
+                self.client.publish(topic, payload=None, qos=0, retain=True)
+                log.debug("Cleared HA MQTT Image message at %s", topic)
+                return
             img_byte_arr = BytesIO()
             image.save(img_byte_arr, format=img_format)
             img_bytes = img_byte_arr.getvalue()

@@ -1,3 +1,5 @@
+# 0.8.0
+- Autoclear to optionally reset state after period of time
 # 0.7.2
 - Python moved to 3.14 for docker image
 ## Home Assistant Integration

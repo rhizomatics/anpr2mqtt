@@ -9,6 +9,7 @@ from PIL import Image
 from anpr2mqtt.const import ImageInfo
 from anpr2mqtt.event_handler import EventHandler, examine_file, process_image, scan_ocr_fields
 from anpr2mqtt.settings import (
+    AutoClearSettings,
     EventSettings,
     OCRSettings,
     TargetSettings,
@@ -503,3 +504,115 @@ def test_classify_target_known_no_description(event_handler: EventHandler) -> No
     result = event_handler.classify_target("AB12CDE")
     assert result["known"] is True
     assert result["description"] == "Known"
+
+
+# --- autoclear ---
+
+
+def _set_autoclear(handler: EventHandler, **kwargs: object) -> None:
+    handler.event_config = handler.event_config.model_copy(
+        update={"autoclear": AutoClearSettings(**kwargs)}  # type:ignore[arg-type]
+    )
+
+
+def test_do_autoclear_sensor_only(event_handler: EventHandler) -> None:
+    _set_autoclear(event_handler, enabled=True, state=True, image=False)
+    event_handler._do_autoclear()
+    event_handler.publisher.post_state_message = Mock()  # type: ignore[method-assign]
+    publisher_mock: Mock = event_handler.publisher.client  # type: ignore[assignment]
+    # state topic published, image topic not touched
+    calls = [c for c in publisher_mock.publish.call_args_list if c.args[0] == "test/images"]
+    assert calls == []
+
+
+def test_do_autoclear_sensor_clears_state(event_handler: EventHandler) -> None:
+    _set_autoclear(event_handler, enabled=True, state=True, image=False)
+    with (
+        patch.object(event_handler.publisher, "post_state_message") as mock_state,
+        patch.object(event_handler.publisher, "post_image_message") as mock_image,
+    ):
+        event_handler._do_autoclear()
+    mock_state.assert_called_once_with(
+        event_handler.state_topic, target=None, event_config=event_handler.event_config, camera=event_handler.camera
+    )
+    mock_image.assert_not_called()
+
+
+def test_do_autoclear_sensor_false_does_not_clear_state(event_handler: EventHandler) -> None:
+    _set_autoclear(event_handler, enabled=True, state=False, image=False)
+    with (
+        patch.object(event_handler.publisher, "post_state_message") as mock_state,
+        patch.object(event_handler.publisher, "post_image_message") as mock_image,
+    ):
+        event_handler._do_autoclear()
+    mock_state.assert_not_called()
+    mock_image.assert_not_called()
+
+
+def test_do_autoclear_image_clears_image_topic(event_handler: EventHandler) -> None:
+    _set_autoclear(event_handler, enabled=True, state=False, image=True)
+    with (
+        patch.object(event_handler.publisher, "post_state_message") as mock_state,
+        patch.object(event_handler.publisher, "post_image_message") as mock_image,
+    ):
+        event_handler._do_autoclear()
+    mock_state.assert_not_called()
+    mock_image.assert_called_once_with(event_handler.image_topic, image=None)
+
+
+def test_schedule_autoclear_disabled_starts_no_timer(event_handler: EventHandler) -> None:
+    _set_autoclear(event_handler, enabled=False)
+    with patch("anpr2mqtt.event_handler.threading.Timer") as mock_timer_cls:
+        event_handler._schedule_autoclear()
+    mock_timer_cls.assert_not_called()
+
+
+def test_schedule_autoclear_starts_timer_with_correct_delay(event_handler: EventHandler) -> None:
+    _set_autoclear(event_handler, enabled=True, post_event=120)
+    with patch("anpr2mqtt.event_handler.threading.Timer") as mock_timer_cls:
+        mock_timer = Mock()
+        mock_timer_cls.return_value = mock_timer
+        event_handler._schedule_autoclear()
+    mock_timer_cls.assert_called_once_with(120, event_handler._do_autoclear)
+    mock_timer.start.assert_called_once()
+
+
+def test_schedule_autoclear_cancels_previous_timer(event_handler: EventHandler) -> None:
+    _set_autoclear(event_handler, enabled=True, post_event=60)
+    first_timer = Mock()
+    event_handler._autoclear_timer = first_timer
+    with patch("anpr2mqtt.event_handler.threading.Timer") as mock_timer_cls:
+        mock_timer_cls.return_value = Mock()
+        event_handler._schedule_autoclear()
+    first_timer.cancel.assert_called_once()
+
+
+def test_schedule_autoclear_timer_is_daemon(event_handler: EventHandler) -> None:
+    _set_autoclear(event_handler, enabled=True, post_event=10)
+    with patch("anpr2mqtt.event_handler.threading.Timer") as mock_timer_cls:
+        mock_timer = Mock()
+        mock_timer_cls.return_value = mock_timer
+        event_handler._schedule_autoclear()
+    assert mock_timer.daemon is True
+
+
+def test_on_closed_schedules_autoclear(event_handler: EventHandler) -> None:
+    _set_autoclear(event_handler, enabled=True, post_event=300)
+    event = Mock()
+    event.src_path = "fixtures/20250602103045407_B4DM3N_VEHICLE_DETECTION.jpg"
+    event.event_type = "closed"
+    event.is_directory = False
+    with patch.object(event_handler, "_schedule_autoclear") as mock_schedule:
+        event_handler.on_closed(event)
+    mock_schedule.assert_called_once()
+
+
+def test_on_closed_no_image_schedules_autoclear(event_handler: EventHandler) -> None:
+    _set_autoclear(event_handler, enabled=True, post_event=300)
+    event = Mock()
+    event.src_path = "fixtures/2024110312013232013_P99JHG_VEHICLE_DETECTION.jpeg"
+    event.event_type = "closed"
+    event.is_directory = False
+    with patch.object(event_handler, "_schedule_autoclear") as mock_schedule:
+        event_handler.on_closed(event)
+    mock_schedule.assert_called_once()
