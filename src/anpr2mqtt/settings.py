@@ -105,7 +105,7 @@ class OCRFieldSettings(BaseModel):
     label: str = "ocr_field"
     crop: DimensionSettings | None = None
     invert: bool = True
-    correction: dict[str, list[re.Pattern | str]] = Field(default_factory=lambda: {})
+    correction: dict[str, list[re.Pattern]] = Field(default_factory=lambda: {})
     values: list[str] | None = None
 
 
@@ -119,7 +119,7 @@ class OCRSettings(BaseModel):
                 invert=True,
                 crop=DimensionSettings(x=850, y=0, h=30, w=650),
                 values=["Forward", "Reverse", "Unknown"],
-                correction={"Forward": [r"Fo.*rd"], "Reverse": [r"Re.*rse", r"Bac.*rd"]},
+                correction={"Forward": [re.compile(r"Fo.*rd")], "Reverse": [re.compile(r"Re.*rse"), re.compile(r"Bac.*rd")]},
             )
         }
     )
@@ -129,7 +129,7 @@ class TargetSettings(BaseModel):
     known: dict[str, str | None] = Field(default_factory=lambda: {})
     dangerous: dict[str, str | None] = Field(default_factory=lambda: {})
     ignore: list[str] = Field(default_factory=list)
-    correction: dict[str, list[re.Pattern | str]] = Field(default_factory=lambda: {})
+    correction: dict[str, list[re.Pattern]] = Field(default_factory=lambda: {})
 
 
 class Settings(BaseSettings):
