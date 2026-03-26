@@ -249,7 +249,7 @@ class EventHandler(RegexMatchingEventHandler):
             results["priority"] = "critical"
             results["description"] = self.target_config.dangerous[target] or "Potential threat"
         if target in self.target_config.known:
-            log.warning("%s known to household", target)
+            log.info("%s known to household", target)
             results["known"] = True
             results["priority"] = "medium"
             results["description"] = self.target_config.known[target] or "Known"
