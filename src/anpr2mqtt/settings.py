@@ -2,7 +2,7 @@ import re
 from pathlib import Path
 from typing import Final, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import (
     BaseSettings,
     CliSettingsSource,
@@ -55,6 +55,15 @@ class EventSettings(BaseModel):
         default_factory=lambda: ["hik_direction"], description="OCR field definitions to find in image"
     )
     autoclear: AutoClearSettings = AutoClearSettings()
+
+    @field_validator("image_name_re")
+    @classmethod
+    def validate_image_name_re(cls, v: re.Pattern[str]) -> re.Pattern[str]:
+        required = {"dt", "target"}
+        missing = required - set(v.groupindex)
+        if missing:
+            raise ValueError(f"image_name_re is missing required named groups: {sorted(missing)}")
+        return v
 
 
 class HomeAssistantSettings(BaseModel):
