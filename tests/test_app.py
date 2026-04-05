@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 
 from anpr2mqtt.app import main_loop, on_connect, on_disconnect
+from anpr2mqtt.settings import EventSettings
 
 
 def _make_rc(name: str, eq_zero: bool = True) -> Mock:
@@ -41,7 +42,7 @@ def test_on_disconnect_failure() -> None:
     on_disconnect(Mock(), None, Mock(), rc, None)
 
 
-def _make_mock_settings(protocol: str = "3.11", events: list | None = None) -> Mock:
+def _make_mock_settings(protocol: str = "3.11", events: list[EventSettings] | None = None) -> Mock:
     from anpr2mqtt.settings import HomeAssistantSettings
 
     settings = Mock()

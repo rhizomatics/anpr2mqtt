@@ -1,3 +1,5 @@
+# 0.8.1
+- Replaced the now doubtfully maintained httpx with niquests, and hishel with requests-cache
 # 0.8.0
 - Autoclear to optionally reset state after period of time
 - Validate all regular expressions at startup

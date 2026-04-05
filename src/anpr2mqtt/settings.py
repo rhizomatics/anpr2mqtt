@@ -91,7 +91,9 @@ class ImageSettings(BaseModel):
     jpeg_opts: dict[str, int | bool | float | str | tuple[int | float, int | float]] = Field(
         default={"quality": 30, "progressive": True, "optimize": True}
     )
-    png_opts: dict[str, int | bool | float | str | tuple] = Field(default={"quality": 30, "dpi": (60, 90), "optimize": True})
+    png_opts: dict[str, int | bool | float | str | tuple[int, int]] = Field(
+        default={"quality": 30, "dpi": (60, 90), "optimize": True}
+    )
 
 
 class DimensionSettings(BaseModel):
@@ -129,7 +131,7 @@ class TargetSettings(BaseModel):
     known: dict[str, str | None] = Field(default_factory=lambda: {})
     dangerous: dict[str, str | None] = Field(default_factory=lambda: {})
     ignore: list[str] = Field(default_factory=list)
-    correction: dict[str, list[re.Pattern]] = Field(default_factory=lambda: {})
+    correction: dict[str, list[str | re.Pattern[str]]] = Field(default_factory=lambda: {})
 
 
 class Settings(BaseSettings):

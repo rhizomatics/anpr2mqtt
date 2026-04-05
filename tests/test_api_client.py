@@ -1,13 +1,29 @@
+from unittest.mock import MagicMock
+
 import pytest
-from pytest_httpx import HTTPXMock
+from pytest_mock import MockerFixture
 
 from anpr2mqtt.api_client import DVLA, APIClient
 
 
-@pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
-def test_discover_metadata(httpx_mock: HTTPXMock) -> None:
-    httpx_mock.add_response(
-        json={
+def _mock_session(mocker: MockerFixture, status_code: int, json_data: object) -> MagicMock:
+    resp = MagicMock()
+    resp.status_code = status_code
+    resp.json.return_value = json_data
+    resp.from_cache = False
+    session = MagicMock()
+    session.__enter__ = lambda s: s
+    session.__exit__ = MagicMock(return_value=False)
+    session.post.return_value = resp
+    mocker.patch("anpr2mqtt.api_client._CachedSession", return_value=session)
+    return session
+
+
+def test_discover_metadata(mocker: MockerFixture) -> None:
+    _mock_session(
+        mocker,
+        200,
+        {
             "artEndDate": "2025-02-28",
             "co2Emissions": 135,
             "colour": "BLUE",
@@ -27,43 +43,37 @@ def test_discover_metadata(httpx_mock: HTTPXMock) -> None:
             "euroStatus": "EURO 6 AD",
             "realDrivingEmissions": "1",
             "dateOfLastV5CIssued": "2016-12-25",
-        }
+        },
     )
-    api_client = DVLA("7878748347834")
-    result = api_client.lookup("SP13TST")
+    result = DVLA("7878748347834").lookup("SP13TST")
     assert result["yearOfManufacture"] == 2004  # type:ignore[call-overload,index]
 
 
 def test_dvla_invalid_reg() -> None:
-    api_client = DVLA("fake_key")
-    result = api_client.lookup("NOTAVALID!!!REG")
+    result = DVLA("fake_key").lookup("NOTAVALID!!!REG")
     assert isinstance(result, dict)
     assert result == {"reg_match_fail": "GB"}
 
 
-@pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
-def test_dvla_api_error_response(httpx_mock: HTTPXMock) -> None:
-    httpx_mock.add_response(
-        status_code=403,
-        json={"errors": [{"title": "Forbidden", "code": "403", "status": "403"}]},
-    )
-    api_client = DVLA("bad_key")
-    result = api_client.lookup("SP13TST")
+def test_dvla_api_error_response(mocker: MockerFixture) -> None:
+    _mock_session(mocker, 403, {"errors": [{"title": "Forbidden", "code": "403", "status": "403"}]})
+    result = DVLA("bad_key").lookup("SP13TST")
     assert isinstance(result, dict)
     assert "api_errors" in result
     assert result["api_status"] == 403
 
 
-@pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
-def test_dvla_api_exception(httpx_mock: HTTPXMock) -> None:
-    httpx_mock.add_exception(ConnectionError("network down"))
-    api_client = DVLA("fake_key")
-    result = api_client.lookup("SP13TST")
+def test_dvla_api_exception(mocker: MockerFixture) -> None:
+    session = MagicMock()
+    session.__enter__ = lambda s: s
+    session.__exit__ = MagicMock(return_value=False)
+    session.post.side_effect = ConnectionError("network down")
+    mocker.patch("anpr2mqtt.api_client._CachedSession", return_value=session)
+    result = DVLA("fake_key").lookup("SP13TST")
     assert isinstance(result, dict)
     assert "api_exception" in result
 
 
 def test_api_client_base_not_implemented() -> None:
-    client = APIClient()
     with pytest.raises(NotImplementedError):
-        client.lookup("TEST")
+        APIClient().lookup("TEST")

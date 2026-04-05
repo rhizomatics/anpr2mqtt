@@ -27,7 +27,7 @@ uv run pytest             # Run tests
 uv run python script.py   # Run any Python script
 
 # Manage dependencies
-uv add httpx.             # Add production dependency
+uv add niquests           # Add production dependency
 uv add --dev pytest       # Add dev dependency
 uv remove package-name    # Remove a dependency
 uv lock                   # Update lockfile after manual pyproject.toml edits

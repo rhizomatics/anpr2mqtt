@@ -1,11 +1,17 @@
 import re
 from typing import TYPE_CHECKING, Any, cast
 
+import niquests
 import structlog
-from hishel.httpx import SyncCacheClient
+from requests_cache.session import CacheMixin
 
 if TYPE_CHECKING:
-    from httpx import Response
+    from requests_cache import CachedResponse
+
+
+class _CachedSession(CacheMixin, niquests.Session):  # type: ignore[misc]
+    """requests-cache backed by niquests as the transport."""
+
 
 log = structlog.get_logger()
 
@@ -29,14 +35,17 @@ class DVLA(APIClient):
             log.warning(f"DVLA SKIP invalid reg {reg}")
             return {"reg_match_fail": self.ID}
         try:
-            with SyncCacheClient(headers=[("cache-control", f"max-age={self.cache_ttl}")]) as client:
+            with _CachedSession("dvla_cache", expire_after=self.cache_ttl) as client:
                 log.debug(f"Fetching DVLA info from API, cache_ttl={self.cache_ttl}")
-                response: Response = client.post(
-                    url="https://driver-vehicle-licensing.api.gov.uk/vehicle-enquiry/v1/vehicles",
-                    headers={"x-api-key": self.api_key, "Content-Type": "application/json"},
-                    json={"registrationNumber": reg.upper()},
+                response: CachedResponse = cast(
+                    "CachedResponse",
+                    client.post(
+                        url="https://driver-vehicle-licensing.api.gov.uk/vehicle-enquiry/v1/vehicles",
+                        headers={"x-api-key": self.api_key, "Content-Type": "application/json"},
+                        json={"registrationNumber": reg.upper()},
+                    ),
                 )
-                if response.extensions.get("hishel_from_cache"):
+                if response.from_cache:
                     log.debug("DVLA API cached response")
                 if response.status_code == 200:
                     return cast("dict[str,Any]", response.json())

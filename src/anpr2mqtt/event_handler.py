@@ -288,7 +288,7 @@ def process_image(
         return None
 
 
-def examine_file(file_path: Path, image_name_re: re.Pattern) -> ImageInfo | None:
+def examine_file(file_path: Path, image_name_re: re.Pattern[str]) -> ImageInfo | None:
     try:
         match = re.match(image_name_re, file_path.name)
         if match:

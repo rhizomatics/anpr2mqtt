@@ -113,8 +113,8 @@ or change the time lag, or also clear image ) using the `autoclear` configuratio
 - **Pillow** - Image processing
 - **pytesseract** - OCR for direction detection
 - **structlog** - Structured logging
-- **httpx** - API Client
-- **hishel** - API result caching
+- **niquests** - API Client
+- **requests-cache** - API result caching
 
 ## Distribution
 
