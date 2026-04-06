@@ -7,6 +7,8 @@ import structlog
 from requests_cache import FileCache
 from requests_cache.session import CacheMixin
 
+from anpr2mqtt.settings import CacheType
+
 if TYPE_CHECKING:
     from requests_cache import CachedResponse
 
@@ -28,8 +30,15 @@ class DVLA(APIClient):
     REG_RE = r"(^[A-Z]{2}[0-9]{2}\s?[A-Z]{3}$)|(^[A-Z][0-9]{1,3}[A-Z]{3}$)|(^[A-Z]{3}[0-9]{1,3}[A-Z]$)|(^[0-9]{1,4}[A-Z]{1,2}$)|(^[0-9]{1,3}[A-Z]{1,3}$)|(^[A-Z]{1,2}[0-9]{1,4}$)|(^[A-Z]{1,3}[0-9]{1,3}$)|(^[A-Z]{1,3}[0-9]{1,4}$)|(^[0-9]{3}[DX]{1}[0-9]{3}$)"  # noqa: E501
     """https://developer-portal.driver-vehicle-licensing.api.gov.uk"""
 
-    def __init__(self, api_key: str, cache_ttl: int = 60 * 60 * 6, cache_dir: Path | None = None, test: bool = False) -> None:
-        if cache_dir:
+    def __init__(
+        self,
+        api_key: str,
+        cache_ttl: int = 60 * 60 * 6,
+        cache_type: CacheType = CacheType.MEMORY,
+        cache_dir: Path | None = None,
+        test: bool = False,
+    ) -> None:
+        if cache_type == CacheType.FILE and cache_dir:
             file_cache: FileCache = FileCache(cache_name=str(cache_dir), use_cache_dir=True)
             log.debug("Caching DVLA at %s for %s", file_cache.cache_dir, cache_ttl)
             self.cache_session = _CachedSession(

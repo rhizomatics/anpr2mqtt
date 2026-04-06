@@ -92,5 +92,7 @@ Key flags for `dvla_lookup`:
 | `REGISTRATION` | Vehicle registration number (positional) | required |
 | `--dvla.api_key` | DVLA API key | — |
 | `--dvla.cache_ttl` | Cache TTL in seconds | `86400` |
+| `--dvla.cache_type` | Cache type | `FILE` |
+| `--dvla.cache_dir` | Caching directory | `/data/cache` |
 | `--test` | Use UAT environment | `False` |
 | `--log_level` | Logging verbosity | `INFO` |

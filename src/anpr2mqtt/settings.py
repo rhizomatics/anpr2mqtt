@@ -1,4 +1,5 @@
 import re
+from enum import StrEnum, auto
 from pathlib import Path
 from typing import Final, Literal
 
@@ -78,10 +79,16 @@ class HomeAssistantSettings(BaseModel):
     camera_entity: bool = Field(default=True, description="Create a Camera entity via MQTT discovery")
 
 
+class CacheType(StrEnum):
+    MEMORY = auto()
+    FILE = auto()
+
+
 class DVLASettings(BaseModel):
     api_key: str | None = Field(default=None, description="DVLA issued API key")
-    cache_ttl: int = Field(default=86400, description="Time to live for cached DVLA API results, in seconds")
-    cache_dir: Path | None = Field(default=Path("/data/cache"), description="Cache directory, in memory if set to empty")
+    cache_ttl: int = Field(default=86400, description="Time to live for cached DVLA API results, in seconds, default 1 day")
+    cache_type: CacheType = Field(default=CacheType.FILE, description="Cache implementation, MEMORY or FILE")
+    cache_dir: Path | None = Field(default=None, description="Cache directory")
 
 
 class TrackerSettings(BaseModel):

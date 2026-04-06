@@ -63,7 +63,9 @@ class EventHandler(RegexMatchingEventHandler):
 
         if dvla_config.api_key and event_config.target_type == TARGET_TYPE_PLATE:
             log.info("Configured gov API lookup")
-            self.api_client: APIClient | None = DVLA(dvla_config.api_key, cache_ttl=dvla_config.cache_ttl)
+            self.api_client: APIClient | None = DVLA(
+                dvla_config.api_key, cache_type=dvla_config.cache_type, cache_ttl=dvla_config.cache_ttl
+            )
         else:
             log.info("No gov API lookup configured")
             self.api_client = None

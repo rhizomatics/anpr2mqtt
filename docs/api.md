@@ -18,6 +18,8 @@ Configure the API key using the `DVLA__API_KEY` environment variable, the CLI ar
 dvla:
     api_key: 59859j545h458957
     cache_ttl: 86400 # number of seconds to cache the result
+    cache_type: FILE # cache implementation can be FILE or MEMORY
+    cache_dir: /data/cache # where to store cached data if FILE chosen
 ```
 
 ### Example Response

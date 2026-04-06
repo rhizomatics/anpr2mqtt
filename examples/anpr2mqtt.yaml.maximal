@@ -65,6 +65,8 @@ tracker:
   data_dir: /data
 dvla:
   cache_ttl: 86400
+  cache_type: FILE
+  cache_dir: /data/cache
   api_key: MY6676SECRET787KEY
 targets:
   plate:

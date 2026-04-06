@@ -6,6 +6,7 @@ import pytest
 from pytest_mock import MockerFixture
 
 from anpr2mqtt.api_client import DVLA, APIClient
+from anpr2mqtt.settings import CacheType
 
 
 def _make_response(status_code: int, json_data: object, from_cache: bool = False) -> MagicMock:
@@ -89,7 +90,7 @@ def test_api_client_base_not_implemented() -> None:
         APIClient().lookup("TEST")
 
 
-def test_init_without_cache_dir_omits_backend(mocker: MockerFixture) -> None:
+def test_init_without_cache_dir_uses_memory_backend(mocker: MockerFixture) -> None:
     cls_mock, _ = _mock_session(mocker, 200, {})
     DVLA("key")
     _, kwargs = cls_mock.call_args
@@ -99,7 +100,7 @@ def test_init_without_cache_dir_omits_backend(mocker: MockerFixture) -> None:
 def test_init_with_cache_dir_uses_file_cache(mocker: MockerFixture, tmp_path: Path) -> None:
     file_cache_cls = mocker.patch("anpr2mqtt.api_client.FileCache")
     cls_mock, _ = _mock_session(mocker, 200, {})
-    DVLA("key", cache_dir=tmp_path)
+    DVLA("key", cache_dir=tmp_path, cache_type=CacheType.FILE)
     file_cache_cls.assert_called_once_with(cache_name=str(tmp_path), use_cache_dir=True)
     _, kwargs = cls_mock.call_args
     assert kwargs["backend"] is file_cache_cls.return_value
