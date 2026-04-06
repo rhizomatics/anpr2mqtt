@@ -38,17 +38,24 @@ class DVLA(APIClient):
         cache_dir: Path | None = None,
         test: bool = False,
     ) -> None:
+
         if cache_type == CacheType.FILE and cache_dir:
-            file_cache: FileCache = FileCache(cache_name=str(cache_dir), use_cache_dir=True)
-            log.debug("Caching DVLA at %s for %s", file_cache.cache_dir, cache_ttl)
-            self.cache_session = _CachedSession(
-                cache_name="dvla_cache", allowable_methods=["GET", "POST"], expire_after=cache_ttl, backend=file_cache
-            )
-        else:
+            try:
+                file_cache: FileCache = FileCache(cache_name=str(cache_dir), use_cache_dir=True)
+                log.debug("Caching DVLA at %s for %s", file_cache.cache_dir, cache_ttl)
+                self.cache_session = _CachedSession(
+                    cache_name="dvla_cache", allowable_methods=["GET", "POST"], expire_after=cache_ttl, backend=file_cache
+                )
+            except Exception as e:
+                log.error("Unable to configure file system caching, reverting to in memory: %s", e)
+                cache_type = CacheType.MEMORY
+
+        if cache_type != CacheType.FILE:
             log.debug("Caching DVLA in memory for %s", cache_ttl)
             self.cache_session = _CachedSession(
                 cache_name="dvla_cache", allowable_methods=["GET", "POST"], backend="memory", expire_after=cache_ttl
             )
+
         self.api_key: str = api_key
         self.env_prefix: Literal["uat."] | Literal[""] = "uat." if test else ""
 
