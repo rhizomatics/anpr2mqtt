@@ -38,4 +38,6 @@ htmlcov/
 # uv (keep uv.lock in version control)
 .python-version
 
+*.sqlite
+
 examples/mine.yaml

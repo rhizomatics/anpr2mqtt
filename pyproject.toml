@@ -159,20 +159,15 @@ skip-magic-trailing-comma = false
 # Like Black, automatically detect the appropriate line ending.
 line-ending = "auto"
 
-
-[tool.pytest.ini_options]
-testpaths = [
-    "tests",
+[tool.pytest]
+markers = [
+    "manual: tests to be executed manually"
 ]
-norecursedirs = [
-    ".git",
-    "templates",
-]
-
-pythonpath = [
-  "."
-]
-addopts = "--junitxml=junit/test-results.xml --cov --cov-report=lcov:lcov.info --cov-report=xml --cov-report=html --cov-report=term --import-mode=importlib"
+testpaths = ["tests"]
+norecursedirs = [".git","templates"]
+pythonpath = ["."]
+addopts = ["--strict-markers","--junitxml=junit/test-results.xml",
+"--cov","--cov-report=lcov:lcov.info","--cov-report=xml","--cov-report=html","--cov-report=term","--import-mode=importlib"]
 
 [tool.coverage.run]
 branch = true

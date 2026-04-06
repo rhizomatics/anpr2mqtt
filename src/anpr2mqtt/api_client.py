@@ -26,9 +26,10 @@ class DVLA(APIClient):
     REG_RE = r"(^[A-Z]{2}[0-9]{2}\s?[A-Z]{3}$)|(^[A-Z][0-9]{1,3}[A-Z]{3}$)|(^[A-Z]{3}[0-9]{1,3}[A-Z]$)|(^[0-9]{1,4}[A-Z]{1,2}$)|(^[0-9]{1,3}[A-Z]{1,3}$)|(^[A-Z]{1,2}[0-9]{1,4}$)|(^[A-Z]{1,3}[0-9]{1,3}$)|(^[A-Z]{1,3}[0-9]{1,4}$)|(^[0-9]{3}[DX]{1}[0-9]{3}$)"  # noqa: E501
     """https://developer-portal.driver-vehicle-licensing.api.gov.uk"""
 
-    def __init__(self, api_key: str, cache_ttl: int = 60 * 60 * 6) -> None:
+    def __init__(self, api_key: str, cache_ttl: int = 60 * 60 * 6, test: bool = False) -> None:
         self.cache_ttl: int = cache_ttl
         self.api_key: str = api_key
+        self.env_prefix = "uat." if test else ""
 
     def lookup(self, reg: str) -> list[Any] | dict[str, Any] | None:
         if not re.match(self.REG_RE, reg):
@@ -40,7 +41,7 @@ class DVLA(APIClient):
                 response: CachedResponse = cast(
                     "CachedResponse",
                     client.post(
-                        url="https://driver-vehicle-licensing.api.gov.uk/vehicle-enquiry/v1/vehicles",
+                        url=f"https://{self.env_prefix}driver-vehicle-licensing.api.gov.uk/vehicle-enquiry/v1/vehicles",
                         headers={"x-api-key": self.api_key, "Content-Type": "application/json"},
                         json={"registrationNumber": reg.upper()},
                     ),

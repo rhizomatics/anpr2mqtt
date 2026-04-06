@@ -77,3 +77,18 @@ def test_dvla_api_exception(mocker: MockerFixture) -> None:
 def test_api_client_base_not_implemented() -> None:
     with pytest.raises(NotImplementedError):
         APIClient().lookup("TEST")
+
+
+@pytest.mark.skip
+def test_real_api_call() -> None:
+    """Requires a UAT env key to use the test reg"""
+    import os
+
+    api_key: str | None = os.environ.get("DVLA_API_KEY")
+    assert api_key
+    reg: str = "AA19AAA"  # see https://developer-portal.driver-vehicle-licensing.api.gov.uk/apis/vehicle-enquiry-service/mock-responses.html#test-vrns
+    result = DVLA(api_key=api_key, test=True).lookup(reg)
+    assert result
+    assert "api_errors" not in result
+    assert "api_exception" not in result
+    assert "reg_match_fail" not in result
