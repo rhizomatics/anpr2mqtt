@@ -51,9 +51,9 @@ class DVLA(APIClient):
                 if response.status_code == 200:
                     return {
                         "cache": {
-                            "calls": len(response.history),
+                            "calls": len(response.history) if response.history else 0,
                             "cached": response.from_cache,
-                            "created": response.created_at,
+                            "created": response.created_at.isoformat() if response.created_at else None,
                         },
                         "plate": cast("dict[str,Any]", response.json()),
                     }
