@@ -32,10 +32,14 @@ class DVLA(APIClient):
         if cache_dir:
             file_cache: FileCache = FileCache(cache_name=str(cache_dir), use_cache_dir=True)
             log.debug("Caching DVLA at %s for %s", file_cache.cache_dir, cache_ttl)
-            self.cache_session = _CachedSession(cache_name="dvla_cache", expire_after=cache_ttl, backend=file_cache)
+            self.cache_session = _CachedSession(
+                cache_name="dvla_cache", allowable_methods=["GET", "POST"], expire_after=cache_ttl, backend=file_cache
+            )
         else:
             log.debug("Caching DVLA in memory for %s", cache_ttl)
-            self.cache_session = _CachedSession(cache_name="dvla_cache", backend="memory", expire_after=cache_ttl)
+            self.cache_session = _CachedSession(
+                cache_name="dvla_cache", allowable_methods=["GET", "POST"], backend="memory", expire_after=cache_ttl
+            )
         self.api_key: str = api_key
         self.env_prefix: Literal["uat."] | Literal[""] = "uat." if test else ""
 
