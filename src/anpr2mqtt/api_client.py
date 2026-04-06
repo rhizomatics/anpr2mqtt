@@ -30,7 +30,7 @@ class DVLA(APIClient):
 
     def __init__(self, api_key: str, cache_ttl: int = 60 * 60 * 6, cache_dir: Path | None = None, test: bool = False) -> None:
         if cache_dir:
-            file_cache: FileCache = FileCache(cache_name=cache_dir, use_cache_dir=True)
+            file_cache: FileCache = FileCache(cache_name=str(cache_dir), use_cache_dir=True)
             log.debug("Caching DVLA at %s for %s", file_cache.cache_dir, cache_ttl)
             self.cache_session = _CachedSession(cache_name="dvla_cache", expire_after=cache_ttl, backend=file_cache)
         else:
