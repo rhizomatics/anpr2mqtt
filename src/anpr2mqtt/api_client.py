@@ -1,6 +1,6 @@
 import re
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 import niquests
 import structlog
@@ -31,12 +31,12 @@ class DVLA(APIClient):
     def __init__(self, api_key: str, cache_ttl: int = 60 * 60 * 6, cache_dir: Path | None = None, test: bool = False) -> None:
         if cache_dir:
             self.cache_session = _CachedSession(
-                "dvla_cache", expire_after=cache_ttl, backend=FileCache(cache_dir, use_cache_dir=True)
+                cache_name="dvla_cache", expire_after=cache_ttl, backend=FileCache(cache_dir, use_cache_dir=True)
             )
         else:
-            self.cache_session = _CachedSession("dvla_cache", expire_after=cache_ttl)
+            self.cache_session = _CachedSession(cache_name="dvla_cache", backend="memory", expire_after=cache_ttl)
         self.api_key: str = api_key
-        self.env_prefix = "uat." if test else ""
+        self.env_prefix: Literal["uat."] | Literal[""] = "uat." if test else ""
 
     def lookup(self, reg: str) -> dict[str, Any]:
         if not re.match(self.REG_RE, reg):
