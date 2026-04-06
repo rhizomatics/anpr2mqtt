@@ -117,7 +117,7 @@ class EventHandler(RegexMatchingEventHandler):
                     and image_info.target
                     and self.event_config.target_type == TARGET_TYPE_PLATE
                 ):
-                    reg_info = self.api_client.lookup(target)
+                    reg_info = self.api_client.lookup(target).get("plate")
 
                 visit_count: int
                 last_seen: dt.datetime | None

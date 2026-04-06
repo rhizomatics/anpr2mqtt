@@ -1,3 +1,4 @@
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -45,14 +46,14 @@ def test_discover_metadata(mocker: MockerFixture) -> None:
             "dateOfLastV5CIssued": "2016-12-25",
         },
     )
-    result = DVLA("7878748347834").lookup("SP13TST")
-    assert result["yearOfManufacture"] == 2004  # type:ignore[call-overload,index]
+    result: dict[str, Any] = DVLA("7878748347834").lookup("SP13TST").get("plate", {})
+    assert result["yearOfManufacture"] == 2004
 
 
 def test_dvla_invalid_reg() -> None:
     result = DVLA("fake_key").lookup("NOTAVALID!!!REG")
     assert isinstance(result, dict)
-    assert result == {"reg_match_fail": "GB"}
+    assert result == {"reg_match_fail": "GB", "plate": {}}
 
 
 def test_dvla_api_error_response(mocker: MockerFixture) -> None:

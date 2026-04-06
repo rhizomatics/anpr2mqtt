@@ -107,7 +107,7 @@ class OCRFieldSettings(BaseModel):
     label: str = "ocr_field"
     crop: DimensionSettings | None = None
     invert: bool = True
-    correction: dict[str, list[re.Pattern]] = Field(default_factory=lambda: {})
+    correction: dict[str, list[re.Pattern[str]]] = Field(default_factory=lambda: {})
     values: list[str] | None = None
 
 

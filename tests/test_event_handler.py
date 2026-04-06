@@ -378,7 +378,7 @@ def test_on_closed_ignored_target(event_handler: EventHandler) -> None:
 
 def test_on_closed_with_api_client(event_handler: EventHandler) -> None:
     mock_api = Mock()
-    mock_api.lookup.return_value = {"make": "FORD", "colour": "BLUE"}
+    mock_api.lookup.return_value = {"plate": {"make": "FORD", "colour": "BLUE"}}
     event_handler.api_client = mock_api
     event_handler.event_config = EventSettings(
         camera="test_cam",

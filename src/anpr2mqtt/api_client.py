@@ -17,7 +17,7 @@ log = structlog.get_logger()
 
 
 class APIClient:
-    def lookup(self, reg: str) -> list[Any] | dict[str, Any] | None:
+    def lookup(self, reg: str) -> dict[str, Any]:
         raise NotImplementedError()
 
 
@@ -31,10 +31,10 @@ class DVLA(APIClient):
         self.api_key: str = api_key
         self.env_prefix = "uat." if test else ""
 
-    def lookup(self, reg: str) -> list[Any] | dict[str, Any] | None:
+    def lookup(self, reg: str) -> dict[str, Any]:
         if not re.match(self.REG_RE, reg):
             log.warning(f"DVLA SKIP invalid reg {reg}")
-            return {"reg_match_fail": self.ID}
+            return {"reg_match_fail": self.ID, "plate": {}}
         try:
             with _CachedSession("dvla_cache", expire_after=self.cache_ttl) as client:
                 log.debug(f"Fetching DVLA info from API, cache_ttl={self.cache_ttl}")
@@ -47,12 +47,19 @@ class DVLA(APIClient):
                     ),
                 )
                 if response.from_cache:
-                    log.debug("DVLA API cached response")
+                    log.debug("DVLA API cached response, created %s", response.created_at)
                 if response.status_code == 200:
-                    return cast("dict[str,Any]", response.json())
+                    return {
+                        "cache": {
+                            "calls": len(response.history),
+                            "cached": response.from_cache,
+                            "created": response.created_at,
+                        },
+                        "plate": cast("dict[str,Any]", response.json()),
+                    }
 
                 log.error("DVLA API FAIL: %s", response.json())
-                return {"api_errors": response.json()["errors"], "api_status": response.status_code}
+                return {"api_errors": response.json()["errors"], "api_status": response.status_code, "plate": {}}
         except Exception as e:
             log.exception("Failed to fetch DVLA reg data")
-            return {"api_exception": str(e)}
+            return {"api_exception": str(e), "plate": {}}
