@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 import structlog
 from PIL import Image
@@ -69,8 +69,11 @@ class DVLATool(BaseModel):
         if not self.dvla.api_key:
             print("Error: DVLA API key required (--dvla.api_key or DVLA__API_KEY env var)")  # noqa: T201
             return
+        print(  # noqa: T201
+            "Caching for {} at {}".format(self.dvla.cache_ttl, "in memory" if not self.dvla.cache_dir else self.dvla.cache_dir)
+        )
         client = DVLA(api_key=self.dvla.api_key, cache_dir=self.dvla.cache_dir, cache_ttl=self.dvla.cache_ttl, test=self.test)
-        result = client.lookup(self.registration.upper())
+        result: dict[str, Any] = client.lookup(self.registration.upper())
         print(json.dumps(result, indent=2))  # noqa: T201
 
 
