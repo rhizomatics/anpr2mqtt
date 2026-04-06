@@ -81,6 +81,7 @@ class HomeAssistantSettings(BaseModel):
 class DVLASettings(BaseModel):
     api_key: str | None = Field(default=None, description="DVLA issued API key")
     cache_ttl: int = Field(default=86400, description="Time to live for cached DVLA API results, in seconds")
+    cache_dir: Path | None = Field(default=None, description="Cache directory, in memory if not specified")
 
 
 class TrackerSettings(BaseModel):

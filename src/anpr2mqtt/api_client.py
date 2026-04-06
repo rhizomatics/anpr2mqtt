@@ -1,8 +1,10 @@
 import re
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 import niquests
 import structlog
+from requests_cache import FileCache
 from requests_cache.session import CacheMixin
 
 if TYPE_CHECKING:
@@ -26,8 +28,13 @@ class DVLA(APIClient):
     REG_RE = r"(^[A-Z]{2}[0-9]{2}\s?[A-Z]{3}$)|(^[A-Z][0-9]{1,3}[A-Z]{3}$)|(^[A-Z]{3}[0-9]{1,3}[A-Z]$)|(^[0-9]{1,4}[A-Z]{1,2}$)|(^[0-9]{1,3}[A-Z]{1,3}$)|(^[A-Z]{1,2}[0-9]{1,4}$)|(^[A-Z]{1,3}[0-9]{1,3}$)|(^[A-Z]{1,3}[0-9]{1,4}$)|(^[0-9]{3}[DX]{1}[0-9]{3}$)"  # noqa: E501
     """https://developer-portal.driver-vehicle-licensing.api.gov.uk"""
 
-    def __init__(self, api_key: str, cache_ttl: int = 60 * 60 * 6, test: bool = False) -> None:
-        self.cache_ttl: int = cache_ttl
+    def __init__(self, api_key: str, cache_ttl: int = 60 * 60 * 6, cache_dir: Path | None = None, test: bool = False) -> None:
+        if cache_dir:
+            self.cache_session = _CachedSession(
+                "dvla_cache", expire_after=cache_ttl, backend=FileCache(cache_dir, use_cache_dir=True)
+            )
+        else:
+            self.cache_session = _CachedSession("dvla_cache", expire_after=cache_ttl)
         self.api_key: str = api_key
         self.env_prefix = "uat." if test else ""
 
@@ -36,8 +43,8 @@ class DVLA(APIClient):
             log.warning(f"DVLA SKIP invalid reg {reg}")
             return {"reg_match_fail": self.ID, "plate": {}}
         try:
-            with _CachedSession("dvla_cache", expire_after=self.cache_ttl) as client:
-                log.debug(f"Fetching DVLA info from API, cache_ttl={self.cache_ttl}")
+            with self.cache_session as client:
+                log.debug(f"Fetching DVLA info from API, cache_ttl={self.cache_session.expire_after}")
                 response: CachedResponse = cast(
                     "CachedResponse",
                     client.post(
