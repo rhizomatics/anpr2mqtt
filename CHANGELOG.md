@@ -1,5 +1,6 @@
 # 0.8.1
 - Replaced the now doubtfully maintained httpx with niquests, and hishel with requests-cache
+- Add DVLA lookup to the CLI tools
 # 0.8.0
 - Autoclear to optionally reset state after period of time
 - Validate all regular expressions at startup

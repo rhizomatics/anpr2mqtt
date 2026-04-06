@@ -1,9 +1,10 @@
+import json
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
 import structlog
 from PIL import Image
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from pydantic_settings import (
     BaseSettings,
     CliApp,
@@ -12,8 +13,9 @@ from pydantic_settings import (
     SettingsConfigDict,
 )
 
+from anpr2mqtt.api_client import DVLA
 from anpr2mqtt.event_handler import examine_file, scan_ocr_fields
-from anpr2mqtt.settings import EventSettings, OCRFieldSettings, OCRSettings
+from anpr2mqtt.settings import DVLASettings, EventSettings, OCRFieldSettings, OCRSettings
 
 if TYPE_CHECKING:
     from anpr2mqtt.const import ImageInfo
@@ -56,6 +58,22 @@ class ListTool(BaseModel):
                 print(f"{results.target}: timestamp={results.timestamp},ext={results.ext}")  # noqa: T201
 
 
+class DVLATool(BaseModel):
+    dvla: DVLASettings = DVLASettings()
+    test: bool = Field(default=False, description="Use DVLA UAT environment")
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
+    registration: CliPositionalArg[str]
+
+    def cli_cmd(self) -> None:
+        structlog.configure(wrapper_class=structlog.make_filtering_bound_logger(self.log_level))
+        if not self.dvla.api_key:
+            print("Error: DVLA API key required (--dvla.api_key or DVLA__API_KEY env var)")  # noqa: T201
+            return
+        client = DVLA(api_key=self.dvla.api_key, cache_ttl=self.dvla.cache_ttl, test=self.test)
+        result = client.lookup(self.registration.upper())
+        print(json.dumps(result, indent=2))  # noqa: T201
+
+
 class Tools(BaseSettings, cli_parse_args=True, cli_exit_on_error=True):
     model_config = SettingsConfigDict(
         env_nested_delimiter="__",
@@ -64,6 +82,7 @@ class Tools(BaseSettings, cli_parse_args=True, cli_exit_on_error=True):
     )
     ocr_file: CliSubCommand[OCRTool]
     list_dir: CliSubCommand[ListTool]
+    dvla_lookup: CliSubCommand[DVLATool]
 
     def cli_cmd(self) -> None:
         CliApp.run_subcommand(self)

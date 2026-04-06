@@ -58,6 +58,17 @@ Build and run with Docker, example [docker-compose.yaml](examples/docker_compose
 
 ANPR2MQTT uses [pydantic-settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/), which means configuration can happen in a variety of ways, and these can be combined - yaml configuration file, environment variables, Docker Secrets, built-in defaults, and `.env` file or command line arguments.
 
+### CLI Arguments
+
+Every configuration setting can be passed as a command line argument, using dot notation for nested settings.
+This is the highest-priority source and overrides all other configuration.
+
+```bash
+uv run anpr2mqtt --mqtt.host 192.168.1.10 --mqtt.port 1884 --log_level DEBUG
+```
+
+Run `uv run anpr2mqtt --help` to see all available flags, and find more information at [Debug Tools](debug_tools.md)
+
 ## Home Assistant Integration
 
 See [Home Assistant Integration](homeassistant.md) for configuration and example notification automation.
