@@ -72,7 +72,13 @@ class DVLATool(BaseModel):
         print(  # noqa: T201
             "Caching for {} at {}".format(self.dvla.cache_ttl, "in memory" if not self.dvla.cache_dir else self.dvla.cache_dir)
         )
-        client = DVLA(api_key=self.dvla.api_key, cache_dir=self.dvla.cache_dir, cache_ttl=self.dvla.cache_ttl, test=self.test)
+        client = DVLA(
+            api_key=self.dvla.api_key,
+            cache_type=self.dvla.cache_type,
+            cache_dir=self.dvla.cache_dir,
+            cache_ttl=self.dvla.cache_ttl,
+            test=self.test,
+        )
         result: dict[str, Any] = client.lookup(self.registration.upper())
         print(json.dumps(result, indent=2))  # noqa: T201
 
