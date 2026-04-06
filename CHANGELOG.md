@@ -1,5 +1,6 @@
-# 0.8.1
+# 0.9.0
 - Replaced the now doubtfully maintained httpx with niquests, and hishel with requests-cache
+- Settings now has configuration for `cache_dir` and to choose `cache_type` between `FILE` or `MEMORY`
 - Add DVLA lookup to the CLI tools
 # 0.8.0
 - Autoclear to optionally reset state after period of time

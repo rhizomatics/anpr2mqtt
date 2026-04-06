@@ -1,6 +1,6 @@
 [project]
 name = "anpr2mqtt"
-version = "0.8.1"
+version = "0.9.0"
 description = "ANPR MQTT bridge for Home Assistant"
 authors = [
     { name = "jey burrows", email = "jrb@rhizomatics.org.uk" }
