@@ -7,17 +7,25 @@ from pytest_mock import MockerFixture
 from anpr2mqtt.api_client import DVLA, APIClient
 
 
-def _mock_session(mocker: MockerFixture, status_code: int, json_data: object) -> MagicMock:
+def _make_response(status_code: int, json_data: object, from_cache: bool = False) -> MagicMock:
     resp = MagicMock()
     resp.status_code = status_code
     resp.json.return_value = json_data
-    resp.from_cache = False
+    resp.from_cache = from_cache
+    resp.history = None
+    resp.created_at = None
+    return resp
+
+
+def _mock_session(mocker: MockerFixture, status_code: int, json_data: object) -> tuple[MagicMock, MagicMock]:
+    """Return (session_cls_mock, session_instance_mock)."""
+    resp = _make_response(status_code, json_data)
     session = MagicMock()
     session.__enter__ = lambda s: s
     session.__exit__ = MagicMock(return_value=False)
     session.post.return_value = resp
-    mocker.patch("anpr2mqtt.api_client._CachedSession", return_value=session)
-    return session
+    cls_mock = mocker.patch("anpr2mqtt.api_client._CachedSession", return_value=session)
+    return cls_mock, session
 
 
 def test_discover_metadata(mocker: MockerFixture) -> None:

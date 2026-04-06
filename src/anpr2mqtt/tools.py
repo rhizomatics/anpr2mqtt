@@ -69,7 +69,7 @@ class DVLATool(BaseModel):
         if not self.dvla.api_key:
             print("Error: DVLA API key required (--dvla.api_key or DVLA__API_KEY env var)")  # noqa: T201
             return
-        client = DVLA(api_key=self.dvla.api_key, cache_ttl=self.dvla.cache_ttl, test=self.test)
+        client = DVLA(api_key=self.dvla.api_key, cache_dir=self.dvla.cache_dir, cache_ttl=self.dvla.cache_ttl, test=self.test)
         result = client.lookup(self.registration.upper())
         print(json.dumps(result, indent=2))  # noqa: T201
 
