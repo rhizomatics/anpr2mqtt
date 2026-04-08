@@ -274,16 +274,23 @@ def process_image(
             img_args = jpeg_opts
         elif image_format == "png" and png_opts:
             img_args = png_opts
+        else:
+            log.info("Unknown image format %s, no tuning available", image_format)
         if img_args:
             log.debug("Rewriting image to process %s", img_args)
             buffer = BytesIO()
             image.save(buffer, image_format, **img_args)
             size = buffer.getbuffer().nbytes
-            if size != image_info.size:
-                log.info("Image size %s -> %s", image_info.size, size)
+            if image_info.size and size != image_info.size:
+                log.info(
+                    "Image size %s -> %s, %0.2f saving",
+                    image_info.size,
+                    size,
+                    (image_info.size / (image_info.size - size)) * 100,
+                )
                 image_info.size = size
             image = Image.open(buffer)
-            log.info("Resaved image with %s", img_args)
+            log.debug("Resaved image with %s", img_args)
         return image
     except Exception as e:
         log.warn("Unable to load image at %s: %s", file_path, e)

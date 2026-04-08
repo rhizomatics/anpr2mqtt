@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 
 import niquests
 import structlog
-from requests_cache import FileCache
+from requests_cache.backends.filesystem import FileCache
 from requests_cache.session import CacheMixin
 
 from anpr2mqtt.settings import CacheType
