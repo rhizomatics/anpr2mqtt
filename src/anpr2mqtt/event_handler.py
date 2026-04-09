@@ -60,12 +60,14 @@ class EventHandler(RegexMatchingEventHandler):
         if event_config.image_url_base:
             log.info("Images available from web server with prefix %s", event_config.image_url_base)
         self.image_topic: str = image_topic
+        self.api_client: APIClient | None
 
         if dvla_config.api_key and event_config.target_type == TARGET_TYPE_PLATE:
-            log.info("Configured gov API lookup")
-            self.api_client: APIClient | None = DVLAClient(
+            self.api_client = DVLAClient(
                 dvla_config.api_key, cache_type=dvla_config.cache_type, cache_ttl=dvla_config.cache_ttl
             )
+        if self.api_client:
+            log.info("Configured gov API lookup")
         else:
             log.info("No gov API lookup configured")
             self.api_client = None
