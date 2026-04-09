@@ -51,7 +51,7 @@ class DVLAClient(APIClient):
                 cache_type = CacheType.MEMORY
 
         if self.cache_session is None:
-            if cache_type != CacheType.FILE:
+            if cache_type != CacheType.MEMORY:
                 log.warn("Unable to cache DVLA as %s, falling back to in memory for %s", cache_type, cache_ttl)
             else:
                 log.debug("Caching DVLA in memory for %s", cache_ttl)
