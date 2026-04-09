@@ -1,3 +1,5 @@
+# 0.9.1
+- Fixes for API Client caching and logging
 # 0.9.0
 - Replaced the now doubtfully maintained httpx with niquests, and hishel with requests-cache
 - Settings now has configuration for `cache_dir` and to choose `cache_type` between `FILE` or `MEMORY`
