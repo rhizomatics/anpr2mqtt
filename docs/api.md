@@ -20,6 +20,7 @@ dvla:
     cache_ttl: 86400 # number of seconds to cache the result
     cache_type: FILE # cache implementation can be FILE or MEMORY
     cache_dir: /data/cache # where to store cached data if FILE chosen
+    verify_plate: MAG1C # licence plate to check at startup to verify API and API Key working ok
 ```
 
 ### Example Response

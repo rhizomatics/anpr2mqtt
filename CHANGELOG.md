@@ -1,6 +1,7 @@
 # 0.9.1
 - Fixes for API Client caching and logging
 - Report % saved on image compression
+- Option to specify a `verify_plate` to check the DVLA API at startup
 # 0.9.0
 - Replaced the now doubtfully maintained httpx with niquests, and hishel with requests-cache
 - Settings now has configuration for `cache_dir` and to choose `cache_type` between `FILE` or `MEMORY`
