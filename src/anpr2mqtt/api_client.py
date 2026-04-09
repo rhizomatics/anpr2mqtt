@@ -25,7 +25,7 @@ class APIClient:
         raise NotImplementedError()
 
 
-class DVLA(APIClient):
+class DVLAClient(APIClient):
     ID = "GB"
     REG_RE = r"(^[A-Z]{2}[0-9]{2}\s?[A-Z]{3}$)|(^[A-Z][0-9]{1,3}[A-Z]{3}$)|(^[A-Z]{3}[0-9]{1,3}[A-Z]$)|(^[0-9]{1,4}[A-Z]{1,2}$)|(^[0-9]{1,3}[A-Z]{1,3}$)|(^[A-Z]{1,2}[0-9]{1,4}$)|(^[A-Z]{1,3}[0-9]{1,3}$)|(^[A-Z]{1,3}[0-9]{1,4}$)|(^[0-9]{3}[DX]{1}[0-9]{3}$)"  # noqa: E501
     """https://developer-portal.driver-vehicle-licensing.api.gov.uk"""
@@ -38,7 +38,7 @@ class DVLA(APIClient):
         cache_dir: Path | None = None,
         test: bool = False,
     ) -> None:
-
+        self.cache_session: _CachedSession | None = None
         if cache_type == CacheType.FILE and cache_dir:
             try:
                 file_cache: FileCache = FileCache(cache_name=str(cache_dir), use_cache_dir=True)
@@ -50,8 +50,11 @@ class DVLA(APIClient):
                 log.error("Unable to configure file system caching, reverting to in memory: %s", e)
                 cache_type = CacheType.MEMORY
 
-        if cache_type != CacheType.FILE:
-            log.debug("Caching DVLA in memory for %s", cache_ttl)
+        if self.cache_session is None:
+            if cache_type != CacheType.FILE:
+                log.warn("Unable to cache DVLA as %s, falling back to in memory for %s", cache_type, cache_ttl)
+            else:
+                log.debug("Caching DVLA in memory for %s", cache_ttl)
             self.cache_session = _CachedSession(
                 cache_name="dvla_cache", allowable_methods=["GET", "POST"], backend="memory", expire_after=cache_ttl
             )
@@ -63,6 +66,9 @@ class DVLA(APIClient):
         if not re.match(self.REG_RE, reg):
             log.warning(f"DVLA SKIP invalid reg {reg}")
             return {"reg_match_fail": self.ID, "plate": {}}
+        if self.cache_session is None:
+            log.error("Unable to lookup, failed to configure cache session or fallback")
+            return {"lookup_fail": "missing cache", "plate": {}}
         try:
             with self.cache_session as client:
                 log.debug(f"Fetching DVLA info from API, cache_ttl={self.cache_session.expire_after}")

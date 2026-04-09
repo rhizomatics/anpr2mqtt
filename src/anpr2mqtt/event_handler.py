@@ -13,7 +13,7 @@ import tzlocal
 from PIL import Image
 from watchdog.events import DirCreatedEvent, FileClosedEvent, FileCreatedEvent, RegexMatchingEventHandler
 
-from anpr2mqtt.api_client import DVLA, APIClient
+from anpr2mqtt.api_client import APIClient, DVLAClient
 from anpr2mqtt.const import ImageInfo
 from anpr2mqtt.hass import HomeAssistantPublisher
 from anpr2mqtt.settings import (
@@ -63,7 +63,7 @@ class EventHandler(RegexMatchingEventHandler):
 
         if dvla_config.api_key and event_config.target_type == TARGET_TYPE_PLATE:
             log.info("Configured gov API lookup")
-            self.api_client: APIClient | None = DVLA(
+            self.api_client: APIClient | None = DVLAClient(
                 dvla_config.api_key, cache_type=dvla_config.cache_type, cache_ttl=dvla_config.cache_ttl
             )
         else:

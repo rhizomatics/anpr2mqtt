@@ -13,7 +13,7 @@ from pydantic_settings import (
     SettingsConfigDict,
 )
 
-from anpr2mqtt.api_client import DVLA
+from anpr2mqtt.api_client import DVLAClient
 from anpr2mqtt.event_handler import examine_file, scan_ocr_fields
 from anpr2mqtt.settings import DVLASettings, EventSettings, OCRFieldSettings, OCRSettings
 
@@ -72,7 +72,7 @@ class DVLATool(BaseModel):
         print(  # noqa: T201
             "Caching for {} at {}".format(self.dvla.cache_ttl, "in memory" if not self.dvla.cache_dir else self.dvla.cache_dir)
         )
-        client = DVLA(
+        client = DVLAClient(
             api_key=self.dvla.api_key,
             cache_type=self.dvla.cache_type,
             cache_dir=self.dvla.cache_dir,

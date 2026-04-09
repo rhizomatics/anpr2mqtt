@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 import pytest
 from pytest_mock import MockerFixture
 
-from anpr2mqtt.api_client import DVLA, APIClient
+from anpr2mqtt.api_client import APIClient, DVLAClient
 from anpr2mqtt.settings import CacheType
 
 
@@ -56,19 +56,19 @@ def test_discover_metadata(mocker: MockerFixture) -> None:
             "dateOfLastV5CIssued": "2016-12-25",
         },
     )
-    result: dict[str, Any] = DVLA("7878748347834").lookup("SP13TST").get("plate", {})
+    result: dict[str, Any] = DVLAClient("7878748347834").lookup("SP13TST").get("plate", {})
     assert result["yearOfManufacture"] == 2004
 
 
 def test_dvla_invalid_reg() -> None:
-    result = DVLA("fake_key").lookup("NOTAVALID!!!REG")
+    result = DVLAClient("fake_key").lookup("NOTAVALID!!!REG")
     assert isinstance(result, dict)
     assert result == {"reg_match_fail": "GB", "plate": {}}
 
 
 def test_dvla_api_error_response(mocker: MockerFixture) -> None:
     _mock_session(mocker, 403, {"errors": [{"title": "Forbidden", "code": "403", "status": "403"}]})
-    result = DVLA("bad_key").lookup("SP13TST")
+    result = DVLAClient("bad_key").lookup("SP13TST")
     assert isinstance(result, dict)
     assert "api_errors" in result
     assert result["api_status"] == 403
@@ -80,7 +80,7 @@ def test_dvla_api_exception(mocker: MockerFixture) -> None:
     session.__exit__ = MagicMock(return_value=False)
     session.post.side_effect = ConnectionError("network down")
     mocker.patch("anpr2mqtt.api_client._CachedSession", return_value=session)
-    result = DVLA("fake_key").lookup("SP13TST")
+    result = DVLAClient("fake_key").lookup("SP13TST")
     assert isinstance(result, dict)
     assert "api_exception" in result
 
@@ -92,7 +92,7 @@ def test_api_client_base_not_implemented() -> None:
 
 def test_init_without_cache_dir_uses_memory_backend(mocker: MockerFixture) -> None:
     cls_mock, _ = _mock_session(mocker, 200, {})
-    DVLA("key")
+    DVLAClient("key")
     _, kwargs = cls_mock.call_args
     assert kwargs["backend"] == "memory"
 
@@ -100,7 +100,7 @@ def test_init_without_cache_dir_uses_memory_backend(mocker: MockerFixture) -> No
 def test_init_with_cache_dir_uses_file_cache(mocker: MockerFixture, tmp_path: Path) -> None:
     file_cache_cls = mocker.patch("anpr2mqtt.api_client.FileCache")
     cls_mock, _ = _mock_session(mocker, 200, {})
-    DVLA("key", cache_dir=tmp_path, cache_type=CacheType.FILE)
+    DVLAClient("key", cache_dir=tmp_path, cache_type=CacheType.FILE)
     file_cache_cls.assert_called_once_with(cache_name=str(tmp_path), use_cache_dir=True)
     _, kwargs = cls_mock.call_args
     assert kwargs["backend"] is file_cache_cls.return_value
@@ -114,7 +114,7 @@ def test_real_api_call() -> None:
     api_key: str | None = os.environ.get("DVLA_API_KEY")
     assert api_key
     reg: str = "AA19AAA"  # see https://developer-portal.driver-vehicle-licensing.api.gov.uk/apis/vehicle-enquiry-service/mock-responses.html#test-vrns
-    result = DVLA(api_key=api_key, test=True).lookup(reg)
+    result = DVLAClient(api_key=api_key, test=True).lookup(reg)
     assert result
     assert "api_errors" not in result
     assert "api_exception" not in result
@@ -129,10 +129,10 @@ def test_real_api_call_with_file_cache(tmp_path: Path) -> None:
     api_key: str | None = os.environ.get("DVLA_API_KEY")
     assert api_key
     reg: str = "AA19AAA"  # see https://developer-portal.driver-vehicle-licensing.api.gov.uk/apis/vehicle-enquiry-service/mock-responses.html#test-vrns
-    result: dict[str, Any] = DVLA(api_key=api_key, cache_dir=tmp_path, test=True).lookup(reg)
+    result: dict[str, Any] = DVLAClient(api_key=api_key, cache_dir=tmp_path, test=True).lookup(reg)
     assert result
     assert "api_errors" not in result
     assert "api_exception" not in result
     assert "reg_match_fail" not in result
-    cached_result = DVLA(api_key=api_key, cache_dir=tmp_path, test=True).lookup(reg)
+    cached_result = DVLAClient(api_key=api_key, cache_dir=tmp_path, test=True).lookup(reg)
     assert cached_result["cache"]["cached"] is True
