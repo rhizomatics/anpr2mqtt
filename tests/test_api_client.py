@@ -63,7 +63,7 @@ def test_discover_metadata(mocker: MockerFixture) -> None:
 def test_dvla_invalid_reg() -> None:
     result = DVLAClient("fake_key").lookup("NOTAVALID!!!REG")
     assert isinstance(result, dict)
-    assert result == {"reg_match_fail": "GB", "plate": {}}
+    assert result == {"reg_match_fail": "GB", "plate": {}, "success": False}
 
 
 def test_dvla_api_error_response(mocker: MockerFixture) -> None:

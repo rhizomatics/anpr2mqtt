@@ -60,7 +60,7 @@ class EventHandler(RegexMatchingEventHandler):
         if event_config.image_url_base:
             log.info("Images available from web server with prefix %s", event_config.image_url_base)
         self.image_topic: str = image_topic
-        self.api_client: APIClient | None
+        self.api_client: APIClient | None = None
 
         if dvla_config.api_key and event_config.target_type == TARGET_TYPE_PLATE:
             self.api_client = DVLAClient(

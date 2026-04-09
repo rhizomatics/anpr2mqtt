@@ -1,3 +1,5 @@
+# 0.9.2
+- Test fixes
 # 0.9.1
 - Fixes for API Client caching and logging
 - Report % saved on image compression
