@@ -68,6 +68,7 @@ class EventHandler(RegexMatchingEventHandler):
                 cache_type=dvla_config.cache_type,
                 cache_ttl=dvla_config.cache_ttl,
                 cache_dir=dvla_config.cache_dir,
+                verify_plate=dvla_config.verify_plate,
             )
         if self.api_client:
             log.info("Configured gov API lookup, cache type %s, ttl %s", dvla_config.cache_type, dvla_config.cache_ttl)
