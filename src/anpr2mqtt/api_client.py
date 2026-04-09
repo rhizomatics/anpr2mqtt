@@ -36,6 +36,7 @@ class DVLAClient(APIClient):
         cache_ttl: int = 60 * 60 * 6,
         cache_type: CacheType = CacheType.MEMORY,
         cache_dir: Path | None = None,
+        verify_plate: str | None = None,
         test: bool = False,
     ) -> None:
         self.cache_session: _CachedSession | None = None
@@ -61,14 +62,20 @@ class DVLAClient(APIClient):
 
         self.api_key: str = api_key
         self.env_prefix: Literal["uat."] | Literal[""] = "uat." if test else ""
+        if verify_plate:
+            result: dict[str, Any] = self.lookup(reg=verify_plate)
+            if result and result["success"]:
+                log.info("Verified DVLA API lookup using %s, details: %s", verify_plate, result["plate"])
+            else:
+                log.error("DVLA startup verificatio failed: %s", result)
 
     def lookup(self, reg: str) -> dict[str, Any]:
         if not re.match(self.REG_RE, reg):
             log.warning(f"DVLA SKIP invalid reg {reg}")
-            return {"reg_match_fail": self.ID, "plate": {}}
+            return {"reg_match_fail": self.ID, "plate": {}, "success": False}
         if self.cache_session is None:
             log.error("Unable to lookup, failed to configure cache session or fallback")
-            return {"lookup_fail": "missing cache", "plate": {}}
+            return {"lookup_fail": "missing cache", "plate": {}, "success": False}
         try:
             with self.cache_session as client:
                 log.debug(f"Fetching DVLA info from API, cache_ttl={self.cache_session.expire_after}")
@@ -90,10 +97,16 @@ class DVLAClient(APIClient):
                             "created": response.created_at.isoformat() if response.created_at else None,
                         },
                         "plate": cast("dict[str,Any]", response.json()),
+                        "success": True,
                     }
 
                 log.error("DVLA API FAIL: %s", response.json())
-                return {"api_errors": response.json()["errors"], "api_status": response.status_code, "plate": {}}
+                return {
+                    "api_errors": response.json()["errors"],
+                    "api_status": response.status_code,
+                    "plate": {},
+                    "success": False,
+                }
         except Exception as e:
             log.exception("Failed to fetch DVLA reg data")
-            return {"api_exception": str(e), "plate": {}}
+            return {"api_exception": str(e), "plate": {}, "success": False}

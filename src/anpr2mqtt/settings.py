@@ -89,6 +89,7 @@ class DVLASettings(BaseModel):
     cache_ttl: int = Field(default=86400, description="Time to live for cached DVLA API results, in seconds, default 1 day")
     cache_type: CacheType = Field(default=CacheType.FILE, description="Cache implementation, MEMORY or FILE")
     cache_dir: Path | None = Field(default=Path("/data/cache"), description="Cache directory")
+    verify_plate: str | None = Field(default=None, description="Plate to check at startup to verify API")
 
 
 class TrackerSettings(BaseModel):
