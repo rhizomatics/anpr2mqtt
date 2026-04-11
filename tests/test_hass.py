@@ -281,8 +281,14 @@ def test_post_state_message_with_all_fields(
         ocr_fields={"vehicle_direction": "Forward"},
         image_info=image_info,
         classification={"known": True, "dangerous": False},
-        previous_sightings=3,
-        last_sighting=dt.datetime(2025, 6, 1, tzinfo=dt.UTC),
+        time_analysis={
+            "previous_sightings": 3,
+            "last_seen": "2025-06-01T00:00:00+00:00",
+            "hourly_counts": {},
+            "earliest_time": "08:00:00",
+            "latest_time": "14:00:00",
+            "within_time_range": True,
+        },
         url="http://cam1/image.jpg",
         reg_info={"make": "FORD"},
         file_path=Path("/data/image.jpg"),
@@ -292,7 +298,9 @@ def test_post_state_message_with_all_fields(
     assert payload["target"] == "AB12CDE"
     assert payload["vehicle_direction"] == "Forward"
     assert payload["known"] is True
-    assert payload["previous_sightings"] == 3
+    assert payload["history"]["previous_sightings"] == 3
+    assert payload["history"]["last_seen"] == "2025-06-01T00:00:00+00:00"
+    assert payload["history"]["within_time_range"] is True
     assert payload["event_image_url"] == "http://cam1/image.jpg"
     assert payload["file_path"] == "/data/image.jpg"
     assert payload["ext"] == "jpg"
@@ -300,7 +308,6 @@ def test_post_state_message_with_all_fields(
     assert payload["area"] == "Driveway"
     assert payload["live_url"] == "http://cam1/live"
     assert payload["reg_info"] == {"make": "FORD"}
-    assert "last_sighting" in payload
 
 
 def test_post_state_message_with_error(
@@ -338,3 +345,18 @@ def test_post_image_message_exception(publisher: HomeAssistantPublisher, mock_cl
     img = Image.new("RGB", (10, 10))
     # Should not raise
     publisher.post_image_message("topic", img, "JPEG")
+
+
+def test_post_image_message_none_clears_topic(publisher: HomeAssistantPublisher, mock_client: Mock) -> None:
+    """image=None publishes a null payload to clear the topic (lines 232-234)."""
+    publisher.post_image_message("test/images", None)
+    mock_client.publish.assert_called_once_with("test/images", payload=None, qos=0, retain=True)
+
+
+def test_post_state_message_with_camera_publish_exception(publisher: HomeAssistantPublisher, mock_client: Mock) -> None:
+    """client.publish raises → exception caught and logged (lines 226-227 in hass.py)."""
+    mock_client.publish.side_effect = RuntimeError("broker gone")
+    event_config = EventSettings(camera="cam", event="anpr")
+    camera = CameraSettings(name="cam")
+    # Should not raise
+    publisher.post_state_message("test/topic", target=None, event_config=event_config, camera=camera)

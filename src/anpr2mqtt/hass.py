@@ -1,4 +1,3 @@
-import datetime as dt
 import json
 import random
 import time
@@ -178,8 +177,7 @@ class HomeAssistantPublisher:
         ocr_fields: dict[str, str | None] | None = None,
         image_info: ImageInfo | None = None,
         classification: dict[str, Any] | None = None,
-        previous_sightings: int | None = None,
-        last_sighting: dt.datetime | None = None,
+        time_analysis: dict[str, Any] | None = None,
         url: str | None = None,
         error: str | None = None,
         file_path: Path | None = None,
@@ -205,10 +203,8 @@ class HomeAssistantPublisher:
             payload["file_path"] = str(file_path)
         if classification is not None:
             payload.update(classification)
-        if previous_sightings is not None:
-            payload["previous_sightings"] = previous_sightings
-        if last_sighting is not None:
-            payload["last_sighting"] = last_sighting.isoformat()
+        if time_analysis:
+            payload["history"] = time_analysis
 
         try:
             if image_info:

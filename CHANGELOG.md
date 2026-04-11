@@ -1,5 +1,7 @@
 # 0.10.0
 - Auto match plates with potential errors to known plates, using Levenshtein algorithm, and controlled via new `auto_match_tolerance` setting
+- Historical analysis now provides a count of times vehicle previously seen
+by hour of the day, the earliest and latest time of day ever seen, and if the current visit is within that range
 # 0.9.2
 - Test fixes
 # 0.9.1

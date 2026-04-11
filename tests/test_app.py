@@ -225,3 +225,141 @@ def test_main_loop_observer_exception() -> None:
 
     mock_observer.stop.assert_called_once()
     mock_observer.join.assert_called()
+
+
+def test_main_loop_log_level_debug() -> None:
+    """log_level != 'INFO' triggers the second structlog.configure call (line 57)."""
+    mock_settings = _make_mock_settings()
+    mock_settings.log_level = "DEBUG"
+    mock_client = Mock()
+    mock_observer = Mock()
+    mock_observer.is_alive.return_value = False
+
+    with (
+        patch("anpr2mqtt.app.Settings", return_value=mock_settings),
+        patch("anpr2mqtt.app.mqtt.Client", return_value=mock_client),
+        patch("anpr2mqtt.app.Observer", return_value=mock_observer),
+        patch("anpr2mqtt.app.structlog.configure") as mock_configure,
+    ):
+        main_loop()
+
+    assert mock_configure.call_count >= 2
+
+
+def test_main_loop_with_targets() -> None:
+    """Non-empty targets dict triggers the targets log loop (line 60)."""
+    from anpr2mqtt.settings import TargetSettings
+
+    mock_settings = _make_mock_settings()
+    mock_settings.targets = {"plate": TargetSettings(known={"AB12CDE": "Alice"})}
+    mock_client = Mock()
+    mock_observer = Mock()
+    mock_observer.is_alive.return_value = False
+
+    with (
+        patch("anpr2mqtt.app.Settings", return_value=mock_settings),
+        patch("anpr2mqtt.app.mqtt.Client", return_value=mock_client),
+        patch("anpr2mqtt.app.Observer", return_value=mock_observer),
+    ):
+        main_loop()
+
+    mock_observer.start.assert_called_once()
+
+
+def test_main_loop_observer_setup_fails() -> None:
+    """Observer() raises → sys.exit(-400) (lines 105-107)."""
+    mock_settings = _make_mock_settings()
+    mock_client = Mock()
+
+    with (
+        patch("anpr2mqtt.app.Settings", return_value=mock_settings),
+        patch("anpr2mqtt.app.mqtt.Client", return_value=mock_client),
+        patch("anpr2mqtt.app.Observer", side_effect=RuntimeError("no inotify")),
+        pytest.raises(SystemExit) as exc_info,
+    ):
+        main_loop()
+
+    assert exc_info.value.code == -400
+
+
+def test_main_loop_observer_loop_enters_body() -> None:
+    """is_alive returns True then False → observer.join(1) is called (line 159)."""
+    mock_settings = _make_mock_settings()
+    mock_client = Mock()
+    mock_observer = Mock()
+    mock_observer.is_alive.side_effect = [True, False]
+
+    with (
+        patch("anpr2mqtt.app.Settings", return_value=mock_settings),
+        patch("anpr2mqtt.app.mqtt.Client", return_value=mock_client),
+        patch("anpr2mqtt.app.Observer", return_value=mock_observer),
+    ):
+        main_loop()
+
+    mock_observer.join.assert_any_call(1)
+
+
+def test_main_loop_camera_name_mismatch(tmp_path: Path) -> None:
+    """Camera list contains a non-matching name → falls through to CameraSettings default (line 113->112)."""
+    from anpr2mqtt.settings import CameraSettings, DVLASettings, EventSettings, ImageSettings, OCRSettings, TrackerSettings
+
+    event_config = EventSettings(
+        camera="target_cam",
+        event="anpr",
+        watch_path=tmp_path,
+        image_name_re=re.compile(r"(?P<dt>[0-9]{17})_(?P<target>[A-Z0-9]+)_(?P<event>VD)\.(?P<ext>jpg)"),
+        ocr_field_ids=[],
+    )
+    mock_settings = _make_mock_settings(events=[event_config])
+    mock_settings.cameras = [CameraSettings(name="other_cam")]  # name mismatch
+    mock_settings.ocr = OCRSettings()
+    mock_settings.image = ImageSettings()
+    mock_settings.dvla = DVLASettings()
+    mock_settings.tracker = TrackerSettings(data_dir=tmp_path)
+    mock_settings.homeassistant.image_entity = False
+    mock_settings.homeassistant.camera_entity = False
+
+    mock_client = Mock()
+    mock_observer = Mock()
+    mock_observer.is_alive.return_value = False
+
+    with (
+        patch("anpr2mqtt.app.Settings", return_value=mock_settings),
+        patch("anpr2mqtt.app.mqtt.Client", return_value=mock_client),
+        patch("anpr2mqtt.app.Observer", return_value=mock_observer),
+    ):
+        main_loop()
+
+    mock_observer.schedule.assert_called_once()
+
+
+def test_main_loop_event_handler_setup_exception(tmp_path: Path) -> None:
+    """Exception during event handler setup is caught and logged (lines 145-146)."""
+    from anpr2mqtt.settings import DVLASettings, EventSettings, ImageSettings, OCRSettings, TrackerSettings
+
+    event_config = EventSettings(
+        camera="cam1",
+        event="anpr",
+        watch_path=tmp_path,
+        image_name_re=re.compile(r"(?P<dt>[0-9]{17})_(?P<target>[A-Z0-9]+)_(?P<event>VD)\.(?P<ext>jpg)"),
+        ocr_field_ids=[],
+    )
+    mock_settings = _make_mock_settings(events=[event_config])
+    mock_settings.ocr = OCRSettings()
+    mock_settings.image = ImageSettings()
+    mock_settings.dvla = DVLASettings()
+    mock_settings.tracker = TrackerSettings(data_dir=tmp_path)
+
+    mock_client = Mock()
+    mock_observer = Mock()
+    mock_observer.is_alive.return_value = False
+
+    with (
+        patch("anpr2mqtt.app.Settings", return_value=mock_settings),
+        patch("anpr2mqtt.app.mqtt.Client", return_value=mock_client),
+        patch("anpr2mqtt.app.Observer", return_value=mock_observer),
+        patch("anpr2mqtt.app.EventHandler", side_effect=RuntimeError("handler boom")),
+    ):
+        main_loop()  # should not raise; exception is caught per-event
+
+    mock_observer.start.assert_called_once()

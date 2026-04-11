@@ -128,9 +128,7 @@ class EventHandler(RegexMatchingEventHandler):
                 ):
                     reg_info = self.api_client.lookup(target).get("plate")
 
-                visit_count: int
-                last_seen: dt.datetime | None
-                visit_count, last_seen = self.track_target(target, self.event_config.target_type, image_info.timestamp)
+                time_analysis: dict[str, Any] = self.track_target(target, self.event_config.target_type, image_info.timestamp)
 
                 if classification.get("ignore"):
                     log.info("Skipping MQTT publication for ignored %s", target)
@@ -144,8 +142,7 @@ class EventHandler(RegexMatchingEventHandler):
                     image_info=image_info,
                     ocr_fields=ocr_fields,
                     classification=classification,
-                    previous_sightings=visit_count,
-                    last_sighting=last_seen,
+                    time_analysis=time_analysis,
                     url=url,
                     reg_info=reg_info,
                     file_path=file_path,
@@ -203,28 +200,25 @@ class EventHandler(RegexMatchingEventHandler):
         if autoclear.image:
             self.publisher.post_image_message(self.image_topic, image=None)
 
-    def track_target(self, target: str, target_type: str, event_dt: dt.datetime | None) -> tuple[int, dt.datetime | None]:
+    def track_target(self, target: str, target_type: str, event_dt: dt.datetime | None) -> dict[str, Any]:
         target = target or "UNKNOWN"
         target_type_path = self.tracker_config.data_dir / target_type
         target_type_path.mkdir(exist_ok=True)
         target_file = target_type_path / f"{target}.json"
-        last_visit: dt.datetime | None = None
-        previous_visits: int = 0
+        time_analysis: dict[str, Any] = {}
         try:
             sightings: list[str] = []
             if target_file.exists():
                 with target_file.open("r") as f:
                     sightings = json.load(f)
-                    previous_visits = len(sightings)
-                    if previous_visits > 0:
-                        last_visit = dt.datetime.fromisoformat(sightings[-1])
 
+            time_analysis = _compute_time_analysis(sightings, event_dt)
             sightings.append(event_dt.isoformat() if event_dt else dt.datetime.now(tz=tzlocal.get_localzone()).isoformat())
             with target_file.open("w") as f:
                 json.dump(sightings, f)
         except Exception as e:
             log.exception("Failed to track sightings for %s:%s", target, e)
-        return previous_visits, last_visit
+        return time_analysis
 
     def classify_target(self, target: str | None) -> dict[str, Any]:
         results = {
@@ -302,6 +296,49 @@ class EventHandler(RegexMatchingEventHandler):
             results["description"] = self.target_config.known[known_match] or "Known"
 
         return results
+
+
+def _compute_time_analysis(sightings: list[str], current_dt: dt.datetime | None) -> dict[str, Any]:
+    """Derive visit history and time-of-day statistics from previous sightings.
+
+    Called before the current visit is appended, so all counts/times reflect prior history only.
+
+    Returns a dict with:
+      - previous_sightings: int — number of times seen before the current visit
+      - last_seen: ISO datetime string of the most recent prior sighting, or None
+      - hourly_counts: dict[int,int] of 24 ints, index = hour (0-23)
+      - earliest_time: "HH:MM:SS" of the earliest time-of-day previously seen, or None
+      - latest_time:   "HH:MM:SS" of the latest time-of-day previously seen, or None
+      - within_time_range: bool — current time falls within [earliest, latest], or None if no history
+    """
+    hourly_counts: dict[int, int] = {}
+    times: list[dt.time] = []
+    last_seen: str | None = sightings[-1] if sightings else None
+    for s in sightings:
+        try:
+            ts = dt.datetime.fromisoformat(s)
+            hourly_counts.setdefault(ts.hour, 0)
+            hourly_counts[ts.hour] += 1
+            times.append(ts.replace(tzinfo=None).time())
+        except Exception as e:
+            log.warning("Skipping unparsable sighting timestamp %r: %s", s, e)
+
+    earliest = min(times) if times else None
+    latest = max(times) if times else None
+
+    within_range: bool | None = None
+    if current_dt is not None and earliest is not None and latest is not None:
+        current_t = current_dt.replace(tzinfo=None).time()
+        within_range = earliest <= current_t <= latest
+
+    return {
+        "previous_sightings": len(sightings),
+        "last_seen": last_seen,
+        "hourly_counts": hourly_counts,
+        "earliest_time": earliest.isoformat() if earliest else None,
+        "latest_time": latest.isoformat() if latest else None,
+        "within_time_range": within_range,
+    }
 
 
 def process_image(

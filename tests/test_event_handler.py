@@ -5,12 +5,17 @@ from pathlib import Path
 from unittest.mock import ANY, Mock, call, patch
 
 from PIL import Image
+from pytest_mock import MockerFixture
 
 from anpr2mqtt.const import ImageInfo
-from anpr2mqtt.event_handler import EventHandler, examine_file, process_image, scan_ocr_fields
+from anpr2mqtt.event_handler import EventHandler, _compute_time_analysis, examine_file, process_image, scan_ocr_fields
 from anpr2mqtt.settings import (
     AutoClearSettings,
+    DimensionSettings,
+    DVLASettings,
     EventSettings,
+    HomeAssistantSettings,
+    OCRFieldSettings,
     OCRSettings,
     TargetSettings,
 )
@@ -45,7 +50,14 @@ def test_eventhandler_handles_reg_plate_event(event_handler: EventHandler) -> No
                         "dangerous": False,
                         "priority": "high",
                         "description": "Unknown vehicle",
-                        "previous_sightings": 0,
+                        "history": {
+                            "previous_sightings": 0,
+                            "last_seen": None,
+                            "hourly_counts": {},
+                            "earliest_time": None,
+                            "latest_time": None,
+                            "within_time_range": None,
+                        },
                         "event_time": "2025-06-02T10:30:45.000407+00:00",
                         "image_event": "VEHICLE_DETECTION",
                         "ext": "jpg",
@@ -465,24 +477,105 @@ def test_on_closed_exception_path(event_handler: EventHandler) -> None:
 # --- track_target ---
 
 
+# --- _compute_time_analysis ---
+
+
+def test_time_analysis_no_history() -> None:
+    result = _compute_time_analysis([], dt.datetime(2025, 6, 2, 10, 30, tzinfo=dt.UTC))
+    assert result["previous_sightings"] == 0
+    assert result["last_seen"] is None
+    assert result["hourly_counts"] == {}
+    assert result["earliest_time"] is None
+    assert result["latest_time"] is None
+    assert result["within_time_range"] is None
+
+
+def test_time_analysis_no_current_dt() -> None:
+    sightings = ["2025-06-02T07:30:00+00:00", "2025-06-02T09:15:00+00:00"]
+    result = _compute_time_analysis(sightings, None)
+    assert result["previous_sightings"] == 2
+    assert result["last_seen"] == "2025-06-02T09:15:00+00:00"
+    assert result["within_time_range"] is None
+    assert result["earliest_time"] == "07:30:00"
+    assert result["latest_time"] == "09:15:00"
+
+
+def test_time_analysis_hourly_counts() -> None:
+    sightings = [
+        "2025-06-01T08:00:00+00:00",
+        "2025-06-02T08:30:00+00:00",
+        "2025-06-03T14:00:00+00:00",
+    ]
+    result = _compute_time_analysis(sightings, dt.datetime(2025, 6, 4, 8, 0, tzinfo=dt.UTC))
+    assert result["hourly_counts"][8] == 2
+    assert result["hourly_counts"][14] == 1
+    assert sum(result["hourly_counts"].values()) == 3
+
+
+def test_time_analysis_within_range() -> None:
+    sightings = ["2025-06-02T07:00:00+00:00", "2025-06-02T09:00:00+00:00"]
+    result = _compute_time_analysis(sightings, dt.datetime(2025, 6, 3, 8, 0, tzinfo=dt.UTC))
+    assert result["earliest_time"] == "07:00:00"
+    assert result["latest_time"] == "09:00:00"
+    assert result["within_time_range"] is True
+
+
+def test_time_analysis_outside_range() -> None:
+    sightings = ["2025-06-02T07:00:00+00:00", "2025-06-02T09:00:00+00:00"]
+    result = _compute_time_analysis(sightings, dt.datetime(2025, 6, 3, 22, 0, tzinfo=dt.UTC))
+    assert result["within_time_range"] is False
+
+
+def test_time_analysis_at_boundary() -> None:
+    # Exactly at earliest or latest is within range
+    sightings = ["2025-06-02T07:00:00+00:00", "2025-06-02T09:00:00+00:00"]
+    at_earliest = _compute_time_analysis(sightings, dt.datetime(2025, 6, 3, 7, 0, tzinfo=dt.UTC))
+    at_latest = _compute_time_analysis(sightings, dt.datetime(2025, 6, 3, 9, 0, tzinfo=dt.UTC))
+    assert at_earliest["within_time_range"] is True
+    assert at_latest["within_time_range"] is True
+
+
+def test_time_analysis_ignores_bad_entries() -> None:
+    sightings = ["2025-06-02T08:00:00+00:00", "not-a-timestamp", "also-bad"]
+    result = _compute_time_analysis(sightings, dt.datetime(2025, 6, 3, 8, 0, tzinfo=dt.UTC))
+    assert result["hourly_counts"][8] == 1
+    assert sum(result["hourly_counts"].values()) == 1
+
+
+def test_track_target_time_analysis_populated(event_handler: EventHandler) -> None:
+    ts1 = dt.datetime(2025, 6, 1, 8, 0, tzinfo=dt.UTC)
+    ts2 = dt.datetime(2025, 6, 2, 14, 0, tzinfo=dt.UTC)
+    ts3 = dt.datetime(2025, 6, 3, 10, 0, tzinfo=dt.UTC)
+    event_handler.track_target("TIMETEST", "plate", ts1)
+    event_handler.track_target("TIMETEST", "plate", ts2)
+    analysis = event_handler.track_target("TIMETEST", "plate", ts3)
+    assert analysis["previous_sightings"] == 2
+    assert analysis["last_seen"] == ts2.isoformat()
+    assert analysis["hourly_counts"][8] == 1
+    assert analysis["hourly_counts"][14] == 1
+    assert analysis["earliest_time"] == "08:00:00"
+    assert analysis["latest_time"] == "14:00:00"
+    assert analysis["within_time_range"] is True  # 10:00 is between 08:00 and 14:00
+
+
 def test_track_target_new(event_handler: EventHandler) -> None:
-    count, last = event_handler.track_target("TEST123", "plate", dt.datetime(2025, 1, 1, tzinfo=dt.UTC))
-    assert count == 0
-    assert last is None
+    result = event_handler.track_target("TEST123", "plate", dt.datetime(2025, 1, 1, tzinfo=dt.UTC))
+    assert result["previous_sightings"] == 0
+    assert result["last_seen"] is None
 
 
 def test_track_target_existing(event_handler: EventHandler) -> None:
     ts1 = dt.datetime(2025, 1, 1, tzinfo=dt.UTC)
     ts2 = dt.datetime(2025, 1, 2, tzinfo=dt.UTC)
     event_handler.track_target("TEST456", "plate", ts1)
-    count, last = event_handler.track_target("TEST456", "plate", ts2)
-    assert count == 1
-    assert last == ts1
+    result = event_handler.track_target("TEST456", "plate", ts2)
+    assert result["previous_sightings"] == 1
+    assert result["last_seen"] == ts1.isoformat()
 
 
 def test_track_target_no_timestamp(event_handler: EventHandler) -> None:
-    count, _last = event_handler.track_target("UNKNOWN", "plate", None)
-    assert count == 0
+    result = event_handler.track_target("UNKNOWN", "plate", None)
+    assert result["previous_sightings"] == 0
 
 
 # --- classify_target: no target_config ---
@@ -700,3 +793,189 @@ def test_fuzzy_match_both_known_and_dangerous(event_handler: EventHandler) -> No
     result = event_handler.classify_target("AB12CDF")
     assert result["known"] is True
     assert result["dangerous"] is True
+
+
+# --- EventHandler.__init__ branches ---
+
+
+def test_event_handler_init_with_dvla_api_key(tmp_path: Path) -> None:
+    from anpr2mqtt.hass import HomeAssistantPublisher
+    from anpr2mqtt.settings import CameraSettings, ImageSettings, OCRSettings, TrackerSettings
+
+    with patch("anpr2mqtt.event_handler.DVLAClient") as mock_dvla_cls:
+        handler = EventHandler(
+            HomeAssistantPublisher(Mock(), HomeAssistantSettings(status_topic="t")),
+            state_topic="t/state",
+            image_topic="t/image",
+            dvla_config=DVLASettings(api_key="testkey"),
+            target_config=TargetSettings(),
+            camera=CameraSettings(name="cam"),
+            image_config=ImageSettings(),
+            tracker_config=TrackerSettings(data_dir=tmp_path),
+            ocr_config=OCRSettings(),
+            event_config=EventSettings(camera="cam", event="anpr", watch_path=tmp_path, target_type="plate", ocr_field_ids=[]),
+        )
+    mock_dvla_cls.assert_called_once()
+    assert handler.api_client is mock_dvla_cls.return_value
+
+
+def test_ignore_directories_property(event_handler: EventHandler) -> None:
+    assert event_handler.ignore_directories is True
+
+
+# --- on_closed: image/format edge cases ---
+
+
+def test_on_closed_image_process_returns_none(event_handler: EventHandler) -> None:
+    """When process_image returns None the image publish is skipped (153->160 branch)."""
+    event = Mock()
+    event.src_path = "fixtures/20250602103045407_B4DM3N_VEHICLE_DETECTION.jpg"
+    event.event_type = "closed"
+    event.is_directory = False
+    with patch("anpr2mqtt.event_handler.process_image", return_value=None):
+        event_handler.on_closed(event)
+    # Only state message published, no image publish
+    calls = [c for c in event_handler.publisher.client.publish.call_args_list if c.args[0] == "test/images"]  # type: ignore[attr-defined]
+    assert calls == []
+
+
+def test_on_closed_image_format_none(event_handler: EventHandler) -> None:
+    """When image_info.ext is None, img_format is None and image publish is skipped (line 159)."""
+    event = Mock()
+    event.src_path = "fixtures/20250602103045407_B4DM3N_VEHICLE_DETECTION.jpg"
+    event.event_type = "closed"
+    event.is_directory = False
+    fake_info = ImageInfo(target="B4DM3N", event="VEHICLE_DETECTION", timestamp=dt.datetime.now(tz=dt.UTC), ext=None, size=100)
+    with (
+        patch("anpr2mqtt.event_handler.examine_file", return_value=fake_info),
+        patch("anpr2mqtt.event_handler.process_image", return_value=Image.new("RGB", (10, 10))),
+    ):
+        event_handler.on_closed(event)
+    calls = [c for c in event_handler.publisher.client.publish.call_args_list if c.args[0] == "test/images"]  # type: ignore[attr-defined]
+    assert calls == []
+
+
+def test_on_closed_correction_changes_target(event_handler: EventHandler) -> None:
+    """When correction remaps target, line 120 (target = classification['target']) is hit."""
+    event_handler.target_config = TargetSettings(
+        correction={"CORRECTED": [r"B4DM3N"]},
+        known={"CORRECTED": "My car"},
+        auto_match_tolerance=0,
+    )
+    event = Mock()
+    event.src_path = "fixtures/20250602103045407_B4DM3N_VEHICLE_DETECTION.jpg"
+    event.event_type = "closed"
+    event.is_directory = False
+    event_handler.on_closed(event)
+    _args, kwargs = event_handler.publisher.client.publish.call_args_list[0]  # type: ignore[attr-defined]
+    payload = json.loads(kwargs["payload"])
+    assert payload["target"] == "CORRECTED"
+    assert payload["orig_target"] == "B4DM3N"
+
+
+# --- process_image: size branch ---
+
+
+def test_process_image_size_unchanged() -> None:
+    """When image_info.size is 0, the size-change logging branch is skipped (329->337)."""
+    fixture_image_path = Path("fixtures") / "20250602103045407_B4DM3N_VEHICLE_DETECTION.jpg"
+    image_info = ImageInfo("", "anpr", dt.datetime.now(tz=dt.UTC), size=0, ext="jpg")
+    result = process_image(fixture_image_path, image_info, jpeg_opts={"quality": 30}, png_opts={})
+    assert result is not None
+
+
+# --- track_target: exception path ---
+
+
+def test_track_target_exception(event_handler: EventHandler, tmp_path: Path) -> None:
+    """json.load raises → exception is caught and logged (lines 225-226)."""
+    target_dir = tmp_path / "plate"
+    target_dir.mkdir()
+    bad_file = target_dir / "BADPLATE.json"
+    bad_file.write_text("not valid json")
+    result = event_handler.track_target("BADPLATE", "plate", dt.datetime(2025, 1, 1, tzinfo=dt.UTC))
+    assert result == {}
+
+
+# --- scan_ocr_fields: uncovered branches ---
+
+
+def _make_event_and_ocr(field: OCRFieldSettings) -> tuple[EventSettings, OCRSettings]:
+    event_config = EventSettings(camera="cam", event="anpr", ocr_field_ids=["myfield"])
+    ocr_config = OCRSettings(fields={"myfield": field})
+    return event_config, ocr_config
+
+
+def test_scan_ocr_fields_no_crop_no_invert(mocker: MockerFixture) -> None:
+    """Field with crop=None and invert=False exercises the no-crop/no-invert branches."""
+    mocker.patch("anpr2mqtt.event_handler.pytesseract.image_to_string", return_value="")
+    field = OCRFieldSettings(label="test_field", crop=None, invert=False, values=None)
+    event_config, ocr_config = _make_event_and_ocr(field)
+    result = scan_ocr_fields(Image.new("RGB", (100, 100)), event_config, ocr_config)
+    assert "test_field" in result
+
+
+def test_scan_ocr_fields_empty_tesseract_output(mocker: MockerFixture) -> None:
+    """Empty string from tesseract → parsed=[] → 'Unparsable field' warning (lines 422-423)."""
+    mocker.patch("anpr2mqtt.event_handler.pytesseract.image_to_string", return_value="")
+    field = OCRFieldSettings(label="dir", crop=DimensionSettings(x=0, y=0, h=10, w=10), invert=True, values=["Forward"])
+    event_config, ocr_config = _make_event_and_ocr(field)
+    result = scan_ocr_fields(Image.new("RGB", (100, 100)), event_config, ocr_config)
+    assert result["dir"] == "Unknown"
+
+
+def test_scan_ocr_fields_correction_match(mocker: MockerFixture) -> None:
+    """Candidate not in correction keys but matches a pattern → candidate is remapped (lines 428-431)."""
+    mocker.patch("anpr2mqtt.event_handler.pytesseract.image_to_string", return_value="label: Fo rd")
+    field = OCRFieldSettings(
+        label="dir",
+        crop=DimensionSettings(x=0, y=0, h=10, w=10),
+        invert=False,
+        correction={"Forward": [re.compile(r"Fo.*rd")]},
+        values=["Forward"],
+    )
+    event_config, ocr_config = _make_event_and_ocr(field)
+    result = scan_ocr_fields(Image.new("RGB", (100, 100)), event_config, ocr_config)
+    assert result["dir"] == "Forward"
+
+
+def test_scan_ocr_fields_case_correction(mocker: MockerFixture) -> None:
+    """Candidate matches a value case-insensitively → candidate is case-corrected (lines 435-436)."""
+    mocker.patch("anpr2mqtt.event_handler.pytesseract.image_to_string", return_value="label: forward")
+    field = OCRFieldSettings(label="dir", crop=None, invert=False, values=["Forward"])
+    event_config, ocr_config = _make_event_and_ocr(field)
+    result = scan_ocr_fields(Image.new("RGB", (100, 100)), event_config, ocr_config)
+    assert result["dir"] == "Forward"
+
+
+def test_scan_ocr_fields_unknown_value(mocker: MockerFixture) -> None:
+    """Candidate not in allowed values → result set to 'Unknown' (lines 440-441)."""
+    mocker.patch("anpr2mqtt.event_handler.pytesseract.image_to_string", return_value="label: GARBAGE")
+    field = OCRFieldSettings(label="dir", crop=None, invert=False, values=["Forward", "Reverse"])
+    event_config, ocr_config = _make_event_and_ocr(field)
+    result = scan_ocr_fields(Image.new("RGB", (100, 100)), event_config, ocr_config)
+    assert result["dir"] == "Unknown"
+
+
+def test_scan_ocr_fields_ocr_exception(mocker: MockerFixture) -> None:
+    """Pytesseract raises → exception caught, OCR_ERROR set (lines 445-447)."""
+    mocker.patch("anpr2mqtt.event_handler.pytesseract.image_to_string", side_effect=RuntimeError("tesseract gone"))
+    field = OCRFieldSettings(label="dir", crop=None, invert=False, values=None)
+    event_config, ocr_config = _make_event_and_ocr(field)
+    result = scan_ocr_fields(Image.new("RGB", (100, 100)), event_config, ocr_config)
+    assert "OCR_ERROR" in result
+
+
+def test_scan_ocr_fields_image_size_exception() -> None:
+    """image.size raises → IMAGE_ERROR set (lines 389-392)."""
+    bad_image = Mock()
+    bad_image.size = property(lambda _self: (_ for _ in ()).throw(RuntimeError("no size")))
+
+    field = OCRFieldSettings(label="dir", crop=DimensionSettings(x=0, y=0, h=10, w=10), invert=False, values=None)
+    event_config, ocr_config = _make_event_and_ocr(field)
+
+    # Trigger via a mock whose .size raises
+    broken = Mock(spec=Image.Image)
+    type(broken).size = property(lambda _self: (_ for _ in ()).throw(RuntimeError("no size")))
+    result = scan_ocr_fields(broken, event_config, ocr_config)
+    assert "IMAGE_ERROR" in result

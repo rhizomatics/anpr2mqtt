@@ -106,6 +106,50 @@ def test_init_with_cache_dir_uses_file_cache(mocker: MockerFixture, tmp_path: Pa
     assert kwargs["backend"] is file_cache_cls.return_value
 
 
+def test_init_file_cache_exception_falls_back_to_memory(mocker: MockerFixture, tmp_path: Path) -> None:
+    """FileCache constructor raises → falls back to in-memory cache (lines 50-52)."""
+    mocker.patch("anpr2mqtt.api_client.FileCache", side_effect=OSError("disk full"))
+    cls_mock, _ = _mock_session(mocker, 200, {})
+    DVLAClient("key", cache_dir=tmp_path, cache_type=CacheType.FILE)
+    _, kwargs = cls_mock.call_args
+    assert kwargs["backend"] == "memory"
+
+
+def test_init_file_type_no_dir_warns_falls_back(mocker: MockerFixture) -> None:
+    """cache_type=FILE but cache_dir=None → file block skipped, warn about non-MEMORY type (line 56)."""
+    cls_mock, _ = _mock_session(mocker, 200, {})
+    DVLAClient("key", cache_type=CacheType.FILE, cache_dir=None)
+    _, kwargs = cls_mock.call_args
+    assert kwargs["backend"] == "memory"
+
+
+def test_dvla_verify_plate_success(mocker: MockerFixture) -> None:
+    """verify_plate with successful lookup logs info (lines 66-69)."""
+    _mock_session(mocker, 200, {"registrationNumber": "SP13TST", "make": "FORD"})
+    client = DVLAClient("key", verify_plate="SP13TST")
+    assert client.api_key == "key"
+
+
+def test_dvla_verify_plate_failure(mocker: MockerFixture) -> None:
+    """verify_plate with failed lookup logs error (line 70)."""
+    _mock_session(mocker, 403, {"errors": [{"title": "Forbidden"}]})
+    client = DVLAClient("key", verify_plate="SP13TST")
+    assert client.api_key == "key"
+
+
+def test_lookup_cached_response_logs_cache_hit(mocker: MockerFixture) -> None:
+    """from_cache=True triggers the cache-hit log (line 91)."""
+    resp = _make_response(200, {"registrationNumber": "SP13TST"}, from_cache=True)
+    resp.created_at = __import__("datetime").datetime(2025, 1, 1)
+    session = MagicMock()
+    session.__enter__ = lambda s: s
+    session.__exit__ = MagicMock(return_value=False)
+    session.post.return_value = resp
+    mocker.patch("anpr2mqtt.api_client._CachedSession", return_value=session)
+    result = DVLAClient("key").lookup("SP13TST")
+    assert result["cache"]["cached"] is True
+
+
 @pytest.mark.skip
 def test_real_api_call() -> None:
     """Require a UAT env key; exercises the default (in-memory) cache."""
