@@ -289,7 +289,7 @@ def process_image(
             size = buffer.getbuffer().nbytes
             if image_info.size and size != image_info.size:
                 log.info(
-                    "Image size %s -> %s, %0.2f saving",
+                    "Image size %s -> %s, %0.2f%% saving",
                     image_info.size,
                     size,
                     (image_info.size / (image_info.size - size)) * 100,
