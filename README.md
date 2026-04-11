@@ -118,6 +118,24 @@ or change the time lag, or also clear image ) using the `autoclear` configuratio
     image: False
 ```
 
+## Corrections
+
+The licence plate detection may mis-read or miss some of the characters of the plate. When the result is
+published to MQTT, both the raw original and corrected versions are provided.
+
+Two mechanisms help with this:
+
+### Fuzzy Matching
+
+The Levenshtein method is used to compare the plate against a list of known friendly or dangerous
+plates in the configuration, subject to a maximum distance tolerance ( number of mismatched characters )
+defined by `auto_match_tolerance`. If its a match for more than one, the plate with least distance is chosen.
+
+### Regex / String Matching
+
+Each known plate can be associated with a list of regular expressions and/or plain strings, and these will
+be checked for every discovered licence plate.
+
 ## Primary Dependencies
 
 - **watchdog** - File system monitoring (cross-platform)

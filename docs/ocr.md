@@ -5,8 +5,7 @@ Hikvision example.
 
 ![OCR Direction Example](assets/images/ocr-example.png){width=600}
 
-Each field can have optional permitted values (`Unknown` returned if none of them found) and a set of corrections
-to handle occasional OCR errors, where corrections are simple strings or regular expressions.
+Each field can have optional permitted values (`Unknown` returned if none of them found) and a set of corrections to handle occasional OCR errors, where corrections are simple strings or regular expressions.
 
 Use the [OCR Tool](debug_tools.md#ocr) for quick tests of configuration with a local image
 
