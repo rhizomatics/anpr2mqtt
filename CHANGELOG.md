@@ -1,3 +1,5 @@
+# 0.10.0
+- Auto match plates with potential errors to known plates, using Levenshtein algorithm, and controlled via new `auto_match_tolerance` setting
 # 0.9.2
 - Test fixes
 # 0.9.1

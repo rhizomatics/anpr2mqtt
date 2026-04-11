@@ -10,7 +10,7 @@ from requests_cache.session import CacheMixin
 from anpr2mqtt.settings import CacheType
 
 if TYPE_CHECKING:
-    from requests_cache import CachedResponse
+    from requests_cache.models.response import CachedResponse
 
 
 class _CachedSession(CacheMixin, niquests.Session):  # type: ignore[misc]

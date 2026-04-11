@@ -141,6 +141,10 @@ class TargetSettings(BaseModel):
     dangerous: dict[str, str | None] = Field(default_factory=lambda: {})
     ignore: list[str] = Field(default_factory=list)
     correction: dict[str, list[str | re.Pattern[str]]] = Field(default_factory=lambda: {})
+    auto_match_tolerance: int = Field(
+        default=1,
+        description="Maximum tolerance for auto matching against known plates, using Levenshtein, 0 to disable fuzzy matching",
+    )
 
 
 class Settings(BaseSettings):

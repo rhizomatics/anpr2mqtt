@@ -70,6 +70,7 @@ dvla:
   api_key: MY6676SECRET787KEY
 targets:
   plate:
+    auto_match_tolerance: 2
     known:
       TJ912UKL: joe's mini
       P001PAT: Postman

@@ -43,6 +43,7 @@ While intended for vehicle plate detection, it can be used to watch for and anal
     - Tracks and counts previous sightings
     - Configurable to classify plates as known, to be ignored or as a potential threat
     - Regular expression based corrections, for known plates that the ANPR sometimes mis-reads
+    - Fuzzy match corrections for known plates, based on Levenshtein algorithm
     - UK Only
         - [DVLA Lookup](api.md) if API_KEY provided, for detailed MOT and tax information
         - Lookups cached for configurable time

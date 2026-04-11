@@ -63,6 +63,7 @@ repos:
           - pytesseract
           - pydantic
           - pydantic-settings
+          - rapidfuzz
           - requests-cache
           - niquests
           - tzlocal

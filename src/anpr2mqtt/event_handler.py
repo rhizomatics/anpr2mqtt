@@ -11,6 +11,7 @@ import pytesseract
 import structlog
 import tzlocal
 from PIL import Image
+from rapidfuzz.distance import Levenshtein
 from watchdog.events import DirCreatedEvent, FileClosedEvent, FileCreatedEvent, RegexMatchingEventHandler
 
 from anpr2mqtt.api_client import APIClient, DVLAClient
@@ -251,16 +252,54 @@ class EventHandler(RegexMatchingEventHandler):
                 results["priority"] = "low"
                 results["description"] = "Ignored"
                 break
-        if target in self.target_config.dangerous:
-            log.warning("%s known as potential danger", target)
+        max_dist = self.target_config.auto_match_tolerance
+
+        def _fuzzy_match(candidates: dict[str, str | None]) -> str | None:
+            """Return the closest key in candidates within max_dist edits, or None."""
+            best: str | None = None
+            best_dist = max_dist + 1
+            for candidate in candidates:
+                d = Levenshtein.distance(target, candidate)
+                if d < best_dist:
+                    best_dist = d
+                    best = candidate
+            return best if best_dist <= max_dist else None
+
+        dangerous_match = (
+            target
+            if target in self.target_config.dangerous
+            else (_fuzzy_match(self.target_config.dangerous) if max_dist > 0 else None)
+        )
+        if dangerous_match:
+            if dangerous_match != target:
+                log.warning(
+                    "Fuzzy-matched %s to dangerous plate %s (distance %s)",
+                    target,
+                    dangerous_match,
+                    Levenshtein.distance(target, dangerous_match),
+                )
+            else:
+                log.warning("%s known as potential danger", target)
             results["dangerous"] = True
             results["priority"] = "critical"
-            results["description"] = self.target_config.dangerous[target] or "Potential threat"
-        if target in self.target_config.known:
-            log.info("%s known to household", target)
+            results["description"] = self.target_config.dangerous[dangerous_match] or "Potential threat"
+
+        known_match = (
+            target if target in self.target_config.known else (_fuzzy_match(self.target_config.known) if max_dist > 0 else None)
+        )
+        if known_match:
+            if known_match != target:
+                log.info(
+                    "Fuzzy-matched %s to known plate %s (distance %s)",
+                    target,
+                    known_match,
+                    Levenshtein.distance(target, known_match),
+                )
+            else:
+                log.info("%s known to household", target)
             results["known"] = True
             results["priority"] = "medium"
-            results["description"] = self.target_config.known[target] or "Known"
+            results["description"] = self.target_config.known[known_match] or "Known"
 
         return results
 

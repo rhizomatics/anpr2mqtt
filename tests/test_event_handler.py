@@ -625,3 +625,78 @@ def test_on_closed_no_image_schedules_autoclear(event_handler: EventHandler) -> 
     with patch.object(event_handler, "_schedule_autoclear") as mock_schedule:
         event_handler.on_closed(event)
     mock_schedule.assert_called_once()
+
+
+# --- classify_target: fuzzy matching via auto_match_tolerance ---
+
+
+def test_fuzzy_match_known_within_tolerance(event_handler: EventHandler) -> None:
+    # "AB12CDF" is distance 1 from "AB12CDE"
+    event_handler.target_config = TargetSettings(known={"AB12CDE": "Alice"}, auto_match_tolerance=1)
+    result = event_handler.classify_target("AB12CDF")
+    assert result["known"] is True
+    assert result["description"] == "Alice"
+    assert result["priority"] == "medium"
+
+
+def test_fuzzy_match_known_beyond_tolerance(event_handler: EventHandler) -> None:
+    # "AB12CXX" is distance 2 from "AB12CDE", tolerance is 1
+    event_handler.target_config = TargetSettings(known={"AB12CDE": "Alice"}, auto_match_tolerance=1)
+    result = event_handler.classify_target("AB12CXX")
+    assert result["known"] is False
+    assert result["priority"] == "high"
+
+
+def test_fuzzy_match_known_disabled(event_handler: EventHandler) -> None:
+    # tolerance=0 means only exact matches; "AB12CDF" must not match "AB12CDE"
+    event_handler.target_config = TargetSettings(known={"AB12CDE": "Alice"}, auto_match_tolerance=0)
+    result = event_handler.classify_target("AB12CDF")
+    assert result["known"] is False
+
+
+def test_fuzzy_match_dangerous_within_tolerance(event_handler: EventHandler) -> None:
+    # "PK12TSX" is distance 1 from "PK12TST"
+    event_handler.target_config = TargetSettings(dangerous={"PK12TST": "Suspect"}, auto_match_tolerance=1)
+    result = event_handler.classify_target("PK12TSX")
+    assert result["dangerous"] is True
+    assert result["description"] == "Suspect"
+    assert result["priority"] == "critical"
+
+
+def test_fuzzy_match_dangerous_beyond_tolerance(event_handler: EventHandler) -> None:
+    # "PK12XXX" is distance 3 from "PK12TST", tolerance is 1
+    event_handler.target_config = TargetSettings(dangerous={"PK12TST": "Suspect"}, auto_match_tolerance=1)
+    result = event_handler.classify_target("PK12XXX")
+    assert result["dangerous"] is False
+
+
+def test_fuzzy_match_picks_closest_known(event_handler: EventHandler) -> None:
+    # "AB12CDF" is distance 1 from "AB12CDE" and distance 2 from "AB12CDZ"
+    event_handler.target_config = TargetSettings(
+        known={"AB12CDE": "Alice", "AB12CDZ": "Bob"},
+        auto_match_tolerance=2,
+    )
+    result = event_handler.classify_target("AB12CDF")
+    assert result["known"] is True
+    assert result["description"] == "Alice"
+
+
+def test_fuzzy_match_exact_preferred(event_handler: EventHandler) -> None:
+    # Exact match should win even when tolerance > 0
+    event_handler.target_config = TargetSettings(known={"AB12CDE": "Exact match"}, auto_match_tolerance=2)
+    result = event_handler.classify_target("AB12CDE")
+    assert result["known"] is True
+    assert result["description"] == "Exact match"
+
+
+def test_fuzzy_match_both_known_and_dangerous(event_handler: EventHandler) -> None:
+    # A plate close to entries in both lists should get both flags
+    event_handler.target_config = TargetSettings(
+        known={"AB12CDE": "Alice"},
+        dangerous={"AB12CDX": "Threat"},
+        auto_match_tolerance=1,
+    )
+    # "AB12CDF" is distance 1 from both "AB12CDE" and "AB12CDX"
+    result = event_handler.classify_target("AB12CDF")
+    assert result["known"] is True
+    assert result["dangerous"] is True
