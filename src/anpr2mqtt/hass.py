@@ -192,6 +192,7 @@ class HomeAssistantPublisher:
             "area": camera.area,
             "live_url": camera.live_url,
             "reg_info": reg_info,
+            "history": time_analysis or {},
         }
         if ocr_fields:
             payload.update(ocr_fields)
@@ -203,8 +204,6 @@ class HomeAssistantPublisher:
             payload["file_path"] = str(file_path)
         if classification is not None:
             payload.update(classification)
-        if time_analysis:
-            payload["history"] = time_analysis
 
         try:
             if image_info:

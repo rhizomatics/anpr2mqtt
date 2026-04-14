@@ -1,9 +1,10 @@
 alias: Driveway ANPR Alert
-description: "Notify via email, chime, Alexa and mobile push when a vehicle identified"
+description: Notify via email, chime, Alexa and mobile push when a vehicle identified
 triggers:
   - trigger: state
     entity_id:
       - sensor.anpr_driveway
+    attribute: event_time
 conditions:
   - condition: not
     conditions:
@@ -13,7 +14,7 @@ conditions:
           - unavailable
           - unknown
 actions:
-  - action: notify.supernotify
+  - action: notify.supernotifier
     metadata: {}
     data:
       message: >-
@@ -24,18 +25,33 @@ actions:
 
         {% if trigger.to_state.attributes.history.previous_sightings == 0 %} Not
         previously sighted  {% else %}  with {{
-        trigger.to_state.attributes.history.previous_sightings }} previous sightings. {%
-        endif %} {% if trigger.to_state.attributes.history.last_sighting is defined %}
-        last seen on {{ trigger.to_state.attributes.history.last_sighting[:10] }} at {{
-        trigger.to_state.attributes.history.last_sighting[11:16] }}   {% endif %}
+        trigger.to_state.attributes.history.previous_sightings }} previous
+        sightings. {% endif %} {% if
+        trigger.to_state.attributes.history.last_sighting is defined %} last
+        seen on {{ trigger.to_state.attributes.history.last_sighting[:10] }} at
+        {{ trigger.to_state.attributes.history.last_sighting[11:16] }}   {%
+        endif %}
 
-        {% if trigger.to_state.attributes.reg_info is defined %}  DVLA info: {{
+        {% if 'reg_info' in trigger.to_state.attributes and
+        trigger.to_state.attributes.reg_info is not none %}  DVLA info: {{
         trigger.to_state.attributes.reg_info }}   {% endif %}
+
+        {% if 'hourly_counts' in trigger.to_state.attributes.history and
+        trigger.to_state.attributes.history.hourly_counts is not none %}  Visit
+        History: {% for time,count in
+        trigger.to_state.attributes.history.hourly_counts.items() %}
+          {{ time }}{% if int(time) < 12 %}am{% else %}pm{% endif %} : {{ count }} times
+        {% endfor %}{% endif %}
       title: >-
         {{ trigger.to_state.attributes.description }} spotted on {{
         trigger.to_state.attributes.camera }} camera
       data:
         priority: "{{ trigger.to_state.attributes.priority }}"
+        spoken_message: >-
+          {{ trigger.to_state.attributes.description }} with {{
+          trigger.to_state.attributes.plate }} spotted at {{
+          trigger.to_state.attributes.camera }} camera, moving {{
+          trigger.to_state.attributes.vehicle_direction }}
         apply_scenarios: >-
           {% if trigger.to_state.attributes.known %}known_vehicle{% else
           %}unknown_vehicle{% endif %}
@@ -44,5 +60,7 @@ actions:
           - unknown_vehicle
         media:
           camera_entity_id: image.anpr_{{trigger.to_state.attributes.camera}}
-          snapshot_url: "{{ trigger.to_state.attributes.event_image_url }}"
+          snapshot_url: >-
+            {% if 'event_image_url' in trigger.to_state.attributes %}{{
+            trigger.to_state.attributes.event_image_url }}{% endif %}
 mode: single
