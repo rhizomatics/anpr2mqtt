@@ -1,3 +1,6 @@
+# 0.10.2
+- Improve error handling when started without config file
+- Fix healthcheck script use of MQTT env vars
 # 0.10.1
 - Update Home Assistant example to display a history summary, use the new `spoken_message` feature of Supernotify, and check `event_image_url` existing
 - Now warns at start up if `image_base_url` has a trailing slash
@@ -17,7 +20,8 @@ by hour of the day, the earliest and latest time of day ever seen, and if the cu
 - Replaced the now doubtfully maintained httpx with niquests, and hishel with requests-cache
 - Settings now has configuration for `cache_dir` and to choose `cache_type` between `FILE` or `MEMORY`
 - Add DVLA lookup to the CLI tools
-  - `uv run tools dvla_lookup MAG1C --dvla.api_key <my_api_key>`
+  - `uv run --with anpr2mqtt tools dvla_lookup MAG1C --dvla.api_key <my_api_key>`
+    - (can skip the `--with anpr2mqtt` if running from checked out dir)
 # 0.8.0
 - Autoclear to optionally reset state after period of time
 - Validate all regular expressions at startup

@@ -65,10 +65,10 @@ Every configuration setting can be passed as a command line argument, using dot 
 This is the highest-priority source and overrides all other configuration.
 
 ```bash
-uv run anpr2mqtt --mqtt.host 192.168.1.10 --mqtt.port 1884 --log_level DEBUG
+uv run --with anpr2mqtt anpr2mqtt --mqtt.host 192.168.1.10 --mqtt.port 1884 --log_level DEBUG
 ```
 
-Run `uv run anpr2mqtt --help` to see all available flags, and find more information at [Debug Tools](debug_tools.md)
+Run `uv run --with anpr2mqtt anpr2mqtt --help` to see all available flags, and find more information at [Debug Tools](debug_tools.md)
 
 ## Home Assistant Integration
 

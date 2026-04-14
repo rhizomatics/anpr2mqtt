@@ -6,7 +6,7 @@ Example `.env` file for Docker Compose configuration to separately store the env
 # Example env file for docker-compose.yaml
 # Used by both the app itself and the healthcheck script
 
-# To use these, add to config.yaml like ${oc.env:MQTT_HOST}
+# To use these, add to config.yaml like ${oc.env:MQTT__HOST}
 
 MQTT__HOST=192.168.0.1
 MQTT__PORT=1883

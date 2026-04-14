@@ -44,8 +44,8 @@ fi
 current_time=$(date +%s)
 
 # Subscribe to MQTT topic and get one message
-echo "Subscribing to topic: $MQTT_TOPIC on $MQTT_HOST:$MQTT_PORT" >&2
-mqtt_payload=$(mosquitto_sub -h "$MQTT_HOST" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$MQTT_TOPIC" -C 1 -W "$SUBSCRIBE_TIMEOUT" 2>&1)
+echo "Subscribing to topic: $MQTT_TOPIC on $MQTT__HOST:$MQTT__PORT" >&2
+mqtt_payload=$(mosquitto_sub -h "$MQTT__HOST" -p "$MQTT__PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$MQTT_TOPIC" -C 1 -W "$SUBSCRIBE_TIMEOUT" 2>&1)
 sub_result=$?
 
 # Check if mosquitto_sub succeeded

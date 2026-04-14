@@ -7,6 +7,7 @@ import structlog
 from paho.mqtt.enums import CallbackAPIVersion, MQTTErrorCode, MQTTProtocolVersion
 from paho.mqtt.properties import Properties
 from paho.mqtt.reasoncodes import ReasonCode
+from pydantic import ValidationError
 from pydantic_settings import CliApp
 from watchdog.observers import Observer
 
@@ -171,4 +172,11 @@ class Anpr2MQTT(Settings):
 
 
 def run() -> None:
-    CliApp.run(model_cls=Anpr2MQTT)
+    try:
+        CliApp.run(model_cls=Anpr2MQTT)
+    except ValidationError as e:
+        log.error(e)
+        log.error("Unable to startup, validation error on settings, check configuration file, arguments or env vars")
+        log.error("MQTT host, account and password are mandatory (if using env vars, be sure to use MQTT__HOST not MQTT_HOST)")
+        log.error("Use --help for a full set of config")
+        log.error("Use the tools CLI for testing out directory watch, image analysis and APIs")
