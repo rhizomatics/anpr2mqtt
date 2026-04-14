@@ -102,7 +102,7 @@ class EventHandler(RegexMatchingEventHandler):
         url: str | None = (
             f"{self.event_config.image_url_base}/{file_path.name!s}" if self.event_config.image_url_base and file_path else None
         )
-        if url is None:
+        if not url:
             log.warning(
                 "No URL available for image, URL base %s, file path name %s",
                 self.event_config.image_url_base,

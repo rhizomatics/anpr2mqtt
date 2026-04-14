@@ -192,7 +192,7 @@ class HomeAssistantPublisher:
             "area": camera.area,
             "live_url": camera.live_url,
             "reg_info": reg_info,
-            "history": time_analysis or {},
+            "history": time_analysis,
         }
         if ocr_fields:
             payload.update(ocr_fields)

@@ -1,6 +1,8 @@
 # 0.10.1
 - Update Home Assistant example to display a history summary, use the new `spoken_message` feature of Supernotify, and check `event_image_url` existing
+- Now warns at start up if `image_base_url` has a trailing slash
 - Always send a `history` value, defaulting to empty dict, to simplify HA templates
+- Added pypi publishing
 # 0.10.0
 - Auto match plates with potential errors to known plates, using Levenshtein algorithm, and controlled via new `auto_match_tolerance` setting
 - Historical analysis now provides a count of times vehicle previously seen

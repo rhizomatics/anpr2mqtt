@@ -1,4 +1,5 @@
 import re
+import warnings
 from enum import StrEnum, auto
 from pathlib import Path
 from typing import Final, Literal
@@ -56,6 +57,18 @@ class EventSettings(BaseModel):
         default_factory=lambda: ["hik_direction"], description="OCR field definitions to find in image"
     )
     autoclear: AutoClearSettings = AutoClearSettings()
+
+    @field_validator("image_url_base")
+    @classmethod
+    def validate_image_url_base(cls, v: str | None) -> str | None:
+        if v is not None and v.endswith("/"):
+            warnings.warn(
+                f"image_url_base has a trailing slash ({v!r}); this will produce double-slash URLs. "
+                "Remove the trailing slash from image_url_base.",
+                UserWarning,
+                stacklevel=2,
+            )
+        return v
 
     @field_validator("image_name_re")
     @classmethod
