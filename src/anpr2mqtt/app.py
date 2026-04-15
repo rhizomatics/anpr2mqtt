@@ -116,8 +116,8 @@ def main_loop() -> None:
                     camera = camera_config
             if camera is None:
                 camera = CameraSettings(name=event_config.camera)
-            state_topic = f"{settings.mqtt.topic_root}/{event_config.event}/{camera.name}/state"
-            image_topic = f"{settings.mqtt.topic_root}/{event_config.event}/{camera.name}/image"
+            state_topic = f"{settings.mqtt.topic_root}/{event_config.event}/cameras/{camera.name}/state"
+            image_topic = f"{settings.mqtt.topic_root}/{event_config.event}/cameras/{camera.name}/image"
             tracker = Tracker(
                 event_config.target_type,
                 tracker_config=settings.tracker,
@@ -148,7 +148,7 @@ def main_loop() -> None:
                 )
             # selectively publish known targets as HA sensors, using last seen timestamp as state value
             for entity_id, targets in tracker.entities.items():
-                target_topic: str = f"{settings.mqtt.topic_root}/{event_config.event}/{entity_id}/state"
+                target_topic: str = f"{settings.mqtt.topic_root}/{event_config.event}/targets/{entity_id}/state"
                 publisher.publish_target_sensor_discovery(
                     entity_id=entity_id, target_type=event_config.target_type, targets=targets, state_topic=target_topic
                 )
