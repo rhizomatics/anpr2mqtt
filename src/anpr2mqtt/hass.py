@@ -177,7 +177,7 @@ class HomeAssistantPublisher:
             "name": targets[0].description if len(targets) == 1 else entity_id,
             "state_topic": state_topic,
             "json_attributes_topic": state_topic,
-            "value_template": ".{{ value_json.last_seen }}",
+            "value_template": "{{ value_json.last_seen }}",
             "device_class": "timestamp",
             "icon": targets[0].icon if len(targets) == 1 else None,
         }
