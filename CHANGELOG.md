@@ -1,7 +1,9 @@
 # 0.11.0
 - Targets can now be more than a simple string - currently `description` and `entity_id` supported
 - Selected targets can be published as Home Assistant MQTT sensors as their own entity
+  - Multiple targets can share one entity, for example if 2 or 3 different post vans service the property
 - Corrected example configurations
+- Refactored internally to a `Sighting` class and a more complete `Target` definition, replacing ad hoc dicts
 # 0.10.2
 - Improve error handling when started without config file
 - Fix healthcheck script use of MQTT env vars
