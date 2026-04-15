@@ -1,5 +1,4 @@
 import datetime as dt
-import json
 import re
 import threading
 from io import BytesIO
@@ -11,7 +10,6 @@ import pytesseract
 import structlog
 import tzlocal
 from PIL import Image
-from rapidfuzz.distance import Levenshtein
 from watchdog.events import DirCreatedEvent, FileClosedEvent, FileCreatedEvent, RegexMatchingEventHandler
 
 from anpr2mqtt.api_client import APIClient, DVLAClient
@@ -25,9 +23,8 @@ from anpr2mqtt.settings import (
     ImageSettings,
     OCRFieldSettings,
     OCRSettings,
-    TargetSettings,
-    TrackerSettings,
 )
+from anpr2mqtt.tracker import Sighting, Tracker
 
 log = structlog.get_logger()
 
@@ -40,11 +37,11 @@ class EventHandler(RegexMatchingEventHandler):
         image_topic: str,
         event_config: EventSettings,
         camera: CameraSettings,
-        target_config: TargetSettings | None,
         ocr_config: OCRSettings,
         image_config: ImageSettings,
         dvla_config: DVLASettings,
-        tracker_config: TrackerSettings,
+        tracker: Tracker,
+        mqtt_topic_root: str = "anpr2mqtt",
     ) -> None:
         fqre = f"{event_config.watch_path.resolve() / event_config.image_name_re.pattern}"
         super().__init__(regexes=[fqre], ignore_directories=True, case_sensitive=True)
@@ -53,14 +50,14 @@ class EventHandler(RegexMatchingEventHandler):
         self.state_topic: str = state_topic
         self.event_config: EventSettings = event_config
         self.camera: CameraSettings = camera
-        self.tracker_config: TrackerSettings = tracker_config
-        self.target_config: TargetSettings | None = target_config
+        self.tracker: Tracker = tracker
         self.ocr_config: OCRSettings = ocr_config
         self.image_config: ImageSettings = image_config
         self.dvla_config: DVLASettings = dvla_config
         if event_config.image_url_base:
             log.info("Images available from web server with prefix %s", event_config.image_url_base)
         self.image_topic: str = image_topic
+        self.mqtt_topic_root: str = mqtt_topic_root
         self.api_client: APIClient | None = None
 
         if dvla_config.api_key and event_config.target_type == TARGET_TYPE_PLATE:
@@ -111,43 +108,50 @@ class EventHandler(RegexMatchingEventHandler):
 
         try:
             image_info: ImageInfo | None = examine_file(file_path, self.event_config.image_name_re)
-            if image_info is not None:
-                target: str = image_info.target
-                log.info("Examining image for %s at %s", target, file_path.absolute())
+            if image_info is not None and image_info.target is not None:
+                target_id: str = image_info.target
+                log.info("Examining image for %s at %s", target_id, file_path.absolute())
 
                 image: Image.Image | None = process_image(
                     file_path.absolute(), image_info, jpeg_opts=self.image_config.jpeg_opts, png_opts=self.image_config.png_opts
                 )
                 ocr_fields: dict[str, str | None] = scan_ocr_fields(image, self.event_config, self.ocr_config)
 
-                classification: dict[str, Any] = self.classify_target(target)
-                if classification["target"] != target:
-                    # apply corrected target name if changed
-                    target = classification["target"]
+                sighting: Sighting = self.tracker.find(target_id)
 
                 reg_info: list[Any] | dict[str, Any] | None = None
                 if (
-                    not classification.get("known")
+                    sighting.target.group != "known"
                     and self.api_client
                     and image_info.target
                     and self.event_config.target_type == TARGET_TYPE_PLATE
                 ):
-                    reg_info = self.api_client.lookup(target).get("plate")
+                    reg_info = self.api_client.lookup(sighting.target.id).get("plate")
 
-                time_analysis: dict[str, Any] = self.track_target(target, self.event_config.target_type, image_info.timestamp)
+                time_analysis: dict[str, Any] = self.tracker.record(
+                    sighting.target.id, self.event_config.target_type, image_info.timestamp
+                )
 
-                if classification.get("ignore"):
-                    log.info("Skipping MQTT publication for ignored %s", target)
+                entity_id: str | None = sighting.target.entity_id
+                if entity_id:
+                    target_state_topic = f"{self.mqtt_topic_root}/targets/{self.event_config.target_type}/{entity_id}"
+                    self.publisher.publish_target_state(
+                        state_topic=target_state_topic,
+                        description=sighting.target.description,
+                        time_analysis=time_analysis,
+                    )
+
+                if sighting.ignore:
+                    log.info("Skipping MQTT publication for ignored %s", sighting.target.id)
                     return
 
                 self.publisher.post_state_message(
                     self.state_topic,
-                    target=target,
+                    sighting=sighting,
                     event_config=self.event_config,
                     camera=self.camera,
                     image_info=image_info,
                     ocr_fields=ocr_fields,
-                    classification=classification,
                     time_analysis=time_analysis,
                     url=url,
                     reg_info=reg_info,
@@ -170,7 +174,7 @@ class EventHandler(RegexMatchingEventHandler):
                     event_config=self.event_config,
                     camera=self.camera,
                     ocr_fields=ocr_fields,
-                    target=None,
+                    sighting=None,
                     url=url,
                     file_path=file_path,
                 )
@@ -182,7 +186,7 @@ class EventHandler(RegexMatchingEventHandler):
                 self.state_topic,
                 event_config=self.event_config,
                 camera=self.camera,
-                target=None,
+                sighting=None,
                 error=str(e),
                 file_path=file_path,
             )
@@ -202,149 +206,11 @@ class EventHandler(RegexMatchingEventHandler):
         autoclear = self.event_config.autoclear
         log.info("Autoclear firing for %s/%s", self.event_config.event, self.event_config.camera)
         if autoclear.state:
-            self.publisher.post_state_message(self.state_topic, target=None, event_config=self.event_config, camera=self.camera)
+            self.publisher.post_state_message(
+                self.state_topic, sighting=None, event_config=self.event_config, camera=self.camera
+            )
         if autoclear.image:
             self.publisher.post_image_message(self.image_topic, image=None)
-
-    def track_target(self, target: str, target_type: str, event_dt: dt.datetime | None) -> dict[str, Any]:
-        target = target or "UNKNOWN"
-        target_type_path = self.tracker_config.data_dir / target_type
-        target_type_path.mkdir(exist_ok=True)
-        target_file = target_type_path / f"{target}.json"
-        time_analysis: dict[str, Any] = {}
-        try:
-            sightings: list[str] = []
-            if target_file.exists():
-                with target_file.open("r") as f:
-                    sightings = json.load(f)
-
-            time_analysis = _compute_time_analysis(sightings, event_dt)
-            sightings.append(event_dt.isoformat() if event_dt else dt.datetime.now(tz=tzlocal.get_localzone()).isoformat())
-            with target_file.open("w") as f:
-                json.dump(sightings, f)
-        except Exception as e:
-            log.exception("Failed to track sightings for %s:%s", target, e)
-        return time_analysis
-
-    def classify_target(self, target: str | None) -> dict[str, Any]:
-        results = {
-            "orig_target": target,
-            "target": target,
-            "ignore": False,
-            "known": False,
-            "dangerous": False,
-            "priority": "high",
-            "description": "Unknown vehicle",
-        }
-        if not target or self.target_config is None:
-            # empty dict to make home assistant template logic easier
-            return results
-        for corrected_target, patterns in self.target_config.correction.items():
-            if any(re.match(pat, target) for pat in patterns):
-                results["target"] = corrected_target
-                target = corrected_target
-                log.info("Corrected target %s -> %s", results["orig_target"], target)
-                break
-        for pat in self.target_config.ignore:
-            if re.match(pat, target):
-                log.info("Ignoring %s matching ignore pattern %s", target, pat)
-                results["ignore"] = True
-                results["priority"] = "low"
-                results["description"] = "Ignored"
-                break
-        max_dist = self.target_config.auto_match_tolerance
-
-        def _fuzzy_match(candidates: dict[str, str | None]) -> str | None:
-            """Return the closest key in candidates within max_dist edits, or None."""
-            best: str | None = None
-            best_dist = max_dist + 1
-            for candidate in candidates:
-                d = Levenshtein.distance(target, candidate)
-                if d < best_dist:
-                    best_dist = d
-                    best = candidate
-            return best if best_dist <= max_dist else None
-
-        dangerous_match = (
-            target
-            if target in self.target_config.dangerous
-            else (_fuzzy_match(self.target_config.dangerous) if max_dist > 0 else None)
-        )
-        if dangerous_match:
-            if dangerous_match != target:
-                log.warning(
-                    "Fuzzy-matched %s to dangerous plate %s (distance %s)",
-                    target,
-                    dangerous_match,
-                    Levenshtein.distance(target, dangerous_match),
-                )
-            else:
-                log.warning("%s known as potential danger", target)
-            results["dangerous"] = True
-            results["priority"] = "critical"
-            results["description"] = self.target_config.dangerous[dangerous_match] or "Potential threat"
-
-        known_match = (
-            target if target in self.target_config.known else (_fuzzy_match(self.target_config.known) if max_dist > 0 else None)
-        )
-        if known_match:
-            if known_match != target:
-                log.info(
-                    "Fuzzy-matched %s to known plate %s (distance %s)",
-                    target,
-                    known_match,
-                    Levenshtein.distance(target, known_match),
-                )
-            else:
-                log.info("%s known to household", target)
-            results["known"] = True
-            results["priority"] = "medium"
-            results["description"] = self.target_config.known[known_match] or "Known"
-
-        return results
-
-
-def _compute_time_analysis(sightings: list[str], current_dt: dt.datetime | None) -> dict[str, Any]:
-    """Derive visit history and time-of-day statistics from previous sightings.
-
-    Called before the current visit is appended, so all counts/times reflect prior history only.
-
-    Returns a dict with:
-      - previous_sightings: int — number of times seen before the current visit
-      - last_seen: ISO datetime string of the most recent prior sighting, or None
-      - hourly_counts: dict[int,int] of 24 ints, index = hour (0-23)
-      - earliest_time: "HH:MM:SS" of the earliest time-of-day previously seen, or None
-      - latest_time:   "HH:MM:SS" of the latest time-of-day previously seen, or None
-      - within_time_range: bool — current time falls within [earliest, latest], or None if no history
-    """
-    hourly_counts: dict[int, int] = {}
-    times: list[dt.time] = []
-    last_seen: str | None = sightings[-1] if sightings else None
-    for s in sightings:
-        try:
-            ts = dt.datetime.fromisoformat(s)
-            hourly_counts.setdefault(ts.hour, 0)
-            hourly_counts[ts.hour] += 1
-            times.append(ts.replace(tzinfo=None).time())
-        except Exception as e:
-            log.warning("Skipping unparsable sighting timestamp %r: %s", s, e)
-
-    earliest = min(times) if times else None
-    latest = max(times) if times else None
-
-    within_range: bool | None = None
-    if current_dt is not None and earliest is not None and latest is not None:
-        current_t = current_dt.replace(tzinfo=None).time()
-        within_range = earliest <= current_t <= latest
-
-    return {
-        "previous_sightings": len(sightings),
-        "last_seen": last_seen,
-        "hourly_counts": hourly_counts,
-        "earliest_time": earliest.isoformat() if earliest else None,
-        "latest_time": latest.isoformat() if latest else None,
-        "within_time_range": within_range,
-    }
 
 
 def process_image(

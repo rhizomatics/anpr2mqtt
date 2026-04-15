@@ -13,6 +13,7 @@ from PIL import Image
 
 import anpr2mqtt
 from anpr2mqtt.settings import CameraSettings, EventSettings, HomeAssistantSettings
+from anpr2mqtt.tracker import Sighting, Target
 
 from .const import ImageInfo
 
@@ -158,6 +159,41 @@ class HomeAssistantPublisher:
         self.republish[topic] = msg
         log.info("Published HA MQTT Discovery message to %s", topic)
 
+    def publish_target_sensor_discovery(
+        self,
+        target: Target,
+        state_topic: str,
+    ) -> None:
+        payload: dict[str, Any] = {
+            "o": {
+                "name": "anpr2mqtt",
+                "sw": anpr2mqtt.version,  # pyright: ignore[reportAttributeAccessIssue]
+                "url": "https://anpr2mqtt.rhizomatics.org.uk",
+            },
+            "unique_id": f"{target.target_type}_{target.group or 'unknown'}_{target.id}",
+            "default_entity_id": f"sensor.{target.entity_id}",
+            "name": target.description or target.entity_id,
+            "state_topic": state_topic,
+            "json_attributes_topic": state_topic,
+            "value_template": ".{{ value_json.last_seen }}",
+            "device_class": "timestamp",
+            "icon": target.icon,
+        }
+        topic = f"{self.discovery_topic_prefix}/sensor/{target.entity_id}/config"
+        msg = json.dumps(payload)
+        self.client.publish(topic, payload=msg, qos=0, retain=True)
+        self.republish[topic] = msg
+        log.info("Published HA MQTT target sensor Discovery message to %s", topic)
+
+    def publish_target_state(self, state_topic: str, description: str | None, time_analysis: dict[str, Any]) -> None:
+        payload: dict[str, Any] = {"description": description, **time_analysis}
+        try:
+            msg = json.dumps(payload)
+            self.client.publish(state_topic, payload=msg, qos=0, retain=True)
+            log.debug("Published target state to %s: %s", state_topic, payload)
+        except Exception as e:
+            log.error("Failed to publish target state to %s: %s", state_topic, e, exc_info=1)
+
     def add_device_info(self, payload: dict[str, Any], camera: CameraSettings) -> None:
         payload["dev"] = {
             "name": f"anpr2mqtt on {camera.name}",
@@ -171,29 +207,30 @@ class HomeAssistantPublisher:
     def post_state_message(
         self,
         topic: str,
-        target: str | None,
+        sighting: Sighting | None,
         event_config: EventSettings,
         camera: CameraSettings,
         ocr_fields: dict[str, str | None] | None = None,
         image_info: ImageInfo | None = None,
-        classification: dict[str, Any] | None = None,
         time_analysis: dict[str, Any] | None = None,
         url: str | None = None,
         error: str | None = None,
         file_path: Path | None = None,
         reg_info: Any = None,
     ) -> None:
-        payload: dict[str, Any] = {
-            "target": target,
-            "target_type": event_config.target_type,
-            event_config.target_type: target,
-            "event": event_config.event,
-            "camera": camera.name or "UNKNOWN",
-            "area": camera.area,
-            "live_url": camera.live_url,
-            "reg_info": reg_info,
-            "history": time_analysis,
-        }
+
+        payload: dict[str, Any] = sighting.as_dict() if sighting else {"target": None, "target_type": event_config.target_type}
+        payload.update(
+            {
+                event_config.target_type: sighting.target.id if sighting else None,
+                "event": event_config.event,
+                "camera": camera.name or "UNKNOWN",
+                "area": camera.area,
+                "live_url": camera.live_url,
+                "reg_info": reg_info,
+                "history": time_analysis,
+            }
+        )
         if ocr_fields:
             payload.update(ocr_fields)
         if error:
@@ -202,8 +239,6 @@ class HomeAssistantPublisher:
             payload["event_image_url"] = url
         if file_path is not None:
             payload["file_path"] = str(file_path)
-        if classification is not None:
-            payload.update(classification)
 
         try:
             if image_info:

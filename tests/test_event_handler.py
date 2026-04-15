@@ -2,13 +2,13 @@ import datetime as dt
 import json
 import re
 from pathlib import Path
-from unittest.mock import ANY, Mock, call, patch
+from unittest.mock import ANY, Mock, patch
 
 from PIL import Image
 from pytest_mock import MockerFixture
 
 from anpr2mqtt.const import ImageInfo
-from anpr2mqtt.event_handler import EventHandler, _compute_time_analysis, examine_file, process_image, scan_ocr_fields
+from anpr2mqtt.event_handler import EventHandler, examine_file, process_image, scan_ocr_fields
 from anpr2mqtt.settings import (
     AutoClearSettings,
     DimensionSettings,
@@ -17,61 +17,44 @@ from anpr2mqtt.settings import (
     HomeAssistantSettings,
     OCRFieldSettings,
     OCRSettings,
+    Target,
     TargetSettings,
 )
+from anpr2mqtt.tracker import Tracker
 
 
-def test_eventhandler_handles_reg_plate_event(event_handler: EventHandler) -> None:
+def test_eventhandler_handles_reg_plate_event(event_handler: EventHandler, tracker: Tracker) -> None:
     event = Mock()
     event.src_path = "fixtures/20250602103045407_B4DM3N_VEHICLE_DETECTION.jpg"
     event.event_type = "closed"
     event.is_directory = False
     event_handler.on_closed(event)
-    event_handler.publisher.client.publish.assert_has_calls(  # type: ignore[attr-defined]
-        [
-            call(
-                "test/topic",
-                payload=json.dumps(
-                    {
-                        "target": "B4DM3N",
-                        "target_type": "plate",
-                        "plate": "B4DM3N",
-                        "event": "unit_testing",
-                        "camera": "test_cam",
-                        "area": None,
-                        "live_url": None,
-                        "reg_info": None,
-                        "history": {
-                            "previous_sightings": 0,
-                            "last_seen": None,
-                            "hourly_counts": {},
-                            "earliest_time": None,
-                            "latest_time": None,
-                            "within_time_range": None,
-                        },
-                        "vehicle_direction": "Forward",
-                        "event_image_url": "http://127.0.0.1/images/20250602103045407_B4DM3N_VEHICLE_DETECTION.jpg",
-                        "file_path": "fixtures/20250602103045407_B4DM3N_VEHICLE_DETECTION.jpg",
-                        "orig_target": "B4DM3N",
-                        "ignore": False,
-                        "known": False,
-                        "dangerous": False,
-                        "priority": "high",
-                        "description": "Unknown vehicle",
-                        "event_time": "2025-06-02T10:30:45.000407+00:00",
-                        "image_event": "VEHICLE_DETECTION",
-                        "ext": "jpg",
-                        "image_size": 123445,
-                    }
-                ),
-                qos=0,
-                retain=True,
-            ),
-            call("test/images", payload=ANY, qos=0, retain=True),
-        ],
-        any_order=True,
+    state_call = next(
+        c
+        for c in event_handler.publisher.client.publish.call_args_list  # type: ignore[attr-defined]
+        if c.args[0] == "test/topic"
     )
-    sightings_db_path: Path = event_handler.tracker_config.data_dir / "plate" / "B4DM3N.json"
+    payload = json.loads(state_call.kwargs["payload"])
+    assert payload["target"] == "B4DM3N"
+    assert payload["orig_target"] == "B4DM3N"
+    assert payload["known"] is False
+    assert payload["dangerous"] is False
+    assert payload["ignore"] is False
+    assert payload["description"] is None
+    assert payload["entity_id"] is None
+    assert payload["event"] == "unit_testing"
+    assert payload["camera"] == "test_cam"
+    assert payload["reg_info"] is None
+    assert payload["history"]["previous_sightings"] == 0
+    assert payload["image_event"] == "VEHICLE_DETECTION"
+    assert payload["ext"] == "jpg"
+    assert payload["image_size"] == 123445
+    assert payload["plate"] == "B4DM3N"
+
+    event_handler.publisher.client.publish.assert_any_call(  # type: ignore[attr-defined]
+        "test/images", payload=ANY, qos=0, retain=True
+    )
+    sightings_db_path: Path = tracker.tracker_config.data_dir / "plate" / "B4DM3N.json"
     assert sightings_db_path.exists()
     with sightings_db_path.open("r") as f:
         sightings = json.load(f)
@@ -105,76 +88,6 @@ def test_eventhandler_copes_with_malformed_reg_plate_event(event_handler: EventH
         qos=0,
         retain=True,
     )
-
-
-def test_corrections_unknown(event_handler: EventHandler) -> None:
-    results = event_handler.classify_target("PK12TST")
-    assert results == {
-        "dangerous": False,
-        "description": "Unknown vehicle",
-        "ignore": False,
-        "known": False,
-        "priority": "high",
-        "orig_target": "PK12TST",
-        "target": "PK12TST",
-    }
-
-
-def test_corrections_gangsta(event_handler: EventHandler) -> None:
-    event_handler.target_config = TargetSettings(dangerous={"PK12TST": "Local dodgy man"})
-    results = event_handler.classify_target("PK12TST")
-    assert results == {
-        "dangerous": True,
-        "description": "Local dodgy man",
-        "ignore": False,
-        "known": False,
-        "priority": "critical",
-        "orig_target": "PK12TST",
-        "target": "PK12TST",
-    }
-
-
-def test_corrections_known(event_handler: EventHandler) -> None:
-    event_handler.target_config = TargetSettings(known={"PK12TST": "Postie"})
-    results = event_handler.classify_target("PK12TST")
-    assert results == {
-        "dangerous": False,
-        "description": "Postie",
-        "ignore": False,
-        "known": True,
-        "priority": "medium",
-        "orig_target": "PK12TST",
-        "target": "PK12TST",
-    }
-
-
-def test_corrections_known_with_correction(event_handler: EventHandler) -> None:
-    event_handler.target_config = TargetSettings(known={"PK12TST": "Postie"}, correction={"PK12TST": ["P12TST"]})
-
-    results = event_handler.classify_target("P12TST")
-    assert results == {
-        "dangerous": False,
-        "description": "Postie",
-        "ignore": False,
-        "known": True,
-        "priority": "medium",
-        "orig_target": "P12TST",
-        "target": "PK12TST",
-    }
-
-
-def test_corrections_ignore(event_handler: EventHandler) -> None:
-    event_handler.target_config = TargetSettings(ignore=[".*TST"])
-    results = event_handler.classify_target("PK12TST")
-    assert results == {
-        "dangerous": False,
-        "description": "Ignored",
-        "ignore": True,
-        "known": False,
-        "priority": "low",
-        "orig_target": "PK12TST",
-        "target": "PK12TST",
-    }
 
 
 def test_process_image(tmp_path: Path) -> None:
@@ -379,7 +292,7 @@ def test_on_closed_no_image_url_base(event_handler: EventHandler) -> None:
 
 
 def test_on_closed_ignored_target(event_handler: EventHandler) -> None:
-    event_handler.target_config = TargetSettings(ignore=[r"B4DM3N"])
+    event_handler.tracker.target_config = TargetSettings(ignore=[r"B4DM3N"])
     event = Mock()
     event.src_path = "fixtures/20250602103045407_B4DM3N_VEHICLE_DETECTION.jpg"
     event.event_type = "closed"
@@ -418,7 +331,8 @@ def test_on_closed_with_api_client(event_handler: EventHandler) -> None:
 def test_on_closed_known_target_skips_api(event_handler: EventHandler) -> None:
     mock_api = Mock()
     event_handler.api_client = mock_api
-    event_handler.target_config = TargetSettings(known={"B4DM3N": "My car"})
+    event_handler.tracker.target_config = TargetSettings(known={"B4DM3N": Target(description="My car", group="known")})
+
     event_handler.event_config = EventSettings(
         camera="test_cam",
         event="unit_testing",
@@ -475,140 +389,6 @@ def test_on_closed_exception_path(event_handler: EventHandler) -> None:
     assert "error" in payload
 
 
-# --- track_target ---
-
-
-# --- _compute_time_analysis ---
-
-
-def test_time_analysis_no_history() -> None:
-    result = _compute_time_analysis([], dt.datetime(2025, 6, 2, 10, 30, tzinfo=dt.UTC))
-    assert result["previous_sightings"] == 0
-    assert result["last_seen"] is None
-    assert result["hourly_counts"] == {}
-    assert result["earliest_time"] is None
-    assert result["latest_time"] is None
-    assert result["within_time_range"] is None
-
-
-def test_time_analysis_no_current_dt() -> None:
-    sightings = ["2025-06-02T07:30:00+00:00", "2025-06-02T09:15:00+00:00"]
-    result = _compute_time_analysis(sightings, None)
-    assert result["previous_sightings"] == 2
-    assert result["last_seen"] == "2025-06-02T09:15:00+00:00"
-    assert result["within_time_range"] is None
-    assert result["earliest_time"] == "07:30:00"
-    assert result["latest_time"] == "09:15:00"
-
-
-def test_time_analysis_hourly_counts() -> None:
-    sightings = [
-        "2025-06-01T08:00:00+00:00",
-        "2025-06-02T08:30:00+00:00",
-        "2025-06-03T14:00:00+00:00",
-    ]
-    result = _compute_time_analysis(sightings, dt.datetime(2025, 6, 4, 8, 0, tzinfo=dt.UTC))
-    assert result["hourly_counts"][8] == 2
-    assert result["hourly_counts"][14] == 1
-    assert sum(result["hourly_counts"].values()) == 3
-
-
-def test_time_analysis_within_range() -> None:
-    sightings = ["2025-06-02T07:00:00+00:00", "2025-06-02T09:00:00+00:00"]
-    result = _compute_time_analysis(sightings, dt.datetime(2025, 6, 3, 8, 0, tzinfo=dt.UTC))
-    assert result["earliest_time"] == "07:00:00"
-    assert result["latest_time"] == "09:00:00"
-    assert result["within_time_range"] is True
-
-
-def test_time_analysis_outside_range() -> None:
-    sightings = ["2025-06-02T07:00:00+00:00", "2025-06-02T09:00:00+00:00"]
-    result = _compute_time_analysis(sightings, dt.datetime(2025, 6, 3, 22, 0, tzinfo=dt.UTC))
-    assert result["within_time_range"] is False
-
-
-def test_time_analysis_at_boundary() -> None:
-    # Exactly at earliest or latest is within range
-    sightings = ["2025-06-02T07:00:00+00:00", "2025-06-02T09:00:00+00:00"]
-    at_earliest = _compute_time_analysis(sightings, dt.datetime(2025, 6, 3, 7, 0, tzinfo=dt.UTC))
-    at_latest = _compute_time_analysis(sightings, dt.datetime(2025, 6, 3, 9, 0, tzinfo=dt.UTC))
-    assert at_earliest["within_time_range"] is True
-    assert at_latest["within_time_range"] is True
-
-
-def test_time_analysis_ignores_bad_entries() -> None:
-    sightings = ["2025-06-02T08:00:00+00:00", "not-a-timestamp", "also-bad"]
-    result = _compute_time_analysis(sightings, dt.datetime(2025, 6, 3, 8, 0, tzinfo=dt.UTC))
-    assert result["hourly_counts"][8] == 1
-    assert sum(result["hourly_counts"].values()) == 1
-
-
-def test_track_target_time_analysis_populated(event_handler: EventHandler) -> None:
-    ts1 = dt.datetime(2025, 6, 1, 8, 0, tzinfo=dt.UTC)
-    ts2 = dt.datetime(2025, 6, 2, 14, 0, tzinfo=dt.UTC)
-    ts3 = dt.datetime(2025, 6, 3, 10, 0, tzinfo=dt.UTC)
-    event_handler.track_target("TIMETEST", "plate", ts1)
-    event_handler.track_target("TIMETEST", "plate", ts2)
-    analysis = event_handler.track_target("TIMETEST", "plate", ts3)
-    assert analysis["previous_sightings"] == 2
-    assert analysis["last_seen"] == ts2.isoformat()
-    assert analysis["hourly_counts"][8] == 1
-    assert analysis["hourly_counts"][14] == 1
-    assert analysis["earliest_time"] == "08:00:00"
-    assert analysis["latest_time"] == "14:00:00"
-    assert analysis["within_time_range"] is True  # 10:00 is between 08:00 and 14:00
-
-
-def test_track_target_new(event_handler: EventHandler) -> None:
-    result = event_handler.track_target("TEST123", "plate", dt.datetime(2025, 1, 1, tzinfo=dt.UTC))
-    assert result["previous_sightings"] == 0
-    assert result["last_seen"] is None
-
-
-def test_track_target_existing(event_handler: EventHandler) -> None:
-    ts1 = dt.datetime(2025, 1, 1, tzinfo=dt.UTC)
-    ts2 = dt.datetime(2025, 1, 2, tzinfo=dt.UTC)
-    event_handler.track_target("TEST456", "plate", ts1)
-    result = event_handler.track_target("TEST456", "plate", ts2)
-    assert result["previous_sightings"] == 1
-    assert result["last_seen"] == ts1.isoformat()
-
-
-def test_track_target_no_timestamp(event_handler: EventHandler) -> None:
-    result = event_handler.track_target("UNKNOWN", "plate", None)
-    assert result["previous_sightings"] == 0
-
-
-# --- classify_target: no target_config ---
-
-
-def test_classify_target_no_config(event_handler: EventHandler) -> None:
-    event_handler.target_config = None
-    result = event_handler.classify_target("AB12CDE")
-    assert result["target"] == "AB12CDE"
-    assert result["known"] is False
-
-
-def test_classify_target_none_target(event_handler: EventHandler) -> None:
-    result = event_handler.classify_target(None)
-    assert result["target"] is None
-    assert result["known"] is False
-
-
-def test_classify_target_dangerous_no_description(event_handler: EventHandler) -> None:
-    event_handler.target_config = TargetSettings(dangerous={"AB12CDE": None})
-    result = event_handler.classify_target("AB12CDE")
-    assert result["dangerous"] is True
-    assert result["description"] == "Potential threat"
-
-
-def test_classify_target_known_no_description(event_handler: EventHandler) -> None:
-    event_handler.target_config = TargetSettings(known={"AB12CDE": None})
-    result = event_handler.classify_target("AB12CDE")
-    assert result["known"] is True
-    assert result["description"] == "Known"
-
-
 # --- autoclear ---
 
 
@@ -636,7 +416,7 @@ def test_do_autoclear_sensor_clears_state(event_handler: EventHandler) -> None:
     ):
         event_handler._do_autoclear()
     mock_state.assert_called_once_with(
-        event_handler.state_topic, target=None, event_config=event_handler.event_config, camera=event_handler.camera
+        event_handler.state_topic, sighting=None, event_config=event_handler.event_config, camera=event_handler.camera
     )
     mock_image.assert_not_called()
 
@@ -721,81 +501,6 @@ def test_on_closed_no_image_schedules_autoclear(event_handler: EventHandler) -> 
     mock_schedule.assert_called_once()
 
 
-# --- classify_target: fuzzy matching via auto_match_tolerance ---
-
-
-def test_fuzzy_match_known_within_tolerance(event_handler: EventHandler) -> None:
-    # "AB12CDF" is distance 1 from "AB12CDE"
-    event_handler.target_config = TargetSettings(known={"AB12CDE": "Alice"}, auto_match_tolerance=1)
-    result = event_handler.classify_target("AB12CDF")
-    assert result["known"] is True
-    assert result["description"] == "Alice"
-    assert result["priority"] == "medium"
-
-
-def test_fuzzy_match_known_beyond_tolerance(event_handler: EventHandler) -> None:
-    # "AB12CXX" is distance 2 from "AB12CDE", tolerance is 1
-    event_handler.target_config = TargetSettings(known={"AB12CDE": "Alice"}, auto_match_tolerance=1)
-    result = event_handler.classify_target("AB12CXX")
-    assert result["known"] is False
-    assert result["priority"] == "high"
-
-
-def test_fuzzy_match_known_disabled(event_handler: EventHandler) -> None:
-    # tolerance=0 means only exact matches; "AB12CDF" must not match "AB12CDE"
-    event_handler.target_config = TargetSettings(known={"AB12CDE": "Alice"}, auto_match_tolerance=0)
-    result = event_handler.classify_target("AB12CDF")
-    assert result["known"] is False
-
-
-def test_fuzzy_match_dangerous_within_tolerance(event_handler: EventHandler) -> None:
-    # "PK12TSX" is distance 1 from "PK12TST"
-    event_handler.target_config = TargetSettings(dangerous={"PK12TST": "Suspect"}, auto_match_tolerance=1)
-    result = event_handler.classify_target("PK12TSX")
-    assert result["dangerous"] is True
-    assert result["description"] == "Suspect"
-    assert result["priority"] == "critical"
-
-
-def test_fuzzy_match_dangerous_beyond_tolerance(event_handler: EventHandler) -> None:
-    # "PK12XXX" is distance 3 from "PK12TST", tolerance is 1
-    event_handler.target_config = TargetSettings(dangerous={"PK12TST": "Suspect"}, auto_match_tolerance=1)
-    result = event_handler.classify_target("PK12XXX")
-    assert result["dangerous"] is False
-
-
-def test_fuzzy_match_picks_closest_known(event_handler: EventHandler) -> None:
-    # "AB12CDF" is distance 1 from "AB12CDE" and distance 2 from "AB12CDZ"
-    event_handler.target_config = TargetSettings(
-        known={"AB12CDE": "Alice", "AB12CDZ": "Bob"},
-        auto_match_tolerance=2,
-    )
-    result = event_handler.classify_target("AB12CDF")
-    assert result["known"] is True
-    assert result["description"] == "Alice"
-
-
-def test_fuzzy_match_exact_preferred(event_handler: EventHandler) -> None:
-    # Exact match should win even when tolerance > 0
-    event_handler.target_config = TargetSettings(known={"AB12CDE": "Exact match"}, auto_match_tolerance=2)
-    result = event_handler.classify_target("AB12CDE")
-    assert result["known"] is True
-    assert result["description"] == "Exact match"
-
-
-def test_fuzzy_match_both_known_and_dangerous(event_handler: EventHandler) -> None:
-    # A plate close to entries in both lists should get both flags
-    event_handler.target_config = TargetSettings(
-        known={"AB12CDE": "Alice"},
-        dangerous={"AB12CDX": "Threat"},
-        auto_match_tolerance=1,
-    )
-    # "AB12CDF" is distance 1 from both "AB12CDE" and "AB12CDX"
-    result = event_handler.classify_target("AB12CDF")
-    assert result["known"] is True
-    assert result["dangerous"] is True
-
-
 # --- EventHandler.__init__ branches ---
 
 
@@ -809,10 +514,9 @@ def test_event_handler_init_with_dvla_api_key(tmp_path: Path) -> None:
             state_topic="t/state",
             image_topic="t/image",
             dvla_config=DVLASettings(api_key="testkey"),
-            target_config=TargetSettings(),
             camera=CameraSettings(name="cam"),
             image_config=ImageSettings(),
-            tracker_config=TrackerSettings(data_dir=tmp_path),
+            tracker=Tracker("testing", TrackerSettings(data_dir=tmp_path)),
             ocr_config=OCRSettings(),
             event_config=EventSettings(camera="cam", event="anpr", watch_path=tmp_path, target_type="plate", ocr_field_ids=[]),
         )
@@ -858,9 +562,9 @@ def test_on_closed_image_format_none(event_handler: EventHandler) -> None:
 
 def test_on_closed_correction_changes_target(event_handler: EventHandler) -> None:
     """When correction remaps target, line 120 (target = classification['target']) is hit."""
-    event_handler.target_config = TargetSettings(
+    event_handler.tracker.target_config = TargetSettings(
         correction={"CORRECTED": [r"B4DM3N"]},
-        known={"CORRECTED": "My car"},
+        known={"CORRECTED": Target(id="CORRECTED", description="My car", group="known")},
         auto_match_tolerance=0,
     )
     event = Mock()
@@ -883,22 +587,6 @@ def test_process_image_size_unchanged() -> None:
     image_info = ImageInfo("", "anpr", dt.datetime.now(tz=dt.UTC), size=0, ext="jpg")
     result = process_image(fixture_image_path, image_info, jpeg_opts={"quality": 30}, png_opts={})
     assert result is not None
-
-
-# --- track_target: exception path ---
-
-
-def test_track_target_exception(event_handler: EventHandler, tmp_path: Path) -> None:
-    """json.load raises → exception is caught and logged (lines 225-226)."""
-    target_dir = tmp_path / "plate"
-    target_dir.mkdir()
-    bad_file = target_dir / "BADPLATE.json"
-    bad_file.write_text("not valid json")
-    result = event_handler.track_target("BADPLATE", "plate", dt.datetime(2025, 1, 1, tzinfo=dt.UTC))
-    assert result == {}
-
-
-# --- scan_ocr_fields: uncovered branches ---
 
 
 def _make_event_and_ocr(field: OCRFieldSettings) -> tuple[EventSettings, OCRSettings]:

@@ -15,6 +15,7 @@ import anpr2mqtt
 from anpr2mqtt.event_handler import EventHandler
 from anpr2mqtt.hass import HomeAssistantPublisher
 from anpr2mqtt.settings import CameraSettings, Settings
+from anpr2mqtt.tracker import Tracker, compute_time_analysis
 
 log = structlog.get_logger()
 # run like docker run --restart always -d -v /ftp:/ftp d4d8dea7d1e3
@@ -117,17 +118,22 @@ def main_loop() -> None:
                 camera = CameraSettings(name=event_config.camera)
             state_topic = f"{settings.mqtt.topic_root}/{event_config.event}/{camera.name}/state"
             image_topic = f"{settings.mqtt.topic_root}/{event_config.event}/{camera.name}/image"
+            tracker = Tracker(
+                event_config.target_type,
+                tracker_config=settings.tracker,
+                target_config=settings.targets.get(event_config.target_type),
+            )
             event_handler = EventHandler(
                 publisher=publisher,
                 event_config=event_config,
                 state_topic=state_topic,
                 camera=camera,
                 image_topic=image_topic,
-                target_config=settings.targets.get(event_config.target_type),
                 ocr_config=settings.ocr,
                 image_config=settings.image,
                 dvla_config=settings.dvla,
-                tracker_config=settings.tracker,
+                tracker=tracker,
+                mqtt_topic_root=settings.mqtt.topic_root,
             )  # ty:ignore[invalid-argument-type]
             log.debug("Scheduling watchdog for %s", event_config.watch_path)
             observer.schedule(event_handler, str(event_config.watch_path), recursive=event_config.watch_tree)  # ty:ignore[invalid-argument-type]
@@ -140,8 +146,22 @@ def main_loop() -> None:
                 publisher.publish_camera_discovery(
                     state_topic=state_topic, image_topic=image_topic, event_config=event_config, camera=camera
                 )
+            # selectively publish known targets as HA sensors, using last seen timestamp as state value
+            for target in tracker.all(entity_id_only=True):
+                publisher.publish_target_sensor_discovery(target, state_topic=state_topic)
+                previous_sightings = tracker.history(target.id, target.target_type)
+                if previous_sightings:
+                    time_analysis: dict[str, Any] = compute_time_analysis(previous_sightings)
+                else:
+                    time_analysis = {"last_seen": None}
+                publisher.publish_target_state(
+                    state_topic=state_topic,
+                    description=target.description,
+                    time_analysis=time_analysis,
+                )
+
             # post initial empty state message
-            publisher.post_state_message(state_topic, target=None, event_config=event_config, camera=camera)
+            publisher.post_state_message(state_topic, sighting=None, event_config=event_config, camera=camera)
             log.info("Publishing %s %s state to %s", event_config.event, camera.name, state_topic)
         except Exception as e:
             log.error(

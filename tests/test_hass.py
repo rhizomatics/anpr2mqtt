@@ -9,7 +9,8 @@ from PIL import Image
 
 from anpr2mqtt.const import ImageInfo
 from anpr2mqtt.hass import HomeAssistantPublisher
-from anpr2mqtt.settings import CameraSettings, EventSettings, HomeAssistantSettings
+from anpr2mqtt.settings import CameraSettings, EventSettings, HomeAssistantSettings, Target
+from anpr2mqtt.tracker import Sighting
 
 
 @pytest.fixture
@@ -254,7 +255,7 @@ def test_add_device_info_without_area(publisher: HomeAssistantPublisher, camera:
 def test_post_state_message_minimal(
     publisher: HomeAssistantPublisher, mock_client: Mock, event_config: EventSettings, camera: CameraSettings
 ) -> None:
-    publisher.post_state_message("anpr2mqtt/anpr/cam1/state", target=None, event_config=event_config, camera=camera)
+    publisher.post_state_message("anpr2mqtt/anpr/cam1/state", sighting=None, event_config=event_config, camera=camera)
     mock_client.publish.assert_called_once()
     _args, kwargs = mock_client.publish.call_args
     payload = json.loads(kwargs["payload"])
@@ -275,12 +276,11 @@ def test_post_state_message_with_all_fields(
     )
     publisher.post_state_message(
         "anpr2mqtt/anpr/cam1/state",
-        target="AB12CDE",
+        sighting=Sighting(target=Target(id="AB12CDE", target_type="plate", group="known")),
         event_config=event_config,
         camera=camera_with_area,
         ocr_fields={"vehicle_direction": "Forward"},
         image_info=image_info,
-        classification={"known": True, "dangerous": False},
         time_analysis={
             "previous_sightings": 3,
             "last_seen": "2025-06-01T00:00:00+00:00",
@@ -313,7 +313,7 @@ def test_post_state_message_with_all_fields(
 def test_post_state_message_with_error(
     publisher: HomeAssistantPublisher, mock_client: Mock, event_config: EventSettings, camera: CameraSettings
 ) -> None:
-    publisher.post_state_message("topic", target=None, event_config=event_config, camera=camera, error="Something broke")
+    publisher.post_state_message("topic", sighting=None, event_config=event_config, camera=camera, error="Something broke")
     _args, kwargs = mock_client.publish.call_args
     payload = json.loads(kwargs["payload"])
     assert payload["error"] == "Something broke"
@@ -324,7 +324,7 @@ def test_post_state_message_publish_exception(
 ) -> None:
     mock_client.publish.side_effect = RuntimeError("mqtt down")
     # Should not raise
-    publisher.post_state_message("topic", target=None, event_config=event_config, camera=camera)
+    publisher.post_state_message("topic", sighting=None, event_config=event_config, camera=camera)
 
 
 # --- post_image_message ---
@@ -359,4 +359,4 @@ def test_post_state_message_with_camera_publish_exception(publisher: HomeAssista
     event_config = EventSettings(camera="cam", event="anpr")
     camera = CameraSettings(name="cam")
     # Should not raise
-    publisher.post_state_message("test/topic", target=None, event_config=event_config, camera=camera)
+    publisher.post_state_message("test/topic", sighting=None, event_config=event_config, camera=camera)

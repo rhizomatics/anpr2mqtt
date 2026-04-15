@@ -4,7 +4,8 @@ from enum import StrEnum, auto
 from pathlib import Path
 from typing import Final, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic_core.core_schema import FieldValidationInfo
 from pydantic_settings import (
     BaseSettings,
     CliSettingsSource,
@@ -18,6 +19,8 @@ TARGET_TYPE_PLATE: Final[str] = "plate"
 
 
 class MQTTSettings(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     topic_root: str = "anpr2mqtt"
     host: str = Field(default="localhost", description="MQTT broker IP address or hostname")
     port: int = Field(default=1883, description="MQTT broker port number")
@@ -149,15 +152,65 @@ class OCRSettings(BaseModel):
     )
 
 
+class Target(BaseModel):
+    id: str = ""
+    target_type: str = ""
+    group: str | None = None
+    description: str | None = Field(default=None, description="Target description")
+    entity_id: str | None = Field(
+        default=None, description="Entity ID to publish using Home Assistant MQTT Discovery compatible message"
+    )
+    icon: str = Field(
+        default="mdi:car",
+        description="Name of icon to publish, for Home Assistant should be a Material Design reference like 'mdi:car'",
+    )
+    priority: str | None = Field(default=None, description="Priority to report for use in Home Assistant notifications")
+
+    def as_dict(self) -> dict[str, bool | str | None]:
+        return {
+            "dangerous": self.group == "dangerous",
+            "description": self.description,
+            "known": self.group == "known",
+            "priority": self.priority,
+            "target": self.id,
+            "target_type": self.target_type,
+            "entity_id": self.entity_id,
+            "icon": self.icon,
+        }
+
+
+_PRIORITY_BY_GROUP: dict[str, str] = {"known": "medium", "dangerous": "critical"}
+
+
 class TargetSettings(BaseModel):
-    known: dict[str, str | None] = Field(default_factory=lambda: {})
-    dangerous: dict[str, str | None] = Field(default_factory=lambda: {})
+    known: dict[str, Target] = Field(default_factory=lambda: {})
+    dangerous: dict[str, Target] = Field(default_factory=lambda: {})
     ignore: list[str] = Field(default_factory=list)
     correction: dict[str, list[str | re.Pattern[str]]] = Field(default_factory=lambda: {})
     auto_match_tolerance: int = Field(
         default=1,
         description="Maximum tolerance for auto matching against known plates, using Levenshtein, 0 to disable fuzzy matching",
     )
+
+    @field_validator("known", "dangerous", mode="before")
+    @classmethod
+    def coerce_targets(cls, v: object, info: FieldValidationInfo) -> dict[str, Target]:
+        if not isinstance(v, dict):
+            return v  # type: ignore[return-value]
+        group: str = info.field_name or ""
+        result: dict[str, Target] = {}
+        for key, val in v.items():
+            if isinstance(val, Target):
+                result[key] = val
+            elif isinstance(val, str):
+                result[key] = Target(id=key, group=group, description=val)
+            elif isinstance(val, dict):
+                result[key] = Target(id=key, group=group, **val)
+            else:
+                result[key] = Target(id=key, group=group)
+            if result[key].priority is None:
+                result[key].priority = _PRIORITY_BY_GROUP.get(group, "high")
+        return result
 
 
 class Settings(BaseSettings):
@@ -179,6 +232,22 @@ class Settings(BaseSettings):
     dvla: DVLASettings = DVLASettings()
     homeassistant: HomeAssistantSettings = HomeAssistantSettings()
     ocr: OCRSettings = OCRSettings()
+
+    @model_validator(mode="before")
+    @classmethod
+    def inject_target_type(cls, data: object) -> object:
+        if not isinstance(data, dict):
+            return data
+        for target_type, target_settings in (data.get("targets") or {}).items():
+            if not isinstance(target_settings, dict):
+                continue
+            for group in ("known", "dangerous"):
+                for target_id, val in (target_settings.get(group) or {}).items():
+                    if isinstance(val, dict):
+                        val["target_type"] = target_type
+                    elif isinstance(val, str):
+                        target_settings[group][target_id] = {"description": val, "target_type": target_type}
+        return data
 
     @classmethod
     def settings_customise_sources(

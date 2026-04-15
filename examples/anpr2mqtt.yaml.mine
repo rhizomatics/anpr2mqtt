@@ -1,6 +1,9 @@
 ---
-log_level: debug
-camera: driveway
+log_level: DEBUG
+cameras:
+  - name: driveway
+    area: Driveway
+    live_url: http://10.111.10.100:5000/#driveway
 events:
   - watch_path: /ftp/Driveway
 mqtt:
@@ -8,7 +11,7 @@ mqtt:
   user: anpr2mqtt
   password: secret987
 targets:
-  plates:
+  plate:
     known:
       SP19TCY: jey's outlander
       SL13UKK: wendy's subaru

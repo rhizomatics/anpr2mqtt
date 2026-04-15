@@ -19,6 +19,7 @@ from anpr2mqtt.settings import (
     TargetSettings,
     TrackerSettings,
 )
+from anpr2mqtt.tracker import Tracker
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -27,16 +28,20 @@ def set_tz_env_variable() -> None:
 
 
 @pytest.fixture
-def event_handler(tmp_path: Path) -> EventHandler:
+def tracker(tmp_path: Path) -> Tracker:
+    return Tracker("testing", TrackerSettings(data_dir=tmp_path), TargetSettings())
+
+
+@pytest.fixture
+def event_handler(tracker: Tracker) -> EventHandler:
     return EventHandler(
         HomeAssistantPublisher(Mock(), HomeAssistantSettings(status_topic="status_test_topic")),
         state_topic="test/topic",
         image_topic="test/images",
         dvla_config=DVLASettings(),
-        target_config=TargetSettings(),
         camera=CameraSettings(name="test_cam"),
         image_config=ImageSettings(),
-        tracker_config=TrackerSettings(data_dir=tmp_path),
+        tracker=tracker,
         ocr_config=OCRSettings(
             fields={
                 "test_direction": OCRFieldSettings(
