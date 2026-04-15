@@ -147,16 +147,21 @@ def main_loop() -> None:
                     state_topic=state_topic, image_topic=image_topic, event_config=event_config, camera=camera
                 )
             # selectively publish known targets as HA sensors, using last seen timestamp as state value
-            for target in tracker.all(entity_id_only=True):
-                publisher.publish_target_sensor_discovery(target, state_topic=state_topic)
-                previous_sightings = tracker.history(target.id, target.target_type)
+            for entity_id, targets in tracker.entities.items():
+                target_topic: str = f"{settings.mqtt.topic_root}/{event_config.event}/{entity_id}/state"
+                publisher.publish_target_sensor_discovery(
+                    entity_id=entity_id, target_type=event_config.target_type, targets=targets, state_topic=target_topic
+                )
+
+                previous_sightings: list[str] = []
+                for target in targets:
+                    previous_sightings.extend(tracker.history(target.id, target.target_type))
                 if previous_sightings:
-                    time_analysis: dict[str, Any] = compute_time_analysis(previous_sightings)
+                    time_analysis: dict[str, Any] = compute_time_analysis(sorted(previous_sightings))
                 else:
                     time_analysis = {"last_seen": None}
                 publisher.publish_target_state(
-                    state_topic=state_topic,
-                    description=target.description,
+                    state_topic=target_topic,
                     time_analysis=time_analysis,
                 )
 

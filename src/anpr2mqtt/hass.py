@@ -161,7 +161,9 @@ class HomeAssistantPublisher:
 
     def publish_target_sensor_discovery(
         self,
-        target: Target,
+        entity_id: str,
+        target_type: str,
+        targets: list[Target],
         state_topic: str,
     ) -> None:
         payload: dict[str, Any] = {
@@ -170,23 +172,25 @@ class HomeAssistantPublisher:
                 "sw": anpr2mqtt.version,  # pyright: ignore[reportAttributeAccessIssue]
                 "url": "https://anpr2mqtt.rhizomatics.org.uk",
             },
-            "unique_id": f"{target.target_type}_{target.group or 'unknown'}_{target.id}",
-            "default_entity_id": f"sensor.{target.entity_id}",
-            "name": target.description or target.entity_id,
+            "unique_id": f"{target_type}_{hash(':'.join(t.id for t in targets))}",
+            "default_entity_id": f"sensor.{entity_id}",
+            "name": targets[0].description if len(targets) == 1 else entity_id,
             "state_topic": state_topic,
             "json_attributes_topic": state_topic,
             "value_template": ".{{ value_json.last_seen }}",
             "device_class": "timestamp",
-            "icon": target.icon,
+            "icon": targets[0].icon if len(targets) == 1 else None,
         }
-        topic = f"{self.discovery_topic_prefix}/sensor/{target.entity_id}/config"
+        topic = f"{self.discovery_topic_prefix}/sensor/{entity_id}/config"
         msg = json.dumps(payload)
         self.client.publish(topic, payload=msg, qos=0, retain=True)
         self.republish[topic] = msg
         log.info("Published HA MQTT target sensor Discovery message to %s", topic)
 
-    def publish_target_state(self, state_topic: str, description: str | None, time_analysis: dict[str, Any]) -> None:
-        payload: dict[str, Any] = {"description": description, **time_analysis}
+    def publish_target_state(self, state_topic: str, time_analysis: dict[str, Any], description: str | None = None) -> None:
+        payload: dict[str, Any] = {**time_analysis}
+        if description:
+            payload["description"] = description
         try:
             msg = json.dumps(payload)
             self.client.publish(state_topic, payload=msg, qos=0, retain=True)

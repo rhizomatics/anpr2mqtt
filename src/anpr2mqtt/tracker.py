@@ -35,14 +35,16 @@ class Tracker:
         self.target_type: str = target_type
         self.tracker_config: TrackerSettings = tracker_config
         self.target_config: TargetSettings | None = target_config
-
-    def all(self, entity_id_only: bool = False) -> list[Target]:
-        results: list[Target] = []
-        if not self.target_config:
-            return results
-        results.extend(target for target in self.target_config.known.values() if target.entity_id or not entity_id_only)
-        results.extend(target for target in self.target_config.dangerous.values() if target.entity_id or not entity_id_only)
-        return results
+        self.entities: dict[str, list[Target]] = {}
+        if self.target_config:
+            for target in self.target_config.known.values():
+                if target.entity_id is not None:
+                    self.entities.setdefault(target.entity_id, [])
+                    self.entities[target.entity_id].append(target)
+            for target in self.target_config.dangerous.values():
+                if target.entity_id is not None:
+                    self.entities.setdefault(target.entity_id, [])
+                    self.entities[target.entity_id].append(target)
 
     def history(self, target_id: str, target_type: str) -> list[str]:
         target_id = target_id or "UNKNOWN"
