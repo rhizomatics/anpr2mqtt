@@ -159,6 +159,9 @@ class Target(BaseModel):
     id: str = Field(description="Target identifier, for example reg plate")
     target_type: str = ""
     group: str | None = None
+    lookup: bool | None = Field(
+        default=None, description="Lookup registration plate using API, defaults to False for configured plates"
+    )
     description: str | None = Field(default=None, description="Target description")
     entity_id: str | None = Field(
         default=None, description="Entity ID to publish using Home Assistant MQTT Discovery compatible message"
@@ -189,6 +192,9 @@ _PRIORITY_BY_GROUP: dict[str, str] = {"known": "medium", "dangerous": "critical"
 class TargetGroup(BaseModel):
     name: str = Field(description="Name of the target group, for example 'known'")
     priority: str = Field(default="medium", description="Priority to report on MQTT message for sightings of this group")
+    lookup: bool = Field(
+        default=False, description="Lookup registration plate using API, defaults to False for configured plates"
+    )
     members: list[Target] = Field(description="List of target IDs or full target definitions")
     icon: str = Field(
         default="mdi:car",
@@ -208,8 +214,9 @@ class TargetGroup(BaseModel):
     @model_validator(mode="after")
     def apply_group_defaults(self) -> "TargetGroup":
         for target in self.members:
-            if target.group is None:
-                target.group = self.name
+            target.group = self.name
+            if target.lookup is None:
+                target.lookup = self.lookup
             if target.priority is None:
                 target.priority = self.priority
             if target.icon is None:
@@ -261,6 +268,8 @@ class Settings(BaseSettings):
             if not isinstance(target_settings, dict):
                 continue
             groups: list[dict[str, object] | TargetGroup] = list(target_settings.get("groups") or [])
+
+            # migration of original known/dangerous fixed groups
             existing_names = {g["name"] if isinstance(g, dict) else g.name for g in groups}
             for group_name in ("known", "dangerous"):
                 legacy: dict[str, object] = target_settings.get(group_name) or {}
@@ -279,8 +288,10 @@ class Settings(BaseSettings):
                         "name": group_name,
                         "priority": _PRIORITY_BY_GROUP.get(group_name, "medium"),
                         "members": members,
+                        "lookup": group_name == "dangerous",
                     }
                 )
+            # normalize strings->dicts
             target_settings["groups"] = groups
             for group in groups:
                 if not isinstance(group, dict):

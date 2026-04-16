@@ -149,6 +149,7 @@ def main_loop() -> None:
             # selectively publish known targets as HA sensors, using last seen timestamp as state value
             for entity_id, targets in tracker.entities.items():
                 target_topic: str = f"{settings.mqtt.topic_root}/{event_config.event}/targets/{entity_id}/state"
+                log.info("Publishing sensor.%s for %s targets", entity_id, len(targets))
                 publisher.publish_target_sensor_discovery(
                     entity_id=entity_id, target_type=event_config.target_type, targets=targets, state_topic=target_topic
                 )

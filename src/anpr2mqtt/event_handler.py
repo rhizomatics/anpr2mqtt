@@ -121,7 +121,7 @@ class EventHandler(RegexMatchingEventHandler):
 
                 reg_info: list[Any] | dict[str, Any] | None = None
                 if (
-                    sighting.target.group != "known"
+                    sighting.target.lookup
                     and self.api_client
                     and image_info.target
                     and self.event_config.target_type == TARGET_TYPE_PLATE

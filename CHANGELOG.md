@@ -5,6 +5,7 @@
   - Existing config using `known` or `dangerous` will be translated at runtime to new structure
 - `correction` lists of patterns or strings can now be added directly to target
 - `auto_match_tolerance` now moved to Event config
+- API lookup can be configured at target or group level, defaults to off, since vehicles already known
 ## Target specific sensors in Home Assistant
 - Groups and individual targets can be given an `entity_id` and a sensor will be created in Home Assistant using MQTT discovery
   - State for the sensor will be timestamp of last sighting, and combined past history will be attributes

@@ -97,7 +97,7 @@ class Tracker:
 
     def find(self, target_id: str) -> Sighting:
         result: Sighting = Sighting(
-            target=Target(id=target_id, target_type=self.target_type, priority="high"), uncorrected=target_id
+            target=Target(id=target_id, target_type=self.target_type, priority="high", lookup=True), uncorrected=target_id
         )
         if not target_id or self.target_config is None:
             # empty dict to make home assistant template logic easier
