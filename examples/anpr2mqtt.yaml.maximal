@@ -9,6 +9,7 @@ events:
   watch_path: /ftp/Driveway
   image_name_re: (?P<dt>[0-9]{17})_(?P<target>[A-Z0-9]+)_(?P<event>VEHICLE_DETECTION)\.(?P<ext>jpg|png|gif|jpeg)
   image_url_base: http://192.168.10.10/CCTV
+  auto_match_tolerance: 2
   ocr_field_ids:
     - hik_direction
 - camera: shed
@@ -71,7 +72,6 @@ dvla:
   api_key: MY6676SECRET787KEY
 targets:
   plate:
-    auto_match_tolerance: 2
     groups:
      - name: known
        members:

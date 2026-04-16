@@ -4,6 +4,7 @@
   - Groups can have an `icon`,`entity_id` and `priority`, targets will inherit these if they don't have their own, or leave empty at group level and populate only on group members
   - Existing config using `known` or `dangerous` will be translated at runtime to new structure
 - `correction` lists of patterns or strings can now be added directly to target
+- `auto_match_tolerance` now moved to Event config
 ## Target specific sensors in Home Assistant
 - Groups and individual targets can be given an `entity_id` and a sensor will be created in Home Assistant using MQTT discovery
   - State for the sensor will be timestamp of last sighting, and combined past history will be attributes

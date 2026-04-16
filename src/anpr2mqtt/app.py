@@ -121,6 +121,7 @@ def main_loop() -> None:
                 event_config.target_type,
                 tracker_config=settings.tracker,
                 target_config=settings.targets.get(event_config.target_type),
+                auto_match_tolerance=event_config.auto_match_tolerance,
             )
             event_handler = EventHandler(
                 publisher=publisher,

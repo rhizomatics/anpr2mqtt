@@ -243,8 +243,8 @@ def test_fuzzy_match_known_within_tolerance(tracker: Tracker) -> None:
     # "AB12CDF" is distance 1 from "AB12CDE"
     tracker.target_config = TargetSettings(
         groups=[TargetGroup(name="known", members=[Target(id="AB12CDE", description="Alice")])],
-        auto_match_tolerance=1,
     )
+    tracker.auto_match_tolerance = 1
 
     result = tracker.find("AB12CDF")
     assert result.target.group == "known"
@@ -255,8 +255,8 @@ def test_fuzzy_match_known_within_tolerance(tracker: Tracker) -> None:
 def test_fuzzy_match_known_beyond_tolerance(tracker: Tracker) -> None:
     tracker.target_config = TargetSettings(
         groups=[TargetGroup(name="known", members=[Target(id="AB12CDE", description="Alice")])],
-        auto_match_tolerance=1,
     )
+    tracker.auto_match_tolerance = 1
 
     result = tracker.find("AB12CXX")
     assert result.target.group is None
@@ -267,8 +267,8 @@ def test_fuzzy_match_known_disabled(tracker: Tracker) -> None:
     # tolerance=0 means only exact matches; "AB12CDF" must not match "AB12CDE"
     tracker.target_config = TargetSettings(
         groups=[TargetGroup(name="known", members=[Target(id="AB12CDE", description="Alice")])],
-        auto_match_tolerance=0,
     )
+    tracker.auto_match_tolerance = 0
 
     result: Sighting = tracker.find("AB12CDF")
     assert result.target.group is None
@@ -278,8 +278,8 @@ def test_fuzzy_match_dangerous_within_tolerance(tracker: Tracker) -> None:
     # "PK12TSX" is distance 1 from "PK12TST"
     tracker.target_config = TargetSettings(
         groups=[TargetGroup(name="dangerous", priority="critical", members=[Target(id="PK12TST", description="Suspect")])],
-        auto_match_tolerance=1,
     )
+    tracker.auto_match_tolerance = 1
 
     result = tracker.find("PK12TSX")
     assert result.target.group == "dangerous"
@@ -290,8 +290,8 @@ def test_fuzzy_match_dangerous_within_tolerance(tracker: Tracker) -> None:
 def test_fuzzy_match_dangerous_beyond_tolerance(tracker: Tracker) -> None:
     tracker.target_config = TargetSettings(
         groups=[TargetGroup(name="dangerous", priority="critical", members=[Target(id="PK12TST", description="Suspect")])],
-        auto_match_tolerance=3,
     )
+    tracker.auto_match_tolerance = 3
 
     result = tracker.find("PK12XXX")
     assert result.target.group == "dangerous"
@@ -299,8 +299,8 @@ def test_fuzzy_match_dangerous_beyond_tolerance(tracker: Tracker) -> None:
 
     tracker.target_config = TargetSettings(
         groups=[TargetGroup(name="dangerous", priority="critical", members=[Target(id="PK12TST", description="Suspect")])],
-        auto_match_tolerance=2,
     )
+    tracker.auto_match_tolerance = 2
     result = tracker.find("PK12XXX")
     assert result.target.group is None
 
@@ -317,8 +317,8 @@ def test_fuzzy_match_picks_closest_known(tracker: Tracker) -> None:
                 ],
             )
         ],
-        auto_match_tolerance=2,
     )
+    tracker.auto_match_tolerance = 2
 
     result = tracker.find("AB12CDF")
     assert result.target.group == "known"
@@ -329,8 +329,8 @@ def test_fuzzy_match_exact_preferred(tracker: Tracker) -> None:
     # Exact match should win even when tolerance > 0
     tracker.target_config = TargetSettings(
         groups=[TargetGroup(name="known", members=[Target(id="AB12CDE", description="Exact match")])],
-        auto_match_tolerance=2,
     )
+    tracker.auto_match_tolerance = 2
 
     result: Sighting = tracker.find("AB12CDE")
     assert result.target.group == "known"
@@ -343,9 +343,9 @@ def test_fuzzy_match_both_known_and_dangerous(tracker: Tracker) -> None:
         groups=[
             TargetGroup(name="known", members=[Target(id="AB12ZZZ", description="Alice")]),
             TargetGroup(name="dangerous", priority="critical", members=[Target(id="AB12CDX", description="Threat")]),
-        ],
-        auto_match_tolerance=1,
+        ]
     )
+    tracker.auto_match_tolerance = 1
 
     result: Sighting = tracker.find("AB12CDF")
     assert result.target.group == "dangerous"

@@ -59,6 +59,10 @@ class EventSettings(BaseModel):
         default_factory=lambda: ["hik_direction"], description="OCR field definitions to find in image"
     )
     autoclear: AutoClearSettings = AutoClearSettings()
+    auto_match_tolerance: int = Field(
+        default=1,
+        description="Maximum tolerance for auto matching against known plates, using Levenshtein, 0 to disable fuzzy matching",
+    )
 
     @field_validator("image_url_base")
     @classmethod
@@ -225,10 +229,6 @@ class TargetSettings(BaseModel):
     )
     ignore: list[str] = Field(default_factory=list)
     correction: dict[str, list[str | re.Pattern[str]]] = Field(default_factory=lambda: {})
-    auto_match_tolerance: int = Field(
-        default=1,
-        description="Maximum tolerance for auto matching against known plates, using Levenshtein, 0 to disable fuzzy matching",
-    )
 
 
 class Settings(BaseSettings):

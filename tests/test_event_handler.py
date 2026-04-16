@@ -568,8 +568,8 @@ def test_on_closed_correction_changes_target(event_handler: EventHandler) -> Non
     event_handler.tracker.target_config = TargetSettings(
         correction={"CORRECTED": [r"B4DM3N"]},
         known={"CORRECTED": Target(id="CORRECTED", description="My car", group="known")},
-        auto_match_tolerance=0,
     )
+    event_handler.tracker.auto_match_tolerance = 0
     event = Mock()
     event.src_path = "fixtures/20250602103045407_B4DM3N_VEHICLE_DETECTION.jpg"
     event.event_type = "closed"

@@ -31,13 +31,20 @@ class Sighting:
 
 
 class Tracker:
-    def __init__(self, target_type: str, tracker_config: TrackerSettings, target_config: TargetSettings | None = None) -> None:
+    def __init__(
+        self,
+        target_type: str,
+        tracker_config: TrackerSettings,
+        target_config: TargetSettings | None = None,
+        auto_match_tolerance: int = 0,
+    ) -> None:
         self.target_type: str = target_type
         self.tracker_config: TrackerSettings = tracker_config
         self.entities: dict[str, list[Target]] = {}
         self.ids: dict[str, Target] = {}
         self._target_config: TargetSettings | None = None
         self.target_config = target_config
+        self.auto_match_tolerance = auto_match_tolerance
 
     @property
     def target_config(self) -> TargetSettings | None:
@@ -118,7 +125,7 @@ class Tracker:
                 if result.target.group is None:  # not yet found in registered lists
                     result.target.description = "Ignored"
                 break
-        max_dist = self.target_config.auto_match_tolerance
+        max_dist = self.auto_match_tolerance
         target: Target | None = None
         registered_match: str | None = (
             lookup_id

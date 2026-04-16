@@ -127,14 +127,11 @@ Two mechanisms help with this:
 
 ### Fuzzy Matching
 
-The Levenshtein method is used to compare the plate against a list of known friendly or dangerous
-plates in the configuration, subject to a maximum distance tolerance ( number of mismatched characters )
-defined by `auto_match_tolerance`. If its a match for more than one, the plate with least distance is chosen.
+The Levenshtein method is used to compare the plate against a list of known plates in the configuration, subject to a maximum distance tolerance ( number of mismatched characters ) defined by `auto_match_tolerance` for the event. If its a match for more than one, the plate with least distance is chosen.
 
 ### Regex / String Matching
 
-Each known plate can be associated with a list of regular expressions and/or plain strings, and these will
-be checked for every discovered licence plate.
+Each known plate can be associated with a list of regular expressions and/or plain strings, and these will be checked for every discovered licence plate.
 
 ## Primary Dependencies
 
