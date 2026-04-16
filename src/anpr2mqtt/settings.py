@@ -227,7 +227,7 @@ class TargetSettings(BaseModel):
     dangerous: dict[str, object] = Field(
         default_factory=dict, deprecated="Replaced by a 'groups' entry with name 'dangerous' and priority 'critical'"
     )
-    ignore: list[str] = Field(default_factory=list)
+    ignore: list[str | re.Pattern[str]] = Field(default_factory=list)
     correction: dict[str, list[str | re.Pattern[str]]] = Field(default_factory=lambda: {})
 
 
