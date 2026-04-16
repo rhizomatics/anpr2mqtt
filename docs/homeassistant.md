@@ -96,6 +96,13 @@ Home Assistant's MQTT integration can publish the status of Home Assistant itsel
 though older installations may have `hass/status` - if its non-default, override in the
 config under `homeassistant: status_topic`.
 
+# Individual or Group Sensors
+
+A single target, a group, or any mix of groups and targets, can be given an `entity_id` and published to
+Home Assistant as a sensor, with the state value being the last sighting timestamp, and the attributes
+being the combined history of the targets.
+
+![Group Sensor](./assets/images/group_sensor.png)
 
 ## More Home Assistant information
 
