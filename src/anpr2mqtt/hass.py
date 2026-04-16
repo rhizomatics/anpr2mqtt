@@ -179,8 +179,10 @@ class HomeAssistantPublisher:
             "json_attributes_topic": state_topic,
             "value_template": "{{ value_json.last_seen }}",
             "device_class": "timestamp",
-            "icon": targets[0].icon if len(targets) == 1 else None,
         }
+        icon: str | None = targets[0].icon if len(targets) > 1 else None
+        if icon:
+            payload["icon"] = icon
         topic = f"{self.discovery_topic_prefix}/sensor/{entity_id}/config"
         msg = json.dumps(payload)
         self.client.publish(topic, payload=msg, qos=0, retain=True)
