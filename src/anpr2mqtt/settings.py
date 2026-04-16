@@ -174,7 +174,7 @@ class Target(BaseModel):
     correction: list[str | re.Pattern[str]] = Field(default_factory=lambda: [])
 
     def as_dict(self) -> dict[str, bool | str | None]:
-        return {
+        result: dict[str, bool | str | None] = {
             "dangerous": self.group == "dangerous",  # backward compat
             "description": self.description,
             "known": self.group == "known",  # backward compat
@@ -182,8 +182,11 @@ class Target(BaseModel):
             "target": self.id,
             "target_type": self.target_type,
             "entity_id": self.entity_id,
-            "icon": self.icon,
         }
+        if self.icon:
+            result["icon"] = self.icon
+
+        return result
 
 
 _PRIORITY_BY_GROUP: dict[str, str] = {"known": "medium", "dangerous": "critical"}
@@ -196,8 +199,8 @@ class TargetGroup(BaseModel):
         default=False, description="Lookup registration plate using API, defaults to False for configured plates"
     )
     members: list[Target] = Field(description="List of target IDs or full target definitions")
-    icon: str = Field(
-        default="mdi:car",
+    icon: str | None = Field(
+        default=None,
         description="Name of icon to publish, for Home Assistant should be a Material Design reference like 'mdi:car'",
     )
     entity_id: str | None = Field(
@@ -213,6 +216,7 @@ class TargetGroup(BaseModel):
 
     @model_validator(mode="after")
     def apply_group_defaults(self) -> "TargetGroup":
+
         for target in self.members:
             target.group = self.name
             if target.lookup is None:
@@ -229,6 +233,10 @@ class TargetGroup(BaseModel):
 
 
 class TargetSettings(BaseModel):
+    icon: str | None = Field(
+        default=None,
+        description="Default icon for all groups and members, can be overridden per-group or per-member",
+    )
     groups: list[TargetGroup] = Field(default_factory=list)
     known: dict[str, object] = Field(default_factory=dict, deprecated="Replaced by a 'groups' entry with name 'known'")
     dangerous: dict[str, object] = Field(
@@ -236,6 +244,18 @@ class TargetSettings(BaseModel):
     )
     ignore: list[str | re.Pattern[str]] = Field(default_factory=list)
     correction: dict[str, list[str | re.Pattern[str]]] = Field(default_factory=lambda: {})
+
+    @model_validator(mode="after")
+    def propagate_icon(self) -> "TargetSettings":
+        if self.icon is None:
+            return self
+        for group in self.groups:
+            if group.icon is None:
+                group.icon = self.icon
+                for target in group.members:
+                    if target.icon is None:
+                        target.icon = group.icon
+        return self
 
 
 class Settings(BaseSettings):

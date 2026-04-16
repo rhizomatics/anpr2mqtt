@@ -1,6 +1,6 @@
 from typing import Any
 
-from anpr2mqtt.settings import Target, TargetGroup
+from anpr2mqtt.settings import Target, TargetGroup, TargetSettings
 
 
 def _group(**kwargs: Any) -> TargetGroup:
@@ -26,7 +26,8 @@ def test_inherits_priority() -> None:
 
 
 def test_inherits_icon() -> None:
-    assert _member(_group()).icon == "mdi:car"
+    ts = TargetSettings(groups=[_group()])
+    assert ts.groups[0].members[0].icon == "mdi:car"
 
 
 def test_inherits_entity_id() -> None:
@@ -58,3 +59,35 @@ def test_does_not_override_entity_id() -> None:
 def test_does_not_override_description() -> None:
     g = TargetGroup(name="known", members=[Target(id="ABC123", description="My car")])
     assert g.members[0].description == "My car"
+
+
+# ── TargetSettings.icon propagation ─────────────────────────────────────────
+
+
+def test_settings_icon_propagates_to_group() -> None:
+    ts = TargetSettings(icon="mdi:bus", groups=[TargetGroup(name="known", members=[Target(id="ABC123")])])
+    assert ts.groups[0].icon == "mdi:bus"
+
+
+def test_settings_icon_propagates_to_member() -> None:
+    ts = TargetSettings(icon="mdi:bus", groups=[TargetGroup(name="known", members=[Target(id="ABC123")])])
+    assert ts.groups[0].members[0].icon == "mdi:bus"
+
+
+def test_settings_icon_does_not_override_group_icon() -> None:
+    ts = TargetSettings(icon="mdi:bus", groups=[TargetGroup(name="known", icon="mdi:car", members=[Target(id="ABC123")])])
+    assert ts.groups[0].icon == "mdi:car"
+
+
+def test_settings_icon_does_not_override_member_icon() -> None:
+    ts = TargetSettings(
+        icon="mdi:bus",
+        groups=[TargetGroup(name="known", members=[Target(id="ABC123", icon="mdi:truck")])],
+    )
+    assert ts.groups[0].members[0].icon == "mdi:truck"
+
+
+def test_settings_icon_none_leaves_group_icon_none() -> None:
+    ts = TargetSettings(groups=[TargetGroup(name="known", members=[Target(id="ABC123")])])
+    assert ts.groups[0].icon is None
+    assert ts.groups[0].members[0].icon is None

@@ -72,6 +72,7 @@ dvla:
   api_key: MY6676SECRET787KEY
 targets:
   plate:
+    icon: mdi:car
     groups:
      - name: known
        members:
