@@ -5,7 +5,7 @@ description = "ANPR MQTT bridge for Home Assistant"
 authors = [
     { name = "jey burrows", email = "jrb@rhizomatics.org.uk" }
 ]
-keywords=["anpr","alpr","lpr","mqtt","hass","homeassistant","homeautomation","cctv"]
+keywords=["anpr","alpr","lpr","mqtt","hass","homeassistant","homeautomation","cctv","ocr","security","hikvision"]
 
 readme = "README.md"
 requires-python = ">=3.13"
