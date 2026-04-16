@@ -1,9 +1,22 @@
-# 0.11.0
+# 1.0.0
+## Known Targets Configuration
+- Restructured from 2 fixed groups ("known" and "dangerous") to a flexible groups structure, so any number of groups can be created, for example "family","postman","delivery","utility"
+  - Groups can have an `icon`,`entity_id` and `priority`, targets will inherit these if they don't have their own, or leave empty at group level and populate only on group members
+  - Existing config using `known` or `dangerous` will be translated at runtime to new structure
+- `correction` lists of patterns or strings can now be added directly to target
+## Target specific sensors in Home Assistant
+- Groups and individual targets can be given an `entity_id` and a sensor will be created in Home Assistant using MQTT discovery
+  - State for the sensor will be timestamp of last sighting, and combined past history will be attributes
+  - Any number of vehicles can be combined in a single sensor, so for example see last post vehicle detected, even if several come to the property
 - Targets can now be more than a simple string - currently `description` and `entity_id` supported
-- Selected targets can be published as Home Assistant MQTT sensors as their own entity
-  - Multiple targets can share one entity, for example if 2 or 3 different post vans service the property
+## Time Analysis
+- Previous sightings now have a richer set of analysis, with histogram data by visit hour of day, earliest/latest times
+## Home Assistant
+- Improved example automation
+## Internals and Fixes
 - Corrected example configurations
 - Refactored internally to a `Sighting` class and a more complete `Target` definition, replacing ad hoc dicts
+
 # 0.10.2
 - Improve error handling when started without config file
 - Fix healthcheck script use of MQTT env vars

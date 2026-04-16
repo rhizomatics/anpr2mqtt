@@ -72,31 +72,15 @@ dvla:
 targets:
   plate:
     auto_match_tolerance: 2
-    groups:
-     - name: known
-       members:
-        - id: TJ912UKL
-          description: joe's mini conv
-          icon: mdi:car-convertible
-          entity_id: my_summer_car
-          correction:
-            - J912UKL
-            - TJ91.KL
-        - id: P001PAT
-          description: Postman
-        - id: MY13CAR
-          entity_id: my_truck
-          description: Homeowner's old pickup
-     - name: Amazon Prime
-       entity_id: delivery_vehicle
-       icon: "mdi:truck-delivery"
-       members:
-        - AM40PRM
-     - name: dangerous
-       priority: critical
-       members:
-         - id: B4DM3N
-           description: Rural watch reported vehicle
+    known:
+      TJ912UKL: joe's mini
+      P001PAT: Postman
+      AM40PRM: Amazon Prime Delivery
+      MY13CAR:
+        entity_id: my_truck
+        description: Homeowner's old pickup
+    dangerous:
+      B4DM3N: Rural watch reported vehicle
     correction:
       UN001TST:
         - UN\d+1TST

@@ -40,4 +40,4 @@ def test_load_yaml(config_name: str) -> None:
     assert settings.mqtt.password is not None
     assert settings.events[0].watch_path is not None
     if settings.targets:
-        assert settings.targets["plate"].known is not None
+        assert settings.targets["plate"].groups is not None

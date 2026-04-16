@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Final, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
-from pydantic_core.core_schema import FieldValidationInfo
 from pydantic_settings import (
     BaseSettings,
     CliSettingsSource,
@@ -153,24 +152,25 @@ class OCRSettings(BaseModel):
 
 
 class Target(BaseModel):
-    id: str = ""
+    id: str = Field(description="Target identifier, for example reg plate")
     target_type: str = ""
     group: str | None = None
     description: str | None = Field(default=None, description="Target description")
     entity_id: str | None = Field(
         default=None, description="Entity ID to publish using Home Assistant MQTT Discovery compatible message"
     )
-    icon: str = Field(
-        default="mdi:car",
+    icon: str | None = Field(
+        default=None,
         description="Name of icon to publish, for Home Assistant should be a Material Design reference like 'mdi:car'",
     )
     priority: str | None = Field(default=None, description="Priority to report for use in Home Assistant notifications")
+    correction: list[str | re.Pattern[str]] = Field(default_factory=lambda: [])
 
     def as_dict(self) -> dict[str, bool | str | None]:
         return {
-            "dangerous": self.group == "dangerous",
+            "dangerous": self.group == "dangerous",  # backward compat
             "description": self.description,
-            "known": self.group == "known",
+            "known": self.group == "known",  # backward compat
             "priority": self.priority,
             "target": self.id,
             "target_type": self.target_type,
@@ -182,35 +182,53 @@ class Target(BaseModel):
 _PRIORITY_BY_GROUP: dict[str, str] = {"known": "medium", "dangerous": "critical"}
 
 
+class TargetGroup(BaseModel):
+    name: str = Field(description="Name of the target group, for example 'known'")
+    priority: str = Field(default="medium", description="Priority to report on MQTT message for sightings of this group")
+    members: list[Target] = Field(description="List of target IDs or full target definitions")
+    icon: str = Field(
+        default="mdi:car",
+        description="Name of icon to publish, for Home Assistant should be a Material Design reference like 'mdi:car'",
+    )
+    entity_id: str | None = Field(
+        default=None, description="Entity ID to publish using Home Assistant MQTT Discovery compatible message"
+    )
+
+    @field_validator("members", mode="before")
+    @classmethod
+    def coerce_member_strings(cls, v: object) -> object:
+        if not isinstance(v, list):
+            return v
+        return [{"id": item} if isinstance(item, str) else item for item in v]
+
+    @model_validator(mode="after")
+    def apply_group_defaults(self) -> "TargetGroup":
+        for target in self.members:
+            if target.group is None:
+                target.group = self.name
+            if target.priority is None:
+                target.priority = self.priority
+            if target.icon is None:
+                target.icon = self.icon
+            if target.entity_id is None:
+                target.entity_id = self.entity_id
+            if target.description is None:
+                target.description = self.name
+        return self
+
+
 class TargetSettings(BaseModel):
-    known: dict[str, Target] = Field(default_factory=lambda: {})
-    dangerous: dict[str, Target] = Field(default_factory=lambda: {})
+    groups: list[TargetGroup] = Field(default_factory=list)
+    known: dict[str, object] = Field(default_factory=dict, deprecated="Replaced by a 'groups' entry with name 'known'")
+    dangerous: dict[str, object] = Field(
+        default_factory=dict, deprecated="Replaced by a 'groups' entry with name 'dangerous' and priority 'critical'"
+    )
     ignore: list[str] = Field(default_factory=list)
     correction: dict[str, list[str | re.Pattern[str]]] = Field(default_factory=lambda: {})
     auto_match_tolerance: int = Field(
         default=1,
         description="Maximum tolerance for auto matching against known plates, using Levenshtein, 0 to disable fuzzy matching",
     )
-
-    @field_validator("known", "dangerous", mode="before")
-    @classmethod
-    def coerce_targets(cls, v: object, info: FieldValidationInfo) -> dict[str, Target]:
-        if not isinstance(v, dict):
-            return v  # type: ignore[return-value]
-        group: str = info.field_name or ""
-        result: dict[str, Target] = {}
-        for key, val in v.items():
-            if isinstance(val, Target):
-                result[key] = val
-            elif isinstance(val, str):
-                result[key] = Target(id=key, group=group, description=val)
-            elif isinstance(val, dict):
-                result[key] = Target(id=key, group=group, **val)
-            else:
-                result[key] = Target(id=key, group=group)
-            if result[key].priority is None:
-                result[key].priority = _PRIORITY_BY_GROUP.get(group, "high")
-        return result
 
 
 class Settings(BaseSettings):
@@ -235,18 +253,44 @@ class Settings(BaseSettings):
 
     @model_validator(mode="before")
     @classmethod
-    def inject_target_type(cls, data: object) -> object:
+    def migrate_and_inject_target_type(cls, data: object) -> object:
+        """Migrate legacy 'known'/'dangerous' to TargetGroup entries and inject target_type into all members."""
         if not isinstance(data, dict):
             return data
         for target_type, target_settings in (data.get("targets") or {}).items():
             if not isinstance(target_settings, dict):
                 continue
-            for group in ("known", "dangerous"):
-                for target_id, val in (target_settings.get(group) or {}).items():
-                    if isinstance(val, dict):
-                        val["target_type"] = target_type
-                    elif isinstance(val, str):
-                        target_settings[group][target_id] = {"description": val, "target_type": target_type}
+            groups: list[dict[str, object] | TargetGroup] = list(target_settings.get("groups") or [])
+            existing_names = {g["name"] if isinstance(g, dict) else g.name for g in groups}
+            for group_name in ("known", "dangerous"):
+                legacy: dict[str, object] = target_settings.get(group_name) or {}
+                if not legacy or group_name in existing_names:
+                    continue
+                members = []
+                for target_id, val in legacy.items():
+                    if isinstance(val, str):
+                        members.append({"id": target_id, "description": val, "target_type": target_type})
+                    elif isinstance(val, dict):
+                        members.append({"id": target_id, "target_type": target_type, **val})
+                    else:
+                        members.append({"id": target_id, "target_type": target_type})
+                groups.append(
+                    {
+                        "name": group_name,
+                        "priority": _PRIORITY_BY_GROUP.get(group_name, "medium"),
+                        "members": members,
+                    }
+                )
+            target_settings["groups"] = groups
+            for group in groups:
+                if not isinstance(group, dict):
+                    continue
+                raw_members: list[object] = group.get("members") or []  # type: ignore[assignment]
+                for i, member in enumerate(raw_members):
+                    if isinstance(member, str):
+                        raw_members[i] = {"id": member, "target_type": target_type}
+                    elif isinstance(member, dict) and "target_type" not in member:
+                        member["target_type"] = target_type
         return data
 
     @classmethod

@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 
 from anpr2mqtt.app import main_loop, on_connect, on_disconnect
-from anpr2mqtt.settings import EventSettings, Target
+from anpr2mqtt.settings import EventSettings, Target, TargetGroup
 
 
 def _make_rc(name: str, eq_zero: bool = True) -> Mock:
@@ -251,7 +251,9 @@ def test_main_loop_with_targets() -> None:
     from anpr2mqtt.settings import TargetSettings
 
     mock_settings = _make_mock_settings()
-    mock_settings.targets = {"plate": TargetSettings(known={"AB12CDE": Target(description="Alice")})}
+    mock_settings.targets = {
+        "plate": TargetSettings(groups=[TargetGroup(name="known", members=[Target(id="AB12CDE", description="Alice")])])
+    }
     mock_client = Mock()
     mock_observer = Mock()
     mock_observer.is_alive.return_value = False

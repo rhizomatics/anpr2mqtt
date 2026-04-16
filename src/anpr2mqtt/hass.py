@@ -12,8 +12,8 @@ from paho.mqtt.reasoncodes import ReasonCode
 from PIL import Image
 
 import anpr2mqtt
-from anpr2mqtt.settings import CameraSettings, EventSettings, HomeAssistantSettings
-from anpr2mqtt.tracker import Sighting, Target
+from anpr2mqtt.settings import CameraSettings, EventSettings, HomeAssistantSettings, Target
+from anpr2mqtt.tracker import Sighting
 
 from .const import ImageInfo
 

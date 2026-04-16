@@ -34,17 +34,28 @@ class Tracker:
     def __init__(self, target_type: str, tracker_config: TrackerSettings, target_config: TargetSettings | None = None) -> None:
         self.target_type: str = target_type
         self.tracker_config: TrackerSettings = tracker_config
-        self.target_config: TargetSettings | None = target_config
         self.entities: dict[str, list[Target]] = {}
-        if self.target_config:
-            for target in self.target_config.known.values():
-                if target.entity_id is not None:
-                    self.entities.setdefault(target.entity_id, [])
-                    self.entities[target.entity_id].append(target)
-            for target in self.target_config.dangerous.values():
-                if target.entity_id is not None:
-                    self.entities.setdefault(target.entity_id, [])
-                    self.entities[target.entity_id].append(target)
+        self.ids: dict[str, Target] = {}
+        self._target_config: TargetSettings | None = None
+        self.target_config = target_config
+
+    @property
+    def target_config(self) -> TargetSettings | None:
+        return self._target_config
+
+    @target_config.setter
+    def target_config(self, value: TargetSettings | None) -> None:
+        self._target_config = value
+        self.ids = {}
+        self.entities = {}
+        if value:
+            for target_group in value.groups:
+                for target in target_group.members:
+                    self.ids[target.id] = target
+                    entity_id: str | None = target.entity_id
+                    if entity_id is not None:
+                        self.entities.setdefault(entity_id, [])
+                        self.entities[entity_id].append(target)
 
     def history(self, target_id: str, target_type: str) -> list[str]:
         target_id = target_id or "UNKNOWN"
@@ -92,6 +103,13 @@ class Tracker:
                 lookup_id = corrected_target
                 log.info("Corrected target %s -> %s", target_id, lookup_id)
                 break
+        if lookup_id == target_id:
+            for registered_target in self.ids.values():
+                if any(re.match(pat, target_id) for pat in registered_target.correction):
+                    lookup_id = registered_target.id
+                    result.target.id = registered_target.id
+                    log.info("Corrected target %s -> %s (per-target)", target_id, lookup_id)
+                    break
         for pat in self.target_config.ignore:
             if re.match(pat, target_id):
                 log.info("Ignoring %s matching ignore pattern %s", target_id, pat)
@@ -104,19 +122,12 @@ class Tracker:
         target: Target | None = None
         registered_match: str | None = (
             lookup_id
-            if lookup_id in self.target_config.dangerous
-            else (_fuzzy_match(lookup_id, max_dist, list(self.target_config.dangerous.keys())) if max_dist > 0 else None)
+            if lookup_id in self.ids
+            else (_fuzzy_match(lookup_id, max_dist, list(self.ids.keys())) if max_dist > 0 else None)
         )
         if registered_match:
-            target = self.target_config.dangerous[registered_match]
-        if registered_match is None:
-            registered_match = (
-                lookup_id
-                if lookup_id in self.target_config.known
-                else (_fuzzy_match(lookup_id, max_dist, list(self.target_config.known.keys())) if max_dist > 0 else None)
-            )
-            if registered_match:
-                target = self.target_config.known[registered_match]
+            target = self.ids[registered_match]
+
         if target:
             if registered_match != lookup_id:
                 log.info(

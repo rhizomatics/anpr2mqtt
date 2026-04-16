@@ -60,9 +60,8 @@ def main_loop() -> None:
     log.info("ANPR2MQTT %s starting up", anpr2mqtt.version)  # pyright: ignore[reportAttributeAccessIssue]
     for target_type in settings.targets:
         log.info(
-            "ANPR2MQTT %s known vehicles, %s alert vehicles, %s corrections, %s ignore patterns",
-            len(settings.targets[target_type].known),
-            len(settings.targets[target_type].dangerous),
+            "ANPR2MQTT %s target groups, %s corrections, %s ignore patterns",
+            len(settings.targets[target_type].groups),
             len(settings.targets[target_type].correction),
             len(settings.targets[target_type].ignore),
         )

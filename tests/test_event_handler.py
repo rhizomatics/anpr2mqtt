@@ -18,6 +18,7 @@ from anpr2mqtt.settings import (
     OCRFieldSettings,
     OCRSettings,
     Target,
+    TargetGroup,
     TargetSettings,
 )
 from anpr2mqtt.tracker import Tracker
@@ -331,7 +332,9 @@ def test_on_closed_with_api_client(event_handler: EventHandler) -> None:
 def test_on_closed_known_target_skips_api(event_handler: EventHandler) -> None:
     mock_api = Mock()
     event_handler.api_client = mock_api
-    event_handler.tracker.target_config = TargetSettings(known={"B4DM3N": Target(description="My car", group="known")})
+    event_handler.tracker.target_config = TargetSettings(
+        groups=[TargetGroup(name="known", members=[Target(id="B4DM3N", description="My car")])]
+    )
 
     event_handler.event_config = EventSettings(
         camera="test_cam",
