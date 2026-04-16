@@ -97,7 +97,7 @@ class HomeAssistantPublisher:
             "unique_id": f"{event_config.event}_{event_config.camera}",
             "state_topic": state_topic,
             "json_attributes_topic": state_topic,
-            "icon": "mdi:car-back",
+            "icon": event_config.icon,
             "name": name,
         }
         if self.device_creation:
@@ -123,7 +123,7 @@ class HomeAssistantPublisher:
             "default_entity_id": f"image.{event_config.event}_{event_config.camera}",
             "image_topic": image_topic,
             "json_attributes_topic": state_topic,
-            "icon": "mdi:car-back",
+            "icon": event_config.icon,
             "name": name,
         }
         if self.device_creation:
@@ -148,7 +148,7 @@ class HomeAssistantPublisher:
             "default_entity_id": f"camera.{event_config.event}_{camera.name}_anpr",
             "topic": image_topic,
             "json_attributes_topic": state_topic,
-            "icon": "mdi:car-back",
+            "icon": event_config.icon,
             "name": name,
         }
         if self.device_creation:
@@ -160,11 +160,7 @@ class HomeAssistantPublisher:
         log.info("Published HA MQTT Discovery message to %s", topic)
 
     def publish_target_sensor_discovery(
-        self,
-        entity_id: str,
-        target_type: str,
-        targets: list[Target],
-        state_topic: str,
+        self, entity_id: str, target_type: str, targets: list[Target], state_topic: str, icon: str | None
     ) -> None:
         payload: dict[str, Any] = {
             "o": {
@@ -180,7 +176,6 @@ class HomeAssistantPublisher:
             "value_template": "{{ value_json.last_seen }}",
             "device_class": "timestamp",
         }
-        icon: str | None = targets[0].icon if len(targets) > 1 else None
         if icon:
             payload["icon"] = icon
         topic = f"{self.discovery_topic_prefix}/sensor/{entity_id}/config"

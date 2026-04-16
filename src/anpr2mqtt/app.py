@@ -150,8 +150,13 @@ def main_loop() -> None:
             for entity_id, targets in tracker.entities.items():
                 target_topic: str = f"{settings.mqtt.topic_root}/{event_config.event}/targets/{entity_id}/state"
                 log.info("Publishing sensor.%s for %s targets", entity_id, len(targets))
+                icon: str | None = targets[0].icon if len(targets) > 1 and targets[0].icon else event_config.icon
                 publisher.publish_target_sensor_discovery(
-                    entity_id=entity_id, target_type=event_config.target_type, targets=targets, state_topic=target_topic
+                    entity_id=entity_id,
+                    target_type=event_config.target_type,
+                    icon=icon,
+                    targets=targets,
+                    state_topic=target_topic,
                 )
 
                 previous_sightings: list[str] = []

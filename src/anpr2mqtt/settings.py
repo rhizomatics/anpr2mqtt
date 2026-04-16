@@ -46,6 +46,10 @@ class EventSettings(BaseModel):
     event: str = Field(default="anpr", description="Identifier of the event, used in MQTT topic description")
     description: str | None = Field(default=None, description="Free text description of event")
     target_type: str = Field(default="plate", description="Type of target for this event, 'plate' if ANPR")
+    icon: str | None = Field(
+        default="mdi:car-back",
+        description="Default icon to provide for Home Assistant sensors",
+    )
     watch_path: Path = Field(default=Path(), description="File system directory to watch")
     watch_tree: bool = Field(
         default=False, description="Watch directory tree at path, or false for only the root watch_path directory"
@@ -233,10 +237,6 @@ class TargetGroup(BaseModel):
 
 
 class TargetSettings(BaseModel):
-    icon: str | None = Field(
-        default=None,
-        description="Default icon for all groups and members, can be overridden per-group or per-member",
-    )
     groups: list[TargetGroup] = Field(default_factory=list)
     known: dict[str, object] = Field(default_factory=dict, deprecated="Replaced by a 'groups' entry with name 'known'")
     dangerous: dict[str, object] = Field(
@@ -244,18 +244,6 @@ class TargetSettings(BaseModel):
     )
     ignore: list[str | re.Pattern[str]] = Field(default_factory=list)
     correction: dict[str, list[str | re.Pattern[str]]] = Field(default_factory=lambda: {})
-
-    @model_validator(mode="after")
-    def propagate_icon(self) -> "TargetSettings":
-        if self.icon is None:
-            return self
-        for group in self.groups:
-            if group.icon is None:
-                group.icon = self.icon
-                for target in group.members:
-                    if target.icon is None:
-                        target.icon = group.icon
-        return self
 
 
 class Settings(BaseSettings):

@@ -15,6 +15,7 @@
 - Previous sightings now have a richer set of analysis, with histogram data by visit hour of day, earliest/latest times
 ## Home Assistant
 - Improved example automation
+- Icon now configurable in the Event config, previously fixed at `mdi:car-back`
 ## Internals and Fixes
 - Corrected example configurations
 - Refactored internally to a `Sighting` class and a more complete `Target` definition, replacing ad hoc dicts
