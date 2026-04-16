@@ -221,6 +221,8 @@ class HomeAssistantPublisher:
     ) -> None:
 
         payload: dict[str, Any] = sighting.as_dict() if sighting else {"target": None, "target_type": event_config.target_type}
+        if payload.get("description") is None:
+            payload["description"] = event_config.default_description
         payload.update(
             {
                 event_config.target_type: sighting.target.id if sighting else None,

@@ -56,8 +56,11 @@ def test_discover_metadata(mocker: MockerFixture) -> None:
             "dateOfLastV5CIssued": "2016-12-25",
         },
     )
-    result: dict[str, Any] = DVLAClient("7878748347834").lookup("SP13TST").get("plate", {})
-    assert result["yearOfManufacture"] == 2004
+    result: dict[str, Any] = DVLAClient("7878748347834").lookup("SP13TST")
+    plate: dict[str, Any] = result.get("plate", {})
+    assert plate["yearOfManufacture"] == 2004
+    assert result["description"] == "Blue Rover"
+    assert result["success"]
 
 
 def test_dvla_invalid_reg() -> None:

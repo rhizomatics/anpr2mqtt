@@ -20,7 +20,7 @@ A simple way to integrate CCTV cameras with built-in **ANPR** (**Automatic Numbe
 
 All that is needed is for the camera to be configured to upload images on plate recognition, by ftp, NAS or whatever else. ANPR2MQTT monitors the directory where the images lands and publishes plate information to MQTT. Its simple, requires no proprietary vendor APIs ( or differing ONVIF implementations ), and Home Assistant gets a copy of the actual annotated detection image to use on dashboards or to attach to notifications.
 
-While intended for vehicle plate detection, it can be used to watch for and analyze any file, so for example uploaded face detection or line crossing images. A single `anpr2mqtt` instance can watch multiple paths and patterns for different cameras and events.
+While intended for vehicle plate detection, it can be used to watch for and analyze any file, so for example uploaded face detection, missing object, unattended baggage or line crossing images. A single `anpr2mqtt` instance can watch multiple paths and patterns for different cameras and events.
 
 ## Features
 

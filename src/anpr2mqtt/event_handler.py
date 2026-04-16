@@ -119,14 +119,18 @@ class EventHandler(RegexMatchingEventHandler):
 
                 sighting: Sighting = self.tracker.find(target_id)
 
-                reg_info: list[Any] | dict[str, Any] | None = None
+                reg_info: dict[str, Any] | None = None
                 if (
                     sighting.target.lookup
                     and self.api_client
                     and image_info.target
                     and self.event_config.target_type == TARGET_TYPE_PLATE
                 ):
-                    reg_info = self.api_client.lookup(sighting.target.id).get("plate")
+                    api_info: dict[str, Any] = self.api_client.lookup(sighting.target.id)
+                    if api_info.get("success"):
+                        reg_info = api_info.get("plate")
+                        if sighting.target.description is None and api_info and api_info.get("description"):
+                            sighting.target.description = api_info["description"]
 
                 time_analysis: dict[str, Any] = self.tracker.record(
                     sighting.target.id, self.event_config.target_type, image_info.timestamp

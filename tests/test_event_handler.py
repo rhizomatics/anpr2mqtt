@@ -41,7 +41,7 @@ def test_eventhandler_handles_reg_plate_event(event_handler: EventHandler, track
     assert payload["known"] is False
     assert payload["dangerous"] is False
     assert payload["ignore"] is False
-    assert payload["description"] is None
+    assert payload["description"] == "Unknown vehicle"
     assert payload["entity_id"] is None
     assert payload["event"] == "unit_testing"
     assert payload["camera"] == "test_cam"
@@ -74,6 +74,7 @@ def test_eventhandler_copes_with_malformed_reg_plate_event(event_handler: EventH
             {
                 "target": None,
                 "target_type": "plate",
+                "description": "Unknown vehicle",
                 "plate": None,
                 "event": "unit_testing",
                 "camera": "test_cam",
@@ -305,7 +306,7 @@ def test_on_closed_ignored_target(event_handler: EventHandler) -> None:
 
 def test_on_closed_with_api_client(event_handler: EventHandler) -> None:
     mock_api = Mock()
-    mock_api.lookup.return_value = {"plate": {"make": "FORD", "colour": "BLUE"}}
+    mock_api.lookup.return_value = {"plate": {"make": "FORD", "colour": "BLUE"}, "success": True, "description": "Blue Ford"}
     event_handler.api_client = mock_api
     event_handler.event_config = EventSettings(
         camera="test_cam",
@@ -327,6 +328,7 @@ def test_on_closed_with_api_client(event_handler: EventHandler) -> None:
     _args, kwargs = event_handler.publisher.client.publish.call_args_list[0]  # type: ignore[attr-defined]
     payload = json.loads(kwargs["payload"])
     assert payload["reg_info"] == {"make": "FORD", "colour": "BLUE"}
+    assert payload["description"] == "Blue Ford"
 
 
 def test_on_closed_known_target_skips_api(event_handler: EventHandler) -> None:

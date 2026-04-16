@@ -46,6 +46,7 @@ class EventSettings(BaseModel):
     event: str = Field(default="anpr", description="Identifier of the event, used in MQTT topic description")
     description: str | None = Field(default=None, description="Free text description of event")
     target_type: str = Field(default="plate", description="Type of target for this event, 'plate' if ANPR")
+    default_description: str = Field(default="Unknown vehicle", description="Default description if no known match found")
     icon: str | None = Field(
         default="mdi:car-back",
         description="Default icon to provide for Home Assistant sensors",

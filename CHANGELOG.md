@@ -16,6 +16,10 @@
 ## Home Assistant
 - Improved example automation
 - Icon now configurable in the Event config, previously fixed at `mdi:car-back`
+## Descriptions
+- DVLA API client can now generate a description for unknown vehicles using the colour and vehicle make
+- A `default_description` can be set on the Event config as a backup so there's never a null value passed to Home Assistant
+  - This defaults to "Unknown vehicle" however can be changed for other languages, or if being used for face/line-crossing detection
 ## Internals and Fixes
 - Corrected example configurations
 - Refactored internally to a `Sighting` class and a more complete `Target` definition, replacing ad hoc dicts

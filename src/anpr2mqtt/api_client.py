@@ -90,13 +90,15 @@ class DVLAClient(APIClient):
                 if response.from_cache:
                     log.debug("DVLA API cached response, created %s", response.created_at)
                 if response.status_code == 200:
+                    plate: dict[str, Any] = cast("dict[str,Any]", response.json())
                     return {
                         "cache": {
                             "calls": len(response.history) if response.history else 0,
                             "cached": response.from_cache,
                             "created": response.created_at.isoformat() if response.created_at else None,
                         },
-                        "plate": cast("dict[str,Any]", response.json()),
+                        "plate": plate,
+                        "description": f"{plate.get('colour', '').title()} {plate.get('make', '').title()}" if plate else None,
                         "success": True,
                     }
 
