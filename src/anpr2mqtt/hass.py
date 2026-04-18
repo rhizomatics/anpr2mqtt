@@ -97,9 +97,10 @@ class HomeAssistantPublisher:
             "unique_id": f"{event_config.event}_{event_config.camera}",
             "state_topic": state_topic,
             "json_attributes_topic": state_topic,
-            "icon": event_config.icon,
             "name": name,
         }
+        if event_config.icon:
+            payload["icon"] = event_config.icon
         if self.device_creation:
             self.add_device_info(payload, camera)
         topic: str = f"{self.discovery_topic_prefix}/sensor/{event_config.camera}/{event_config.event}/config"
