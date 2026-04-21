@@ -4,8 +4,12 @@
   - Groups can have an `icon`,`entity_id` and `priority`, targets will inherit these if they don't have their own, or leave empty at group level and populate only on group members
   - Existing config using `known` or `dangerous` will be translated at runtime to new structure
 - `correction` lists of patterns or strings can now be added directly to target
-- `auto_match_tolerance` now moved to Event config
 - API lookup can be configured at target or group level, defaults to off, since vehicles already known
+## Fuzzy Matching
+- Close matches can be automatically matched to a known plate, with configurable tolerance
+  - `auto_match_tolerance` on Event config controls how far apart it can be, for example 1 or 2 different/missing/extra characters
+    - Internally uses `rapidfuzz` with Levenshtein algorithm
+    - Removes many cases for regular expressions, although still possible to provide them, or known bad readings as fixed strings
 ## Target specific sensors in Home Assistant
 - Groups and individual targets can be given an `entity_id` and a sensor will be created in Home Assistant using MQTT discovery
   - State for the sensor will be timestamp of last sighting, and combined past history will be attributes
