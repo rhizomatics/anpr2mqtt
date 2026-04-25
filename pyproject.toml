@@ -53,7 +53,7 @@ module-name = "anpr2mqtt"
 
 [dependency-groups]
 dev = [
-    "ruff>=0.13.0",
+    "ruff>=0.5.0",
     "pre-commit>=4.4.0",
     "pytest>=8.0.0",
     "pytest-mock>=3.15.0",
