@@ -98,7 +98,6 @@ dev = [
     { name = "pytest-shell-utilities" },
     { name = "pytest-xdist" },
     { name = "ruff", specifier = ">=0.5.0" },
-    { name = "ruff", specifier = ">=0.13.0" },
 ]
 docs = [
     { name = "mike" },
