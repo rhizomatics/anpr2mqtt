@@ -2,7 +2,7 @@ import datetime as dt
 import json
 import threading
 from io import BytesIO
-from typing import Any
+from typing import Any, cast
 
 import niquests
 import paho.mqtt.client as mqtt
@@ -121,21 +121,17 @@ class FrigateHandler:
             if len(self._processed_events) > 5000:
                 self._processed_events = set(list(self._processed_events)[2500:])
 
-        plate_raw: Any = payload.get("after_recognized_license_plate")
-        if not plate_raw:
+        after_data: dict[str, str | int | float | bool] = payload.get("after", {}) or {}
+        plate: str | None = cast("str|None", after_data.get("recognized_license_plate"))
+        score: float | None = float(after_data.get("recognized_license_plate_score", 0.0))
+        if not plate:
             log.debug("Frigate event %s has no recognized plate", event_id)
             return
 
-        try:
-            plate_data = json.loads(plate_raw) if isinstance(plate_raw, str) else plate_raw
-            plate: str = str(plate_data[0]).upper()
-            score: float = float(plate_data[1])
-        except (json.JSONDecodeError, ValueError, IndexError, TypeError) as e:
-            log.warning("Failed to parse plate info %r: %s", plate_raw, e)
-            return
-
-        if score < self.frigate_settings.min_score:
-            log.debug("Plate %s score %.3f below threshold %.3f, skipping", plate, score, self.frigate_settings.min_score)
+        if score is None:
+            log.info("Plate %s has no score, skipping", plate)
+        elif score < self.frigate_settings.min_score:
+            log.info("Plate %s score %.3f below threshold %.3f, skipping", plate, score, self.frigate_settings.min_score)
             return
 
         log.info("Frigate event %s: plate=%s score=%.3f camera=%s", event_id, plate, score, camera)
@@ -164,7 +160,19 @@ class FrigateHandler:
                 if sighting.target.description is None and api_info.get("description"):
                     sighting.target.description = api_info["description"]
 
-        time_analysis = tracker.record(sighting.target.id, event_config.target_type, timestamp)
+        time_analysis: dict[str, Any] = tracker.record(sighting.target.id, event_config.target_type, timestamp)
+        extra_info: dict[str, dict[str, Any]] = {"frigate": {}}
+        for attr in (
+            "recognized_license_plate_score",
+            "velocity_angle",
+            "current_estimated_speed",
+            "average_estimated_speed",
+            "label",
+            "sub_label",
+            "",
+        ):
+            if after_data.get(attr):
+                extra_info["frigate"][attr] = after_data.get(attr)
 
         if sighting.target.entity_id:
             target_state_topic = f"{self.mqtt_topic_root}/{event_config.event}/targets/{sighting.target.entity_id}/state"
@@ -190,6 +198,7 @@ class FrigateHandler:
             image_info=image_info,
             time_analysis=time_analysis,
             reg_info=reg_info,
+            extra_info=extra_info,
             source="frigate",
             frigate_event_id=event_id,
             frigate_ui_url=frigate_ui_url,

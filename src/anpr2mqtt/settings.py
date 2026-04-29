@@ -119,7 +119,7 @@ class DVLASettings(BaseModel):
 class FrigateSettings(BaseModel):
     enabled: bool = Field(default=False, description="Enable Frigate MQTT event listener")
     topic: str = Field(default="frigate/events", description="MQTT topic for Frigate events")
-    min_score: float = Field(default=0.90, description="Minimum plate recognition score to process (0.0->1.0)")
+    min_score: float = Field(default=0.70, description="Minimum plate recognition score to process (0.0->1.0)")
     url: str | None = Field(
         default=None, description="Frigate base URL for API snapshot fallback and UI links, e.g. http://frigate:5000"
     )

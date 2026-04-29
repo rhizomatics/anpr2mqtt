@@ -2,7 +2,7 @@ import datetime as dt
 import json
 import re
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 import structlog
 import tzlocal
@@ -73,7 +73,7 @@ class Tracker:
         try:
             if target_file.exists():
                 with target_file.open("r") as f:
-                    return json.load(f)
+                    return cast("list[str]", json.load(f))
 
         except Exception as e:
             log.exception("Failed to find sightings for %s:%s", target_id, e)

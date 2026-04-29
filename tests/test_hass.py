@@ -279,7 +279,7 @@ def test_post_state_message_with_all_fields(
         sighting=Sighting(target=Target(id="AB12CDE", target_type="plate", group="known")),
         event_config=event_config,
         camera=camera_with_area,
-        ocr_fields={"vehicle_direction": "Forward"},
+        extra_info={"vehicle_direction": "Forward"},
         image_info=image_info,
         time_analysis={
             "previous_sightings": 3,

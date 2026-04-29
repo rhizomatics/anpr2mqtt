@@ -212,7 +212,7 @@ class HomeAssistantPublisher:
         sighting: Sighting | None,
         event_config: EventSettings,
         camera: CameraSettings,
-        ocr_fields: dict[str, str | None] | None = None,
+        extra_info: dict[str, Any] | None = None,
         image_info: ImageInfo | None = None,
         time_analysis: dict[str, Any] | None = None,
         url: str | None = None,
@@ -238,8 +238,8 @@ class HomeAssistantPublisher:
                 "history": time_analysis,
             }
         )
-        if ocr_fields:
-            payload.update(ocr_fields)
+        if extra_info:
+            payload.update(extra_info)
         if error:
             payload["error"] = error
         if url is not None:
