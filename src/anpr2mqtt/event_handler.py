@@ -160,6 +160,7 @@ class EventHandler(RegexMatchingEventHandler):
                     url=url,
                     reg_info=reg_info,
                     file_path=file_path,
+                    source="filesystem",
                 )
                 if image:
                     img_format = image_info.ext.upper() if image_info.ext else None
@@ -181,6 +182,7 @@ class EventHandler(RegexMatchingEventHandler):
                     sighting=None,
                     url=url,
                     file_path=file_path,
+                    source="filesystem",
                 )
                 self._schedule_autoclear()
 

@@ -13,6 +13,7 @@ from watchdog.observers import Observer
 
 import anpr2mqtt
 from anpr2mqtt.event_handler import EventHandler
+from anpr2mqtt.frigate_handler import CameraConfig, FrigateHandler
 from anpr2mqtt.hass import HomeAssistantPublisher
 from anpr2mqtt.settings import CameraSettings, Settings
 from anpr2mqtt.tracker import Tracker, compute_time_analysis
@@ -107,6 +108,10 @@ def main_loop() -> None:
         log.error("Failed to setup file system watchdog: %s", e)
         sys.exit(-400)
 
+    # Maps camera name → (event_config, camera_settings, tracker, state_topic, image_topic)
+    # Used by FrigateHandler to share the same pipeline as filesystem events.
+    frigate_camera_configs: dict[str, CameraConfig] = {}
+
     for event_config in settings.events:
         camera: CameraSettings | None = None
         try:
@@ -123,6 +128,8 @@ def main_loop() -> None:
                 target_config=settings.targets.get(event_config.target_type),
                 auto_match_tolerance=event_config.auto_match_tolerance,
             )
+            if camera.name not in frigate_camera_configs:
+                frigate_camera_configs[camera.name] = (event_config, camera, tracker, state_topic, image_topic)
             event_handler = EventHandler(
                 publisher=publisher,
                 event_config=event_config,
@@ -184,6 +191,27 @@ def main_loop() -> None:
 
     publisher.start()
     observer.start()
+
+    if settings.frigate.enabled:
+        default_tracker = Tracker(
+            target_type="plate",
+            tracker_config=settings.tracker,
+            target_config=settings.targets.get("plate"),
+            auto_match_tolerance=1,
+        )
+        frigate_handler = FrigateHandler(
+            mqtt_client=client,
+            frigate_settings=settings.frigate,
+            publisher=publisher,
+            image_settings=settings.image,
+            dvla_settings=settings.dvla,
+            camera_configs=frigate_camera_configs,
+            mqtt_topic_root=settings.mqtt.topic_root,
+            default_tracker=default_tracker,
+        )
+        frigate_handler.start()
+    else:
+        log.info("Frigate listener disabled")
 
     try:
         log.info("Starting observer loop")

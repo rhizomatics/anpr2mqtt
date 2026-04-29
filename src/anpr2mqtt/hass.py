@@ -219,6 +219,9 @@ class HomeAssistantPublisher:
         error: str | None = None,
         file_path: Path | None = None,
         reg_info: Any = None,
+        source: str | None = None,
+        frigate_event_id: str | None = None,
+        frigate_ui_url: str | None = None,
     ) -> None:
 
         payload: dict[str, Any] = sighting.as_dict() if sighting else {"target": None, "target_type": event_config.target_type}
@@ -243,6 +246,12 @@ class HomeAssistantPublisher:
             payload["event_image_url"] = url
         if file_path is not None:
             payload["file_path"] = str(file_path)
+        if source is not None:
+            payload["source"] = source
+        if frigate_event_id is not None:
+            payload["frigate_event_id"] = frigate_event_id
+        if frigate_ui_url is not None:
+            payload["frigate_ui_url"] = frigate_ui_url
 
         try:
             if image_info:

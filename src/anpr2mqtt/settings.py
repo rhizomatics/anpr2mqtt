@@ -116,6 +116,16 @@ class DVLASettings(BaseModel):
     verify_plate: str | None = Field(default=None, description="Plate to check at startup to verify API")
 
 
+class FrigateSettings(BaseModel):
+    enabled: bool = Field(default=False, description="Enable Frigate MQTT event listener")
+    topic: str = Field(default="frigate/events", description="MQTT topic for Frigate events")
+    min_score: float = Field(default=0.90, description="Minimum plate recognition score to process (0.0->1.0)")
+    url: str | None = Field(
+        default=None, description="Frigate base URL for API snapshot fallback and UI links, e.g. http://frigate:5000"
+    )
+    cameras: list[str] | None = Field(default=None, description="Camera names to process; None means all cameras")
+
+
 class TrackerSettings(BaseModel):
     data_dir: Path = Path("/data")
 
@@ -264,6 +274,7 @@ class Settings(BaseSettings):
     tracker: TrackerSettings = TrackerSettings()
     mqtt: MQTTSettings
     dvla: DVLASettings = DVLASettings()
+    frigate: FrigateSettings = FrigateSettings()
     homeassistant: HomeAssistantSettings = HomeAssistantSettings()
     ocr: OCRSettings = OCRSettings()
 

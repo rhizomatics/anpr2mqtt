@@ -85,6 +85,7 @@ def test_eventhandler_copes_with_malformed_reg_plate_event(event_handler: EventH
                 "vehicle_direction": "Unknown",
                 "event_image_url": "http://127.0.0.1/images/2024110312013232013_P99JHG_VEHICLE_DETECTION.jpeg",
                 "file_path": "fixtures/2024110312013232013_P99JHG_VEHICLE_DETECTION.jpeg",
+                "source": "filesystem",
             }
         ),
         qos=0,

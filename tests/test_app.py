@@ -43,7 +43,7 @@ def test_on_disconnect_failure() -> None:
 
 
 def _make_mock_settings(protocol: str = "3.11", events: list[EventSettings] | None = None) -> Mock:
-    from anpr2mqtt.settings import HomeAssistantSettings
+    from anpr2mqtt.settings import FrigateSettings, HomeAssistantSettings
 
     settings = Mock()
     settings.log_level = "INFO"
@@ -55,6 +55,7 @@ def _make_mock_settings(protocol: str = "3.11", events: list[EventSettings] | No
     settings.mqtt.password = "pass"  # noqa: S105
     settings.mqtt.topic_root = "anpr2mqtt"
     settings.homeassistant = HomeAssistantSettings(status_topic="homeassistant/status")
+    settings.frigate = FrigateSettings()
     settings.events = events if events is not None else []
     settings.cameras = []
     settings.ocr = Mock()
