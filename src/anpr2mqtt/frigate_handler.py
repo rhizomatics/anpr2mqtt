@@ -125,13 +125,22 @@ class FrigateHandler:
         plate: str | None = cast("str|None", after_data.get("recognized_license_plate"))
         score: float | None = float(after_data.get("recognized_license_plate_score", 0.0))
         if not plate:
-            log.debug("Frigate event %s has no recognized plate", event_id)
+            if after_data.get("label") == "car":
+                log.info("Frigate event %s for %s has no recognized plate", event_id, after_data.get("label"))
+            else:
+                log.debug("Frigate event %s has no recognized plate", event_id)
             return
 
         if score is None:
-            log.info("Plate %s has no score, skipping", plate)
+            log.info("Frigate event %s has plate %s with no score, skipping", event_id, plate)
         elif score < self.frigate_settings.min_score:
-            log.info("Plate %s score %.3f below threshold %.3f, skipping", plate, score, self.frigate_settings.min_score)
+            log.info(
+                "Frigate event %s has plate %s score %.3f below threshold %.3f, skipping",
+                event_id,
+                plate,
+                score,
+                self.frigate_settings.min_score,
+            )
             return
 
         log.info("Frigate event %s: plate=%s score=%.3f camera=%s", event_id, plate, score, camera)
