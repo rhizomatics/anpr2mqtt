@@ -65,6 +65,16 @@ image:
     optimize: true
 tracker:
   data_dir: /data
+  
+frigate:
+    enabled: true
+    topic: frigate/events
+    min_score: 0.70
+    url: http://frigate.local:5000
+    cameras: 
+      - driveway
+      - garage
+
 dvla:
   cache_ttl: 86400
   cache_type: file
