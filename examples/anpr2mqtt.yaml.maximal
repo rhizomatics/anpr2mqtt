@@ -68,7 +68,9 @@ tracker:
   
 frigate:
     enabled: true
-    topic: frigate/events
+    topic: 
+     - frigate/events
+     - frigate//tracked_object_update
     min_score: 0.70
     url: http://frigate.local:5000
     cameras: 

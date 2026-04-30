@@ -145,7 +145,7 @@ def test_on_event_message_delegates_to_process_event(handler: FrigateHandler) ->
     msg.payload = _make_payload()
     with patch.object(handler, "_process_event") as mock_process:
         handler._on_event_message(Mock(), None, msg)
-    mock_process.assert_called_once_with(msg.payload)
+    mock_process.assert_called_once_with(msg.topic, msg.payload)
 
 
 def test_on_event_message_catches_exceptions(handler: FrigateHandler) -> None:
@@ -159,30 +159,30 @@ def test_on_event_message_catches_exceptions(handler: FrigateHandler) -> None:
 
 
 def test_process_event_invalid_json_skipped(handler: FrigateHandler, mock_publisher: Mock) -> None:
-    handler._process_event(b"not valid json{")
+    handler._process_event("frigate/events", b"not valid json{")
     mock_publisher.post_state_message.assert_not_called()
 
 
 def test_process_event_non_end_type_ignored(handler: FrigateHandler, mock_publisher: Mock) -> None:
-    handler._process_event(_make_payload(type="new"))
+    handler._process_event("frigate/events", _make_payload(type="new"))
     mock_publisher.post_state_message.assert_not_called()
 
 
 def test_process_event_update_type_ignored(handler: FrigateHandler, mock_publisher: Mock) -> None:
-    handler._process_event(_make_payload(type="update"))
+    handler._process_event("frigate/events", _make_payload(type="update"))
     mock_publisher.post_state_message.assert_not_called()
 
 
 def test_process_event_camera_not_in_allowlist_skipped(handler: FrigateHandler, mock_publisher: Mock) -> None:
     handler.frigate_settings = FrigateSettings(cameras=["driveway"], min_score=0.70)
-    handler._process_event(_make_payload(camera="garage"))
+    handler._process_event("frigate/events", _make_payload(camera="garage"))
     mock_publisher.post_state_message.assert_not_called()
 
 
 def test_process_event_camera_in_allowlist_processed(handler: FrigateHandler, mock_publisher: Mock) -> None:
     handler.frigate_settings = FrigateSettings(cameras=["driveway"], min_score=0.70)
     with patch.object(handler, "_get_event_image", return_value=None), patch.object(handler, "_schedule_autoclear"):
-        handler._process_event(_make_payload(camera="driveway"))
+        handler._process_event("frigate/events", _make_payload(camera="driveway"))
     mock_publisher.post_state_message.assert_called_once()
 
 
@@ -190,26 +190,30 @@ def test_process_event_no_camera_filter_allows_all(handler: FrigateHandler, mock
     # cameras=None means process everything; use a known camera to avoid real filesystem writes
     assert handler.frigate_settings.cameras is None
     with patch.object(handler, "_get_event_image", return_value=None), patch.object(handler, "_schedule_autoclear"):
-        handler._process_event(_make_payload(camera="driveway", event_id="no-filter-test"))
+        handler._process_event("frigate/events", _make_payload(camera="driveway", event_id="no-filter-test"))
     mock_publisher.post_state_message.assert_called_once()
 
 
 def test_process_event_duplicate_event_id_skipped(handler: FrigateHandler, mock_publisher: Mock) -> None:
     with patch.object(handler, "_get_event_image", return_value=None), patch.object(handler, "_schedule_autoclear"):
-        handler._process_event(_make_payload())
+        handler._process_event("frigate/events", _make_payload())
     mock_publisher.reset_mock()
-    handler._process_event(_make_payload())
+    handler._process_event("frigate/events", _make_payload())
     mock_publisher.post_state_message.assert_not_called()
 
 
 def test_process_event_missing_plate_skipped(handler: FrigateHandler, mock_publisher: Mock) -> None:
-    handler._process_event(_make_payload(after={"recognized_license_plate": None, "recognized_license_plate_score": 95}))
+    handler._process_event(
+        "frigate/events", _make_payload(after={"recognized_license_plate": None, "recognized_license_plate_score": 95})
+    )
     mock_publisher.post_state_message.assert_not_called()
 
 
 def test_process_event_low_score_skipped(handler: FrigateHandler, mock_publisher: Mock) -> None:
     # int(0) = 0 < min_score 0.70 → filtered
-    handler._process_event(_make_payload(after={"recognized_license_plate": "AB12CDE", "recognized_license_plate_score": 0}))
+    handler._process_event(
+        "frigate/events", _make_payload(after={"recognized_license_plate": "AB12CDE", "recognized_license_plate_score": 0})
+    )
     mock_publisher.post_state_message.assert_not_called()
 
 
@@ -218,7 +222,7 @@ def test_process_event_low_score_skipped(handler: FrigateHandler, mock_publisher
 
 def test_process_event_publishes_state(handler: FrigateHandler, mock_publisher: Mock) -> None:
     with patch.object(handler, "_get_event_image", return_value=None), patch.object(handler, "_schedule_autoclear"):
-        handler._process_event(_make_payload())
+        handler._process_event("frigate/events", _make_payload())
     mock_publisher.post_state_message.assert_called_once()
     args, kwargs = mock_publisher.post_state_message.call_args
     assert args[0] == "anpr2mqtt/anpr/driveway/state"
@@ -229,7 +233,7 @@ def test_process_event_publishes_state(handler: FrigateHandler, mock_publisher: 
 def test_process_event_publishes_image_when_available(handler: FrigateHandler, mock_publisher: Mock) -> None:
     img = Image.new("RGB", (10, 10))
     with patch.object(handler, "_get_event_image", return_value=img), patch.object(handler, "_schedule_autoclear"):
-        handler._process_event(_make_payload())
+        handler._process_event("frigate/events", _make_payload())
     mock_publisher.post_image_message.assert_called_once()
     args = mock_publisher.post_image_message.call_args[0]
     assert args[0] == "anpr2mqtt/anpr/driveway/image"
@@ -237,14 +241,14 @@ def test_process_event_publishes_image_when_available(handler: FrigateHandler, m
 
 def test_process_event_no_image_skips_image_publish(handler: FrigateHandler, mock_publisher: Mock) -> None:
     with patch.object(handler, "_get_event_image", return_value=None), patch.object(handler, "_schedule_autoclear"):
-        handler._process_event(_make_payload())
+        handler._process_event("frigate/events", _make_payload())
     mock_publisher.post_image_message.assert_not_called()
 
 
 def test_process_event_sets_frigate_ui_url(handler: FrigateHandler, mock_publisher: Mock) -> None:
     handler.frigate_settings = FrigateSettings(url="http://frigate:5000", min_score=0.70)
     with patch.object(handler, "_get_event_image", return_value=None), patch.object(handler, "_schedule_autoclear"):
-        handler._process_event(_make_payload())
+        handler._process_event("frigate/events", _make_payload())
     kwargs = mock_publisher.post_state_message.call_args[1]
     assert kwargs["frigate_ui_url"] == "http://frigate:5000/events?id=evt-123"
 
@@ -252,7 +256,7 @@ def test_process_event_sets_frigate_ui_url(handler: FrigateHandler, mock_publish
 def test_process_event_no_url_leaves_ui_url_none(handler: FrigateHandler, mock_publisher: Mock) -> None:
     assert handler.frigate_settings.url is None
     with patch.object(handler, "_get_event_image", return_value=None), patch.object(handler, "_schedule_autoclear"):
-        handler._process_event(_make_payload())
+        handler._process_event("frigate/events", _make_payload())
     kwargs = mock_publisher.post_state_message.call_args[1]
     assert kwargs["frigate_ui_url"] is None
 
@@ -265,7 +269,7 @@ def test_process_event_ignored_plate_skips_state_publish(
         ignore=True,
     )
     with patch.object(handler, "_get_event_image", return_value=None), patch.object(handler, "_schedule_autoclear"):
-        handler._process_event(_make_payload())
+        handler._process_event("frigate/events", _make_payload())
     mock_publisher.post_state_message.assert_not_called()
 
 
@@ -276,7 +280,7 @@ def test_process_event_target_with_entity_id_publishes_target_state(
         target=Target(id="AB12CDE", target_type=TARGET_TYPE_PLATE, entity_id="my_car"),
     )
     with patch.object(handler, "_get_event_image", return_value=None), patch.object(handler, "_schedule_autoclear"):
-        handler._process_event(_make_payload())
+        handler._process_event("frigate/events", _make_payload())
     mock_publisher.publish_target_state.assert_called_once()
     call_kwargs = mock_publisher.publish_target_state.call_args[1]
     assert "my_car" in call_kwargs["state_topic"]
@@ -289,7 +293,7 @@ def test_process_event_no_entity_id_skips_target_state(
         target=Target(id="AB12CDE", target_type=TARGET_TYPE_PLATE, entity_id=None),
     )
     with patch.object(handler, "_get_event_image", return_value=None), patch.object(handler, "_schedule_autoclear"):
-        handler._process_event(_make_payload())
+        handler._process_event("frigate/events", _make_payload())
     mock_publisher.publish_target_state.assert_not_called()
 
 
@@ -298,7 +302,7 @@ def test_process_event_schedules_autoclear(handler: FrigateHandler) -> None:
         patch.object(handler, "_get_event_image", return_value=None),
         patch.object(handler, "_schedule_autoclear") as mock_sched,
     ):
-        handler._process_event(_make_payload())
+        handler._process_event("frigate/events", _make_payload())
     mock_sched.assert_called_once()
 
 
@@ -309,7 +313,7 @@ def test_process_event_extra_info_includes_frigate_key(handler: FrigateHandler, 
         "current_estimated_speed": 42,
     }
     with patch.object(handler, "_get_event_image", return_value=None), patch.object(handler, "_schedule_autoclear"):
-        handler._process_event(_make_payload(after=after))
+        handler._process_event("frigate/events", _make_payload(after=after))
     kwargs = mock_publisher.post_state_message.call_args[1]
     assert "frigate" in kwargs["extra_info"]
     assert kwargs["extra_info"]["frigate"]["current_estimated_speed"] == 42
@@ -338,7 +342,7 @@ def test_process_event_id_set_pruned_when_oversized(mock_tracker: Mock) -> None:
     )
     h._processed_events = {str(i) for i in range(5001)}
     with patch.object(h, "_get_event_image", return_value=None), patch.object(h, "_schedule_autoclear"):
-        h._process_event(_make_payload(event_id="trim-trigger", camera="x"))
+        h._process_event("frigate/events", _make_payload(event_id="trim-trigger", camera="x"))
     # After pruning [2500:] from 5001 entries and adding the new ID: 2502 total
     assert len(h._processed_events) <= 2502
 
