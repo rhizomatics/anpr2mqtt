@@ -108,9 +108,16 @@ class FrigateHandler:
             log.error("Frigate event JSON parse error: %s", e)
             return
 
-        event_type: str = payload.get("type", "")
-        event_id: str = payload.get("event_id", "")
-        camera: str = payload.get("camera", "")
+        event_data: dict[str, str | int | float | bool] = payload or {}
+        if topic == "frigate/events":
+            event_data = payload.get("after", {}) or {}
+        elif topic != "frigate/tracked_object_update":
+            log.debug("Skipping Frigate message for %s", topic)
+            return
+
+        event_type: str = cast("str", event_data.get("type", "") or "")
+        event_id: str = cast("str", event_data.get("id", "") or "")
+        camera: str = cast("str", event_data.get("camera", "") or "")
 
         # Only process 'end' for frigate/events — they carry the most complete plate data
         if topic == "frigate/events" and event_type == "end":
@@ -118,7 +125,7 @@ class FrigateHandler:
         elif topic == "frigate/tracked_object_update" and event_type == "lpr":
             log.debug("frigate/tracked_object_update: %s %s %s", event_type, event_id, camera)
         else:
-            log.debug("Disposing %s: %s %s %s", topic, event_type, event_id, camera)
+            log.debug("Skipping %s: %s %s %s", topic, event_type, event_id, camera)
             return
 
         if self.frigate_settings.cameras and camera not in self.frigate_settings.cameras:
