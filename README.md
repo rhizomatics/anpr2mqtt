@@ -23,7 +23,7 @@ All that is needed is for the camera to be configured to upload images on plate 
 While intended for vehicle plate detection, it can be used to watch for and analyze any file, so for example uploaded face detection, missing object, unattended baggage or line crossing images. A single `anpr2mqtt` instance can watch multiple paths and patterns for different cameras and events.
 
 The enrichment, including DVLA lookup, can also be extended to licence plates recognized by Frigate (
-see [Frigate License Plate Recognition](https://docs.frigate.video/configuration/license_plate_recognition)), assuming that `frigate/events` topic is on the same MQTT broker.
+see [Frigate License Plate Recognition](https://docs.frigate.video/configuration/license_plate_recognition)), assuming that `frigate/events` and `frigate/update_tracked_object` topics are on the same MQTT broker.
 
 ## Features
 
