@@ -5,6 +5,7 @@ plates found via file system
 ## Auto-correction
 - A recent plate with successful DVLA match will be used as a matching candidate for plates with poor match
 - Dupe messages reduced, and spurious visit counting, by a minimum time gap
+- New extensible Normalizer structure, initialized for Plate/UK combo
 # 1.0.0
 ## Known Targets Configuration
 - Restructured from 2 fixed groups ("known" and "dangerous") to a flexible groups structure, so any number of groups can be created, for example "family","postman","delivery","utility"
