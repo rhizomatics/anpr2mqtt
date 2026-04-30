@@ -71,10 +71,16 @@ class FrigateHandler:
             )
 
     def start(self) -> None:
-        self.mqtt_client.message_callback_add(self.frigate_settings.topic, self._on_event_message)
-        self.mqtt_client.message_callback_add("frigate/+/snapshot", self._on_snapshot_message)
-        self.mqtt_client.subscribe(self.frigate_settings.topic)
-        self.mqtt_client.subscribe("frigate/+/snapshot")
+        for topic in self.frigate_settings.topic:
+            self.mqtt_client.message_callback_add(topic, self._on_event_message)
+            self.mqtt_client.subscribe(topic)
+        if self.frigate_settings.cameras is None:
+            self.mqtt_client.message_callback_add("frigate/+/snapshot", self._on_snapshot_message)
+            self.mqtt_client.subscribe("frigate/+/snapshot")
+        else:
+            for camera in self.frigate_settings.cameras:
+                self.mqtt_client.message_callback_add(f"frigate/{camera}/snapshot", self._on_snapshot_message)
+                self.mqtt_client.subscribe(f"frigate/{camera}/snapshot")
         log.info(
             "Frigate listener started, min_score=%.2f topic=%s",
             self.frigate_settings.min_score,
@@ -91,11 +97,11 @@ class FrigateHandler:
 
     def _on_event_message(self, _client: mqtt.Client, _userdata: Any, msg: mqtt.MQTTMessage) -> None:
         try:
-            self._process_event(msg.payload)
+            self._process_event(msg.topic, msg.payload)
         except Exception as e:
             log.error("Frigate event processing error: %s", e, exc_info=True)
 
-    def _process_event(self, raw: bytes) -> None:
+    def _process_event(self, topic: str, raw: bytes) -> None:
         try:
             payload: dict[str, Any] = json.loads(raw)
         except json.JSONDecodeError as e:
@@ -106,8 +112,13 @@ class FrigateHandler:
         event_id: str = payload.get("event_id", "")
         camera: str = payload.get("camera", "")
 
-        # Only process end events — they carry the most complete plate data
-        if event_type != "end":
+        # Only process 'end' for frigate/events — they carry the most complete plate data
+        if topic == "frigate/events" and event_type == "end":
+            log.debug("frigate/events received: %s %s %s", event_type, event_id, camera)
+        elif topic == "frigate/tracked_object_update" and event_type == "lpr":
+            log.debug("frigate/tracked_object_update: %s %s %s", event_type, event_id, camera)
+        else:
+            log.debug("Disposing %s: %s %s %s", topic, event_type, event_id, camera)
             return
 
         if self.frigate_settings.cameras and camera not in self.frigate_settings.cameras:
@@ -121,12 +132,30 @@ class FrigateHandler:
             if len(self._processed_events) > 5000:
                 self._processed_events = set(list(self._processed_events)[2500:])
 
-        after_data: dict[str, str | int | float | bool] = payload.get("after", {}) or {}
-        plate: str | None = cast("str|None", after_data.get("recognized_license_plate"))
-        score: float | None = float(after_data.get("recognized_license_plate_score", 0.0))
+        extra_info: dict[str, dict[str, Any]] = {"frigate": {}}
+        if topic == "frigate/events":
+            after_data: dict[str, str | int | float | bool] = payload.get("after", {}) or {}
+            plate: str | None = cast("str|None", after_data.get("recognized_license_plate"))
+            score: float | None = float(after_data.get("recognized_license_plate_score", 0.0))
+            description: str | None = cast("str|None", after_data.get("label"))
+            for attr in (
+                "recognized_license_plate_score",
+                "velocity_angle",
+                "current_estimated_speed",
+                "average_estimated_speed",
+                "label",
+                "sub_label",
+                "",
+            ):
+                if after_data.get(attr):
+                    extra_info["frigate"][attr] = after_data.get(attr)
+        else:
+            plate = payload.get("plate")
+            score = payload.get("score")
+            description = payload.get("name") or "Unknown"
         if not plate:
-            if after_data.get("label") == "car":
-                log.info("Frigate event %s for %s has no recognized plate", event_id, after_data.get("label"))
+            if description and description == "car":
+                log.info("Frigate event %s for %s has no recognized plate", event_id, description)
             else:
                 log.debug("Frigate event %s has no recognized plate", event_id)
             return
@@ -170,18 +199,6 @@ class FrigateHandler:
                     sighting.target.description = api_info["description"]
 
         time_analysis: dict[str, Any] = tracker.record(sighting.target.id, event_config.target_type, timestamp)
-        extra_info: dict[str, dict[str, Any]] = {"frigate": {}}
-        for attr in (
-            "recognized_license_plate_score",
-            "velocity_angle",
-            "current_estimated_speed",
-            "average_estimated_speed",
-            "label",
-            "sub_label",
-            "",
-        ):
-            if after_data.get(attr):
-                extra_info["frigate"][attr] = after_data.get(attr)
 
         if sighting.target.entity_id:
             target_state_topic = f"{self.mqtt_topic_root}/{event_config.event}/targets/{sighting.target.entity_id}/state"
