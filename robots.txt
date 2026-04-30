@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://anpr2mqtt.rhizomatics.org.uk/sitemap.xml
