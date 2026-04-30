@@ -10,6 +10,7 @@ import pytesseract
 import structlog
 import tzlocal
 from PIL import Image
+from rapidfuzz.distance import Levenshtein
 from watchdog.events import DirCreatedEvent, FileClosedEvent, FileCreatedEvent, RegexMatchingEventHandler
 
 from anpr2mqtt.api_client import APIClient, DVLAClient
@@ -75,6 +76,7 @@ class EventHandler(RegexMatchingEventHandler):
             self.api_client = None
 
         self._autoclear_timer: threading.Timer | None = None
+        self._last_good_plate: tuple[str, dt.datetime] | None = None
 
     @property
     def ignore_directories(self) -> bool:
@@ -112,6 +114,8 @@ class EventHandler(RegexMatchingEventHandler):
                 target_id: str = image_info.target
                 log.info("Examining image for %s at %s", target_id, file_path.absolute())
 
+                target_id = self._correct_against_good_read(target_id)
+
                 image: Image.Image | None = process_image(
                     file_path.absolute(), image_info, jpeg_opts=self.image_config.jpeg_opts, png_opts=self.image_config.png_opts
                 )
@@ -131,10 +135,15 @@ class EventHandler(RegexMatchingEventHandler):
                         reg_info = api_info.get("plate")
                         if sighting.target.description is None and api_info and api_info.get("description"):
                             sighting.target.description = api_info["description"]
+                        self._last_good_plate = (sighting.target.id, dt.datetime.now(dt.UTC))
 
                 time_analysis: dict[str, Any] = self.tracker.record(
                     sighting.target.id, self.event_config.target_type, image_info.timestamp
                 )
+
+                if not time_analysis.get("is_new_visit", True):
+                    log.info("Skipping duplicate filesystem visit for %s (within gap window)", sighting.target.id)
+                    return
 
                 entity_id: str | None = sighting.target.entity_id
                 if entity_id:
@@ -196,6 +205,21 @@ class EventHandler(RegexMatchingEventHandler):
                 error=str(e),
                 file_path=file_path,
             )
+
+    def _correct_against_good_read(self, plate: str) -> str:
+        ttl = self.event_config.good_read_ttl
+        tolerance = self.event_config.good_read_tolerance
+        if ttl <= 0 or tolerance <= 0 or self._last_good_plate is None:
+            return plate
+        good_plate, good_ts = self._last_good_plate
+        age = (dt.datetime.now(dt.UTC) - good_ts).total_seconds()
+        if age > ttl:
+            return plate
+        dist = Levenshtein.distance(plate, good_plate)
+        if 0 < dist <= tolerance:
+            log.info("Correcting %s -> %s via last known good (age=%.1fs dist=%d)", plate, good_plate, age, dist)
+            return good_plate
+        return plate
 
     def _schedule_autoclear(self) -> None:
         autoclear = self.event_config.autoclear

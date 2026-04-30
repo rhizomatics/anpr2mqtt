@@ -46,6 +46,7 @@ class EventSettings(BaseModel):
     event: str = Field(default="anpr", description="Identifier of the event, used in MQTT topic description")
     description: str | None = Field(default=None, description="Free text description of event")
     target_type: str = Field(default="plate", description="Type of target for this event, 'plate' if ANPR")
+    region: str | None = Field(default="UK", description="Region for applying correction, normalization rules")
     default_description: str = Field(default="Unknown vehicle", description="Default description if no known match found")
     icon: str | None = Field(
         default="mdi:car-back",
@@ -67,6 +68,14 @@ class EventSettings(BaseModel):
     auto_match_tolerance: int = Field(
         default=1,
         description="Maximum tolerance for auto matching against known plates, using Levenshtein, 0 to disable fuzzy matching",
+    )
+    good_read_ttl: int = Field(
+        default=60,
+        description="Seconds to retain the last DVLA-confirmed plate per camera for mis-read correction; 0 to disable",
+    )
+    good_read_tolerance: int = Field(
+        default=2,
+        description="Max Levenshtein distance from last known-good plate to trigger correction; 0 to disable",
     )
 
     @field_validator("image_url_base")
@@ -130,6 +139,10 @@ class FrigateSettings(BaseModel):
 
 class TrackerSettings(BaseModel):
     data_dir: Path = Path("/data")
+    min_visit_gap_seconds: int = Field(
+        default=0,
+        description="Minimum seconds between recorded visits for the same target; 0 to disable (every read is a visit)",
+    )
 
 
 class ImageSettings(BaseModel):

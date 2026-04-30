@@ -29,7 +29,7 @@ def set_tz_env_variable() -> None:
 
 @pytest.fixture
 def tracker(tmp_path: Path) -> Tracker:
-    return Tracker("testing", TrackerSettings(data_dir=tmp_path), TargetSettings())
+    return Tracker(target_type="testing", tracker_config=TrackerSettings(data_dir=tmp_path), target_config=TargetSettings())
 
 
 @pytest.fixture

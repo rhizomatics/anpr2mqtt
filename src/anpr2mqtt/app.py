@@ -15,7 +15,7 @@ import anpr2mqtt
 from anpr2mqtt.event_handler import EventHandler
 from anpr2mqtt.frigate_handler import CameraConfig, FrigateHandler
 from anpr2mqtt.hass import HomeAssistantPublisher
-from anpr2mqtt.settings import CameraSettings, Settings
+from anpr2mqtt.settings import CameraSettings, EventSettings, Settings
 from anpr2mqtt.tracker import Tracker, compute_time_analysis
 
 log = structlog.get_logger()
@@ -126,6 +126,7 @@ def main_loop() -> None:
                 event_config.target_type,
                 tracker_config=settings.tracker,
                 target_config=settings.targets.get(event_config.target_type),
+                region=event_config.region,
                 auto_match_tolerance=event_config.auto_match_tolerance,
             )
             if camera.name not in frigate_camera_configs:
@@ -193,11 +194,19 @@ def main_loop() -> None:
     observer.start()
 
     if settings.frigate.enabled:
+        event_settings: EventSettings | None = None
+        for cfg in settings.events:
+            if cfg.target_type == "plate":
+                event_settings = cfg
+                break
+        event_settings = event_settings or EventSettings(target_type="plate")
+
         default_tracker = Tracker(
             target_type="plate",
             tracker_config=settings.tracker,
             target_config=settings.targets.get("plate"),
-            auto_match_tolerance=1,
+            region=event_settings.region,
+            auto_match_tolerance=event_settings.auto_match_tolerance,
         )
         frigate_handler = FrigateHandler(
             mqtt_client=client,

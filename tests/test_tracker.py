@@ -1,7 +1,7 @@
 import datetime as dt
 from pathlib import Path
 
-from anpr2mqtt.settings import Target, TargetGroup, TargetSettings
+from anpr2mqtt.settings import Target, TargetGroup, TargetSettings, TrackerSettings
 from anpr2mqtt.tracker import Sighting, Tracker, compute_time_analysis
 
 
@@ -109,9 +109,11 @@ def test_track_target_exception(tracker: Tracker, tmp_path: Path) -> None:
     bad_file = target_dir / "BADPLATE.json"
     bad_file.write_text("not valid json")
     result = tracker.record("BADPLATE", "plate", dt.datetime(2025, 1, 1, tzinfo=dt.UTC))
+    # history() swallows the JSON error and returns []; record() then proceeds normally
     assert result == {
         "earliest_time": None,
         "hourly_counts": {},
+        "is_new_visit": True,
         "last_seen": None,
         "latest_time": None,
         "previous_sightings": 0,
@@ -349,3 +351,71 @@ def test_fuzzy_match_both_known_and_dangerous(tracker: Tracker) -> None:
 
     result: Sighting = tracker.find("AB12CDF")
     assert result.target.group == "dangerous"
+
+
+def test_find_normalises_uk_plate_before_lookup(tmp_path: Path) -> None:
+    tracker = Tracker("plate", region="UK", tracker_config=TrackerSettings(data_dir=tmp_path), target_config=TargetSettings())
+    result = tracker.find("ABI2CDE")
+    assert result.target.id == "AB12CDE"
+    assert result.uncorrected == "ABI2CDE"
+
+
+def test_find_normalises_then_fuzzy_matches(tmp_path: Path) -> None:
+    tracker = Tracker(
+        target_type="plate",
+        tracker_config=TrackerSettings(data_dir=tmp_path),
+        region="UK",
+        target_config=TargetSettings(groups=[TargetGroup(name="known", members=[Target(id="AB12CDE", description="Alice")])]),
+        auto_match_tolerance=0,
+    )
+    # ABI2CDE → normalised to AB12CDE → exact match
+    result = tracker.find("ABI2CDE")
+    assert result.target.group == "known"
+    assert result.target.description == "Alice"
+    assert result.uncorrected == "ABI2CDE"
+
+
+def test_find_no_normalisation_for_non_plate_type(tmp_path: Path) -> None:
+    tracker = Tracker("vehicle", TrackerSettings(data_dir=tmp_path), target_config=TargetSettings())
+    result = tracker.find("ABI2CDE")
+    assert result.target.id == "ABI2CDE"  # no change
+
+
+# --- Tracker.record: min_visit_gap_seconds ---
+
+
+def test_record_visit_gap_suppresses_duplicate(tmp_path: Path) -> None:
+    tracker = Tracker("plate", TrackerSettings(data_dir=tmp_path, min_visit_gap_seconds=300), target_config=TargetSettings())
+    ts1 = dt.datetime(2025, 1, 1, 10, 0, 0, tzinfo=dt.UTC)
+    ts2 = dt.datetime(2025, 1, 1, 10, 0, 30, tzinfo=dt.UTC)  # 30s later, within 300s gap
+    tracker.record("AB12CDE", "plate", ts1)
+    result = tracker.record("AB12CDE", "plate", ts2)
+    assert result["is_new_visit"] is False
+    # Should not have appended a second sighting
+    assert len(tracker.history("AB12CDE", "plate")) == 1
+
+
+def test_record_visit_gap_allows_after_gap(tmp_path: Path) -> None:
+    tracker = Tracker("plate", TrackerSettings(data_dir=tmp_path, min_visit_gap_seconds=60), target_config=TargetSettings())
+    ts1 = dt.datetime(2025, 1, 1, 10, 0, 0, tzinfo=dt.UTC)
+    ts2 = dt.datetime(2025, 1, 1, 10, 2, 0, tzinfo=dt.UTC)  # 120s later, beyond 60s gap
+    tracker.record("AB12CDE", "plate", ts1)
+    result = tracker.record("AB12CDE", "plate", ts2)
+    assert result.get("is_new_visit", True) is True
+    assert len(tracker.history("AB12CDE", "plate")) == 2
+
+
+def test_record_visit_gap_zero_disabled(tmp_path: Path) -> None:
+    tracker = Tracker("plate", TrackerSettings(data_dir=tmp_path, min_visit_gap_seconds=0), target_config=TargetSettings())
+    ts1 = dt.datetime(2025, 1, 1, 10, 0, 0, tzinfo=dt.UTC)
+    ts2 = dt.datetime(2025, 1, 1, 10, 0, 1, tzinfo=dt.UTC)
+    tracker.record("AB12CDE", "plate", ts1)
+    result = tracker.record("AB12CDE", "plate", ts2)
+    assert result.get("is_new_visit", True) is True
+    assert len(tracker.history("AB12CDE", "plate")) == 2
+
+
+def test_record_visit_gap_first_sighting_always_new(tmp_path: Path) -> None:
+    tracker = Tracker("plate", TrackerSettings(data_dir=tmp_path, min_visit_gap_seconds=300), target_config=TargetSettings())
+    result = tracker.record("NEWPLATE", "plate", dt.datetime(2025, 1, 1, tzinfo=dt.UTC))
+    assert result.get("is_new_visit", True) is True

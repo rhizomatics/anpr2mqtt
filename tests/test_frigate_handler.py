@@ -28,16 +28,27 @@ def _make_jpeg_bytes() -> bytes:
 
 
 def _make_payload(**overrides: Any) -> bytes:
+    # Mirrors real Frigate frigate/events payload:
+    #   top-level "type" = event lifecycle ("new"/"update"/"end")
+    #   "after" = tracked-object fields (id, camera, plate, …)
+    after_defaults: dict[str, Any] = {
+        "id": "evt-123",
+        "camera": "driveway",
+        "recognized_license_plate": "AB12CDE",
+        "recognized_license_plate_score": 95,  # integer so float() doesn't truncate to 0
+    }
+    after_override = overrides.pop("after", {})
+    camera_override = overrides.pop("camera", None)
+    event_id_override = overrides.pop("event_id", None)
+    if camera_override is not None:
+        after_defaults["camera"] = camera_override
+    if event_id_override is not None:
+        after_defaults["id"] = event_id_override
+    after_defaults.update(after_override)
     data: dict[str, Any] = {
         "type": "end",
-        "event_id": "evt-123",
-        "camera": "driveway",
         "start_time": 1_700_000_000.0,
-        "after": {
-            "recognized_license_plate": "AB12CDE",
-            # Use an integer score so int() cast doesn't truncate to 0
-            "recognized_license_plate_score": 95,
-        },
+        "after": after_defaults,
     }
     data.update(overrides)
     return json.dumps(data).encode()
@@ -356,13 +367,14 @@ def test_get_event_image_uses_cached_mqtt_snapshot(handler: FrigateHandler) -> N
     assert img is not None
 
 
-def test_get_event_image_falls_back_to_api_when_no_cache(handler: FrigateHandler) -> None:
+def test_get_event_image_uses_api_snapshot_first(handler: FrigateHandler) -> None:
     handler.frigate_settings = FrigateSettings(url="http://frigate:5000", min_score=0.70)
+    handler._snapshot_cache["driveway"] = _make_jpeg_bytes()  # also have stale MQTT cache
     expected = Image.new("RGB", (10, 10))
     with patch.object(handler, "_fetch_api_snapshot", return_value=expected) as mock_fetch:
         img = handler._get_event_image("evt-123", "driveway")
     mock_fetch.assert_called_once_with("evt-123")
-    assert img is expected
+    assert img is expected  # API wins over MQTT cache
 
 
 def test_get_event_image_returns_none_when_no_snapshot_no_url(handler: FrigateHandler) -> None:
@@ -371,12 +383,12 @@ def test_get_event_image_returns_none_when_no_snapshot_no_url(handler: FrigateHa
     assert img is None
 
 
-def test_get_event_image_falls_back_to_api_on_bad_snapshot_bytes(handler: FrigateHandler) -> None:
-    handler._snapshot_cache["driveway"] = b"not-an-image"
+def test_get_event_image_falls_back_to_mqtt_when_api_fails(handler: FrigateHandler) -> None:
     handler.frigate_settings = FrigateSettings(url="http://frigate:5000", min_score=0.70)
-    with patch.object(handler, "_fetch_api_snapshot", return_value=None) as mock_fetch:
-        handler._get_event_image("evt-123", "driveway")
-    mock_fetch.assert_called_once_with("evt-123")
+    handler._snapshot_cache["driveway"] = _make_jpeg_bytes()
+    with patch.object(handler, "_fetch_api_snapshot", return_value=None):
+        img = handler._get_event_image("evt-123", "driveway")
+    assert img is not None  # MQTT cache used as fallback
 
 
 # --- _fetch_api_snapshot ---
@@ -526,3 +538,90 @@ def test_dvla_api_client_created_when_key_provided(mock_mqtt: Mock, mock_publish
 
 def test_dvla_api_client_not_created_without_key(handler: FrigateHandler) -> None:
     assert handler.api_client is None
+
+
+# --- _correct_against_good_read ---
+
+
+def test_correct_against_good_read_within_ttl_and_tolerance(handler: FrigateHandler) -> None:
+    import datetime as dt
+
+    handler._last_good_plate["driveway"] = ("AB12CDE", dt.datetime.now(dt.UTC))
+    # "ABI2CDE" is distance 1 from "AB12CDE"
+    result = handler._correct_against_good_read("ABI2CDE", "driveway", ttl=60, tolerance=2)
+    assert result == "AB12CDE"
+
+
+def test_correct_against_good_read_expired_ttl(handler: FrigateHandler) -> None:
+    import datetime as dt
+
+    old_ts = dt.datetime.now(dt.UTC) - dt.timedelta(seconds=120)
+    handler._last_good_plate["driveway"] = ("AB12CDE", old_ts)
+    result = handler._correct_against_good_read("ABI2CDE", "driveway", ttl=60, tolerance=2)
+    assert result == "ABI2CDE"  # not corrected — TTL expired
+
+
+def test_correct_against_good_read_beyond_tolerance(handler: FrigateHandler) -> None:
+    import datetime as dt
+
+    handler._last_good_plate["driveway"] = ("AB12CDE", dt.datetime.now(dt.UTC))
+    result = handler._correct_against_good_read("ZZ99ZZZ", "driveway", ttl=60, tolerance=2)
+    assert result == "ZZ99ZZZ"  # distance > 2, not corrected
+
+
+def test_correct_against_good_read_disabled_by_tolerance_zero(handler: FrigateHandler) -> None:
+    import datetime as dt
+
+    handler._last_good_plate["driveway"] = ("AB12CDE", dt.datetime.now(dt.UTC))
+    result = handler._correct_against_good_read("ABI2CDE", "driveway", ttl=60, tolerance=0)
+    assert result == "ABI2CDE"
+
+
+def test_correct_against_good_read_no_cache(handler: FrigateHandler) -> None:
+    result = handler._correct_against_good_read("ABI2CDE", "driveway", ttl=60, tolerance=2)
+    assert result == "ABI2CDE"
+
+
+def test_correct_against_good_read_exact_match_unchanged(handler: FrigateHandler) -> None:
+    import datetime as dt
+
+    handler._last_good_plate["driveway"] = ("AB12CDE", dt.datetime.now(dt.UTC))
+    result = handler._correct_against_good_read("AB12CDE", "driveway", ttl=60, tolerance=2)
+    assert result == "AB12CDE"  # distance 0, no correction needed
+
+
+# --- good plate cache updated after DVLA success ---
+
+
+def test_process_event_updates_good_plate_cache_on_dvla_success(handler: FrigateHandler, mock_tracker: Mock) -> None:
+    import datetime as dt
+
+    mock_api = Mock()
+    mock_api.lookup.return_value = {"success": True, "plate": {"make": "Ford"}, "description": "Ford Focus"}
+    handler.api_client = mock_api
+    mock_tracker.find.return_value = Sighting(
+        target=Target(id="AB12CDE", target_type="plate", lookup=True),
+    )
+    with patch.object(handler, "_get_event_image", return_value=None), patch.object(handler, "_schedule_autoclear"):
+        handler._process_event("frigate/events", _make_payload())
+    assert "driveway" in handler._last_good_plate
+    plate, ts = handler._last_good_plate["driveway"]
+    assert plate == "AB12CDE"
+    assert (dt.datetime.now(dt.UTC) - ts).total_seconds() < 5
+
+
+# --- duplicate visit suppression ---
+
+
+def test_process_event_duplicate_visit_suppressed(handler: FrigateHandler, mock_publisher: Mock, mock_tracker: Mock) -> None:
+    mock_tracker.record.return_value = {"previous_sightings": 1, "is_new_visit": False}
+    with patch.object(handler, "_get_event_image", return_value=None), patch.object(handler, "_schedule_autoclear"):
+        handler._process_event("frigate/events", _make_payload(event_id="dup-test"))
+    mock_publisher.post_state_message.assert_not_called()
+
+
+def test_process_event_new_visit_publishes(handler: FrigateHandler, mock_publisher: Mock, mock_tracker: Mock) -> None:
+    mock_tracker.record.return_value = {"previous_sightings": 0, "is_new_visit": True}
+    with patch.object(handler, "_get_event_image", return_value=None), patch.object(handler, "_schedule_autoclear"):
+        handler._process_event("frigate/events", _make_payload(event_id="new-visit-test"))
+    mock_publisher.post_state_message.assert_called_once()

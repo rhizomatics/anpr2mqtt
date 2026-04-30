@@ -8,6 +8,7 @@ import niquests
 import paho.mqtt.client as mqtt
 import structlog
 from PIL import Image
+from rapidfuzz.distance import Levenshtein
 
 from anpr2mqtt.api_client import APIClient, DVLAClient
 from anpr2mqtt.const import ImageInfo
@@ -59,6 +60,10 @@ class FrigateHandler:
         # Per-camera autoclear timers
         self._autoclear_timers: dict[str, threading.Timer] = {}
         self._autoclear_lock = threading.Lock()
+
+        # Per-camera last DVLA-confirmed plate for mis-read correction
+        self._last_good_plate: dict[str, tuple[str, dt.datetime]] = {}
+        self._good_plate_lock = threading.Lock()
 
         self.api_client: APIClient | None = None
         if dvla_settings.api_key:
@@ -115,7 +120,13 @@ class FrigateHandler:
             log.debug("Skipping Frigate message for %s", topic)
             return
 
-        event_type: str = cast("str", event_data.get("type", "") or "")
+        # For frigate/events the event type ("new"/"update"/"end") is at the top level of the
+        # payload; the after dict holds the tracked-object type (e.g. "car").  For
+        # frigate/tracked_object_update the type field is directly in the payload.
+        if topic == "frigate/events":
+            event_type: str = cast("str", payload.get("type", "") or "")
+        else:
+            event_type = cast("str", event_data.get("type", "") or "")
         event_id: str = cast("str", event_data.get("id", "") or "")
         camera: str = cast("str", event_data.get("camera", "") or "")
 
@@ -184,6 +195,8 @@ class FrigateHandler:
         image: Image.Image | None = self._get_event_image(event_id, camera)
         event_config, camera_settings, tracker, state_topic, image_topic = self._resolve_camera_config(camera)
 
+        plate = self._correct_against_good_read(plate, camera, event_config.good_read_ttl, event_config.good_read_tolerance)
+
         start_time: float = float(payload.get("start_time") or 0)
         timestamp = dt.datetime.fromtimestamp(start_time, tz=dt.UTC) if start_time else dt.datetime.now(dt.UTC)
 
@@ -204,8 +217,14 @@ class FrigateHandler:
                 reg_info = api_info.get("plate")
                 if sighting.target.description is None and api_info.get("description"):
                     sighting.target.description = api_info["description"]
+                with self._good_plate_lock:
+                    self._last_good_plate[camera] = (sighting.target.id, dt.datetime.now(dt.UTC))
 
         time_analysis: dict[str, Any] = tracker.record(sighting.target.id, event_config.target_type, timestamp)
+
+        if not time_analysis.get("is_new_visit", True):
+            log.info("Skipping duplicate Frigate visit for %s (within gap window)", sighting.target.id)
+            return
 
         if sighting.target.entity_id:
             target_state_topic = f"{self.mqtt_topic_root}/{event_config.event}/targets/{sighting.target.entity_id}/state"
@@ -242,8 +261,32 @@ class FrigateHandler:
 
         self._schedule_autoclear(camera, event_config, state_topic, image_topic)
 
+    def _correct_against_good_read(self, plate: str, camera: str, ttl: int, tolerance: int) -> str:
+        """Return the last DVLA-confirmed plate for this camera if within TTL and Levenshtein tolerance."""
+        if ttl <= 0 or tolerance <= 0:
+            return plate
+        with self._good_plate_lock:
+            cached = self._last_good_plate.get(camera)
+        if not cached:
+            return plate
+        good_plate, good_ts = cached
+        age = (dt.datetime.now(dt.UTC) - good_ts).total_seconds()
+        if age > ttl:
+            return plate
+        dist = Levenshtein.distance(plate, good_plate)
+        if 0 < dist <= tolerance:
+            log.info("Correcting %s -> %s via last known good (age=%.1fs dist=%d)", plate, good_plate, age, dist)
+            return good_plate
+        return plate
+
     def _get_event_image(self, event_id: str, camera: str) -> Image.Image | None:
-        # Prefer the retained MQTT snapshot for this camera (has bounding boxes)
+        # Prefer the event-specific Frigate API snapshot — avoids stale MQTT cache from a subsequent vehicle
+        if self.frigate_settings.url:
+            img = self._fetch_api_snapshot(event_id)
+            if img is not None:
+                return img
+            log.debug("API snapshot unavailable for %s, falling back to MQTT cache", event_id)
+
         with self._snapshot_lock:
             snapshot_bytes = self._snapshot_cache.get(camera)
 
@@ -255,10 +298,6 @@ class FrigateHandler:
                 return img
             except Exception as e:
                 log.warning("Failed to decode MQTT snapshot for camera %s: %s", camera, e)
-
-        # Fall back to Frigate HTTP API snapshot (also includes bounding boxes)
-        if self.frigate_settings.url:
-            return self._fetch_api_snapshot(event_id)
 
         log.warning("No image for Frigate event %s (no MQTT snapshot cached, no url configured)", event_id)
         return None

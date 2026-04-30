@@ -8,6 +8,7 @@ import structlog
 import tzlocal
 from rapidfuzz.distance import Levenshtein
 
+from anpr2mqtt.normalizers import NORMALIZERS, Normalizer
 from anpr2mqtt.settings import (
     Target,
     TargetSettings,
@@ -35,6 +36,7 @@ class Tracker:
         self,
         target_type: str,
         tracker_config: TrackerSettings,
+        region: str | None = None,
         target_config: TargetSettings | None = None,
         auto_match_tolerance: int = 0,
     ) -> None:
@@ -45,6 +47,12 @@ class Tracker:
         self._target_config: TargetSettings | None = None
         self.target_config = target_config
         self.auto_match_tolerance = auto_match_tolerance
+        self.region: str | None = region
+        self.normalizer: Normalizer | None = None
+        if region and target_type:
+            normalizer_type: type[Normalizer] | None = NORMALIZERS.get(self.target_type, {}).get(region)
+            if normalizer_type is not None:
+                self.normalizer = normalizer_type()
 
     @property
     def target_config(self) -> TargetSettings | None:
@@ -88,9 +96,26 @@ class Tracker:
         time_analysis: dict[str, Any] = {}
         try:
             time_analysis = compute_time_analysis(sightings, event_dt)
+            min_gap = self.tracker_config.min_visit_gap_seconds
+            if min_gap > 0 and sightings:
+                try:
+                    last_ts = dt.datetime.fromisoformat(sightings[-1])
+                    current_ts = event_dt if event_dt is not None else dt.datetime.now(tz=tzlocal.get_localzone())
+                    if last_ts.tzinfo is None:
+                        last_ts = last_ts.replace(tzinfo=tzlocal.get_localzone())
+                    if current_ts.tzinfo is None:
+                        current_ts = current_ts.replace(tzinfo=tzlocal.get_localzone())
+                    elapsed = (current_ts - last_ts).total_seconds()
+                    if 0 <= elapsed < min_gap:
+                        log.info("Visit gap: %s seen %.1fs ago (gap=%ds), not recording", target, elapsed, min_gap)
+                        time_analysis["is_new_visit"] = False
+                        return time_analysis
+                except Exception as gap_err:
+                    log.warning("Visit gap check failed for %s: %s", target, gap_err)
             sightings.append(event_dt.isoformat() if event_dt else dt.datetime.now(tz=tzlocal.get_localzone()).isoformat())
             with target_file.open("w") as f:
                 json.dump(sightings, f)
+            time_analysis["is_new_visit"] = True
         except Exception as e:
             log.exception("Failed to record sightings for %s:%s", target, e)
         return time_analysis
@@ -102,6 +127,13 @@ class Tracker:
         if not target_id or self.target_config is None:
             # empty dict to make home assistant template logic easier
             return result
+
+        if self.normalizer:
+            normalised = self.normalizer.normalize(target_id)
+            if normalised:
+                log.info("%s %s normalised %s -> %s", self.region, self.target_type, target_id, normalised)
+                target_id = normalised
+                result.target.id = normalised
 
         lookup_id = target_id
         for corrected_target, patterns in self.target_config.correction.items():
