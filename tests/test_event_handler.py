@@ -451,26 +451,27 @@ def test_do_autoclear_image_clears_image_topic(event_handler: EventHandler) -> N
 
 def test_schedule_autoclear_disabled_starts_no_timer(event_handler: EventHandler) -> None:
     _set_autoclear(event_handler, enabled=False)
-    with patch("anpr2mqtt.event_handler.threading.Timer") as mock_timer_cls:
+    with patch("anpr2mqtt.handler_common.threading.Timer") as mock_timer_cls:
         event_handler._schedule_autoclear()
     mock_timer_cls.assert_not_called()
 
 
 def test_schedule_autoclear_starts_timer_with_correct_delay(event_handler: EventHandler) -> None:
     _set_autoclear(event_handler, enabled=True, post_event=120)
-    with patch("anpr2mqtt.event_handler.threading.Timer") as mock_timer_cls:
+    with patch("anpr2mqtt.handler_common.threading.Timer") as mock_timer_cls:
         mock_timer = Mock()
         mock_timer_cls.return_value = mock_timer
         event_handler._schedule_autoclear()
-    mock_timer_cls.assert_called_once_with(120, event_handler._do_autoclear)
+    delay = mock_timer_cls.call_args.args[0]
+    assert delay == 120
     mock_timer.start.assert_called_once()
 
 
 def test_schedule_autoclear_cancels_previous_timer(event_handler: EventHandler) -> None:
     _set_autoclear(event_handler, enabled=True, post_event=60)
     first_timer = Mock()
-    event_handler._autoclear_timer = first_timer
-    with patch("anpr2mqtt.event_handler.threading.Timer") as mock_timer_cls:
+    event_handler._autoclear_timer._timer = first_timer
+    with patch("anpr2mqtt.handler_common.threading.Timer") as mock_timer_cls:
         mock_timer_cls.return_value = Mock()
         event_handler._schedule_autoclear()
     first_timer.cancel.assert_called_once()
@@ -478,7 +479,7 @@ def test_schedule_autoclear_cancels_previous_timer(event_handler: EventHandler) 
 
 def test_schedule_autoclear_timer_is_daemon(event_handler: EventHandler) -> None:
     _set_autoclear(event_handler, enabled=True, post_event=10)
-    with patch("anpr2mqtt.event_handler.threading.Timer") as mock_timer_cls:
+    with patch("anpr2mqtt.handler_common.threading.Timer") as mock_timer_cls:
         mock_timer = Mock()
         mock_timer_cls.return_value = mock_timer
         event_handler._schedule_autoclear()
@@ -514,7 +515,7 @@ def test_event_handler_init_with_dvla_api_key(tmp_path: Path) -> None:
     from anpr2mqtt.hass import HomeAssistantPublisher
     from anpr2mqtt.settings import CameraSettings, ImageSettings, OCRSettings, TrackerSettings
 
-    with patch("anpr2mqtt.event_handler.DVLAClient") as mock_dvla_cls:
+    with patch("anpr2mqtt.handler_common.DVLAClient") as mock_dvla_cls:
         handler = EventHandler(
             HomeAssistantPublisher(Mock(), HomeAssistantSettings(status_topic="t")),
             state_topic="t/state",

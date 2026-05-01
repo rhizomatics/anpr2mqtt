@@ -1,20 +1,18 @@
 import datetime as dt
 import re
-import threading
 from io import BytesIO
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import PIL.ImageOps
 import pytesseract
 import structlog
 import tzlocal
 from PIL import Image
-from rapidfuzz.distance import Levenshtein
 from watchdog.events import DirCreatedEvent, FileClosedEvent, FileCreatedEvent, RegexMatchingEventHandler
 
-from anpr2mqtt.api_client import APIClient, DVLAClient
 from anpr2mqtt.const import ImageInfo
+from anpr2mqtt.handler_common import AutoclearTimer, CameraGatekeeper, build_dvla_client, correct_against_good_read
 from anpr2mqtt.hass import HomeAssistantPublisher
 from anpr2mqtt.settings import (
     TARGET_TYPE_PLATE,
@@ -26,6 +24,9 @@ from anpr2mqtt.settings import (
     OCRSettings,
 )
 from anpr2mqtt.tracker import Sighting, Tracker
+
+if TYPE_CHECKING:
+    from anpr2mqtt.api_client import APIClient
 
 log = structlog.get_logger()
 
@@ -59,23 +60,14 @@ class EventHandler(RegexMatchingEventHandler):
             log.info("Images available from web server with prefix %s", event_config.image_url_base)
         self.image_topic: str = image_topic
         self.mqtt_topic_root: str = mqtt_topic_root
-        self.api_client: APIClient | None = None
-
-        if dvla_config.api_key and event_config.target_type == TARGET_TYPE_PLATE:
-            self.api_client = DVLAClient(
-                dvla_config.api_key,
-                cache_type=dvla_config.cache_type,
-                cache_ttl=dvla_config.cache_ttl,
-                cache_dir=dvla_config.cache_dir,
-                verify_plate=dvla_config.verify_plate,
-            )
+        self.api_client: APIClient | None = build_dvla_client(dvla_config, event_config.target_type)
         if self.api_client:
             log.info("Configured gov API lookup, cache type %s, ttl %s", dvla_config.cache_type, dvla_config.cache_ttl)
         else:
             log.info("No gov API lookup configured")
-            self.api_client = None
 
-        self._autoclear_timer: threading.Timer | None = None
+        self._autoclear_timer = AutoclearTimer()
+        self._camera_gate = CameraGatekeeper()
         self._last_good_plate: tuple[str, dt.datetime] | None = None
 
     @property
@@ -114,7 +106,13 @@ class EventHandler(RegexMatchingEventHandler):
                 target_id: str = image_info.target
                 log.info("Examining image for %s at %s", target_id, file_path.absolute())
 
-                target_id = self._correct_against_good_read(target_id)
+                target_id = correct_against_good_read(
+                    target_id,
+                    self._last_good_plate,
+                    self.event_config.good_read_ttl,
+                    self.event_config.good_read_tolerance,
+                    self.tracker.normalizer,
+                )
 
                 image: Image.Image | None = process_image(
                     file_path.absolute(), image_info, jpeg_opts=self.image_config.jpeg_opts, png_opts=self.image_config.png_opts
@@ -143,6 +141,12 @@ class EventHandler(RegexMatchingEventHandler):
 
                 if not time_analysis.get("is_new_visit", True):
                     log.info("Skipping duplicate filesystem visit for %s (within gap window)", sighting.target.id)
+                    return
+
+                if not self._camera_gate.allow(
+                    image_info.timestamp, reg_info is not None, self.tracker.tracker_config.min_visit_gap_seconds
+                ):
+                    log.info("Skipping cross-plate duplicate for %s (plate=%s)", self.event_config.camera, target_id)
                     return
 
                 entity_id: str | None = sighting.target.entity_id
@@ -206,31 +210,12 @@ class EventHandler(RegexMatchingEventHandler):
                 file_path=file_path,
             )
 
-    def _correct_against_good_read(self, plate: str) -> str:
-        ttl = self.event_config.good_read_ttl
-        tolerance = self.event_config.good_read_tolerance
-        if ttl <= 0 or tolerance <= 0 or self._last_good_plate is None:
-            return plate
-        good_plate, good_ts = self._last_good_plate
-        age = (dt.datetime.now(dt.UTC) - good_ts).total_seconds()
-        if age > ttl:
-            return plate
-        dist = Levenshtein.distance(plate, good_plate)
-        if 0 < dist <= tolerance:
-            log.info("Correcting %s -> %s via last known good (age=%.1fs dist=%d)", plate, good_plate, age, dist)
-            return good_plate
-        return plate
-
     def _schedule_autoclear(self) -> None:
-        autoclear = self.event_config.autoclear
-        if not autoclear.enabled:
-            return
-        if self._autoclear_timer is not None:
-            self._autoclear_timer.cancel()
-        self._autoclear_timer = threading.Timer(autoclear.post_event, self._do_autoclear)
-        self._autoclear_timer.daemon = True
-        self._autoclear_timer.start()
-        log.debug("Autoclear scheduled in %ss", autoclear.post_event)
+        self._autoclear_timer.schedule(
+            self.event_config,
+            self._do_autoclear,
+            f"{self.event_config.event}/{self.event_config.camera}",
+        )
 
     def _do_autoclear(self) -> None:
         autoclear = self.event_config.autoclear

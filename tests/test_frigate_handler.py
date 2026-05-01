@@ -1,5 +1,4 @@
 import json
-import threading
 from io import BytesIO
 from typing import Any
 from unittest.mock import Mock, patch
@@ -71,6 +70,9 @@ def mock_tracker() -> Mock:
         target=Target(id="AB12CDE", target_type=TARGET_TYPE_PLATE),
     )
     tracker.record.return_value = {"previous_sightings": 0}
+    tracker.tracker_config = Mock()
+    tracker.tracker_config.min_visit_gap_seconds = 0  # disable camera gate in unit tests
+    tracker.normalizer = None
     return tracker
 
 
@@ -476,16 +478,23 @@ def test_schedule_autoclear_creates_timer(handler: FrigateHandler) -> None:
     event_cfg = EventSettings(camera="driveway", event="anpr", autoclear=AutoClearSettings(enabled=True, post_event=60))
     handler._schedule_autoclear("driveway", event_cfg, "s", "i")
     assert "driveway" in handler._autoclear_timers
-    handler._autoclear_timers["driveway"].cancel()
+    timer = handler._autoclear_timers["driveway"]._timer
+    assert timer is not None
+    timer.cancel()
 
 
 def test_schedule_autoclear_cancels_existing_timer(handler: FrigateHandler) -> None:
-    old_timer = Mock(spec=threading.Timer)
-    handler._autoclear_timers["driveway"] = old_timer
+    from anpr2mqtt.handler_common import AutoclearTimer
+
+    old_inner = Mock()
+    existing = AutoclearTimer()
+    existing._timer = old_inner
+    handler._autoclear_timers["driveway"] = existing
     event_cfg = EventSettings(camera="driveway", event="anpr", autoclear=AutoClearSettings(enabled=True, post_event=60))
-    handler._schedule_autoclear("driveway", event_cfg, "s", "i")
-    old_timer.cancel.assert_called_once()
-    handler._autoclear_timers["driveway"].cancel()
+    with patch("anpr2mqtt.handler_common.threading.Timer") as mock_timer_cls:
+        mock_timer_cls.return_value = Mock()
+        handler._schedule_autoclear("driveway", event_cfg, "s", "i")
+    old_inner.cancel.assert_called_once()
 
 
 # --- _do_autoclear ---
@@ -523,7 +532,7 @@ def test_do_autoclear_passes_none_sighting_to_state(handler: FrigateHandler, moc
 
 
 def test_dvla_api_client_created_when_key_provided(mock_mqtt: Mock, mock_publisher: Mock) -> None:
-    with patch("anpr2mqtt.frigate_handler.DVLAClient") as mock_dvla_cls:
+    with patch("anpr2mqtt.handler_common.DVLAClient") as mock_dvla_cls:
         h = FrigateHandler(
             mqtt_client=mock_mqtt,
             frigate_settings=FrigateSettings(),
@@ -540,54 +549,59 @@ def test_dvla_api_client_not_created_without_key(handler: FrigateHandler) -> Non
     assert handler.api_client is None
 
 
-# --- _correct_against_good_read ---
+# --- correct_against_good_read (module-level function in handler_common) ---
 
 
-def test_correct_against_good_read_within_ttl_and_tolerance(handler: FrigateHandler) -> None:
+def test_correct_against_good_read_within_ttl_and_tolerance() -> None:
     import datetime as dt
 
-    handler._last_good_plate["driveway"] = ("AB12CDE", dt.datetime.now(dt.UTC))
+    from anpr2mqtt.handler_common import correct_against_good_read
+
+    cached = ("AB12CDE", dt.datetime.now(dt.UTC))
     # "ABI2CDE" is distance 1 from "AB12CDE"
-    result = handler._correct_against_good_read("ABI2CDE", "driveway", ttl=60, tolerance=2)
-    assert result == "AB12CDE"
+    assert correct_against_good_read("ABI2CDE", cached, ttl=60, tolerance=2) == "AB12CDE"
 
 
-def test_correct_against_good_read_expired_ttl(handler: FrigateHandler) -> None:
+def test_correct_against_good_read_expired_ttl() -> None:
     import datetime as dt
+
+    from anpr2mqtt.handler_common import correct_against_good_read
 
     old_ts = dt.datetime.now(dt.UTC) - dt.timedelta(seconds=120)
-    handler._last_good_plate["driveway"] = ("AB12CDE", old_ts)
-    result = handler._correct_against_good_read("ABI2CDE", "driveway", ttl=60, tolerance=2)
-    assert result == "ABI2CDE"  # not corrected — TTL expired
+    assert correct_against_good_read("ABI2CDE", ("AB12CDE", old_ts), ttl=60, tolerance=2) == "ABI2CDE"
 
 
-def test_correct_against_good_read_beyond_tolerance(handler: FrigateHandler) -> None:
+def test_correct_against_good_read_beyond_tolerance() -> None:
     import datetime as dt
 
-    handler._last_good_plate["driveway"] = ("AB12CDE", dt.datetime.now(dt.UTC))
-    result = handler._correct_against_good_read("ZZ99ZZZ", "driveway", ttl=60, tolerance=2)
-    assert result == "ZZ99ZZZ"  # distance > 2, not corrected
+    from anpr2mqtt.handler_common import correct_against_good_read
+
+    cached = ("AB12CDE", dt.datetime.now(dt.UTC))
+    assert correct_against_good_read("ZZ99ZZZ", cached, ttl=60, tolerance=2) == "ZZ99ZZZ"
 
 
-def test_correct_against_good_read_disabled_by_tolerance_zero(handler: FrigateHandler) -> None:
+def test_correct_against_good_read_disabled_by_tolerance_zero() -> None:
     import datetime as dt
 
-    handler._last_good_plate["driveway"] = ("AB12CDE", dt.datetime.now(dt.UTC))
-    result = handler._correct_against_good_read("ABI2CDE", "driveway", ttl=60, tolerance=0)
-    assert result == "ABI2CDE"
+    from anpr2mqtt.handler_common import correct_against_good_read
+
+    cached = ("AB12CDE", dt.datetime.now(dt.UTC))
+    assert correct_against_good_read("ABI2CDE", cached, ttl=60, tolerance=0) == "ABI2CDE"
 
 
-def test_correct_against_good_read_no_cache(handler: FrigateHandler) -> None:
-    result = handler._correct_against_good_read("ABI2CDE", "driveway", ttl=60, tolerance=2)
-    assert result == "ABI2CDE"
+def test_correct_against_good_read_no_cache() -> None:
+    from anpr2mqtt.handler_common import correct_against_good_read
+
+    assert correct_against_good_read("ABI2CDE", None, ttl=60, tolerance=2) == "ABI2CDE"
 
 
-def test_correct_against_good_read_exact_match_unchanged(handler: FrigateHandler) -> None:
+def test_correct_against_good_read_exact_match_unchanged() -> None:
     import datetime as dt
 
-    handler._last_good_plate["driveway"] = ("AB12CDE", dt.datetime.now(dt.UTC))
-    result = handler._correct_against_good_read("AB12CDE", "driveway", ttl=60, tolerance=2)
-    assert result == "AB12CDE"  # distance 0, no correction needed
+    from anpr2mqtt.handler_common import correct_against_good_read
+
+    cached = ("AB12CDE", dt.datetime.now(dt.UTC))
+    assert correct_against_good_read("AB12CDE", cached, ttl=60, tolerance=2) == "AB12CDE"
 
 
 # --- good plate cache updated after DVLA success ---

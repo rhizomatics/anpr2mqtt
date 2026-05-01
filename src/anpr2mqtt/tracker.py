@@ -6,9 +6,8 @@ from typing import Any, cast
 
 import structlog
 import tzlocal
-from rapidfuzz.distance import Levenshtein
 
-from anpr2mqtt.normalizers import NORMALIZERS, Normalizer
+from anpr2mqtt.normalizers import NORMALIZERS, Normalizer, fuzzy_match
 from anpr2mqtt.settings import (
     Target,
     TargetSettings,
@@ -137,7 +136,7 @@ class Tracker:
 
         lookup_id = target_id
         for corrected_target, patterns in self.target_config.correction.items():
-            if any(re.match(pat, target_id) for pat in patterns):
+            if any(re.match(pat, target_id) for pat in patterns) and corrected_target != target_id:
                 result.target.id = corrected_target
                 lookup_id = corrected_target
                 log.info("Corrected target %s -> %s", target_id, lookup_id)
@@ -162,19 +161,14 @@ class Tracker:
         registered_match: str | None = (
             lookup_id
             if lookup_id in self.ids
-            else (_fuzzy_match(lookup_id, max_dist, list(self.ids.keys())) if max_dist > 0 else None)
+            else (fuzzy_match(lookup_id, max_dist, list(self.ids.keys())) if max_dist > 0 else None)
         )
         if registered_match:
             target = self.ids[registered_match]
 
         if target:
             if registered_match != lookup_id:
-                log.info(
-                    "Fuzzy-matched %s to registered plate %s (distance %s)",
-                    lookup_id,
-                    registered_match,
-                    Levenshtein.distance(lookup_id, target.id),
-                )
+                log.info("Fuzzy-matched %s to registered plate %s", lookup_id, registered_match)
             result.target = target
         return result
 
@@ -222,15 +216,3 @@ def compute_time_analysis(sightings: list[str], current_dt: dt.datetime | None =
             result["within_time_range"] = None
 
     return result
-
-
-def _fuzzy_match(target_id: str, max_dist: int, candidates: list[str]) -> str | None:
-    """Return the closest key in candidates within max_dist edits, or None."""
-    best: str | None = None
-    best_dist = max_dist + 1
-    for candidate in candidates:
-        d = Levenshtein.distance(target_id, candidate)
-        if d < best_dist:
-            best_dist = d
-            best = candidate
-    return best if best_dist <= max_dist else None

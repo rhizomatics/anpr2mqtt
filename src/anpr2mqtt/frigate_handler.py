@@ -2,16 +2,15 @@ import datetime as dt
 import json
 import threading
 from io import BytesIO
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import niquests
 import paho.mqtt.client as mqtt
 import structlog
 from PIL import Image
-from rapidfuzz.distance import Levenshtein
 
-from anpr2mqtt.api_client import APIClient, DVLAClient
 from anpr2mqtt.const import ImageInfo
+from anpr2mqtt.handler_common import AutoclearTimer, CameraGatekeeper, build_dvla_client, correct_against_good_read
 from anpr2mqtt.hass import HomeAssistantPublisher
 from anpr2mqtt.settings import (
     TARGET_TYPE_PLATE,
@@ -22,6 +21,9 @@ from anpr2mqtt.settings import (
     ImageSettings,
 )
 from anpr2mqtt.tracker import Sighting, Tracker
+
+if TYPE_CHECKING:
+    from anpr2mqtt.api_client import APIClient
 
 log = structlog.get_logger()
 
@@ -57,23 +59,17 @@ class FrigateHandler:
         self._processed_events: set[str] = set()
         self._processed_lock = threading.Lock()
 
-        # Per-camera autoclear timers
-        self._autoclear_timers: dict[str, threading.Timer] = {}
-        self._autoclear_lock = threading.Lock()
-
         # Per-camera last DVLA-confirmed plate for mis-read correction
         self._last_good_plate: dict[str, tuple[str, dt.datetime]] = {}
         self._good_plate_lock = threading.Lock()
 
-        self.api_client: APIClient | None = None
-        if dvla_settings.api_key:
-            self.api_client = DVLAClient(
-                dvla_settings.api_key,
-                cache_type=dvla_settings.cache_type,
-                cache_ttl=dvla_settings.cache_ttl,
-                cache_dir=dvla_settings.cache_dir,
-                verify_plate=dvla_settings.verify_plate,
-            )
+        # Per-camera autoclear timers
+        self._autoclear_timers: dict[str, AutoclearTimer] = {}
+
+        # Per-camera cross-plate duplicate gate
+        self._camera_gates: dict[str, CameraGatekeeper] = {}
+
+        self.api_client: APIClient | None = build_dvla_client(dvla_settings)
 
     def start(self) -> None:
         for topic in self.frigate_settings.topic:
@@ -195,7 +191,11 @@ class FrigateHandler:
         image: Image.Image | None = self._get_event_image(event_id, camera)
         event_config, camera_settings, tracker, state_topic, image_topic = self._resolve_camera_config(camera)
 
-        plate = self._correct_against_good_read(plate, camera, event_config.good_read_ttl, event_config.good_read_tolerance)
+        with self._good_plate_lock:
+            cached = self._last_good_plate.get(camera)
+        plate = correct_against_good_read(
+            plate, cached, event_config.good_read_ttl, event_config.good_read_tolerance, tracker.normalizer
+        )
 
         start_time: float = float(payload.get("start_time") or 0)
         timestamp = dt.datetime.fromtimestamp(start_time, tz=dt.UTC) if start_time else dt.datetime.now(dt.UTC)
@@ -224,6 +224,11 @@ class FrigateHandler:
 
         if not time_analysis.get("is_new_visit", True):
             log.info("Skipping duplicate Frigate visit for %s (within gap window)", sighting.target.id)
+            return
+
+        gate = self._camera_gates.setdefault(camera, CameraGatekeeper())
+        if not gate.allow(timestamp, reg_info is not None, tracker.tracker_config.min_visit_gap_seconds):
+            log.info("Skipping cross-plate duplicate for camera %s (plate=%s)", camera, plate)
             return
 
         if sighting.target.entity_id:
@@ -260,24 +265,6 @@ class FrigateHandler:
             self.publisher.post_image_message(image_topic, image, "JPEG")
 
         self._schedule_autoclear(camera, event_config, state_topic, image_topic)
-
-    def _correct_against_good_read(self, plate: str, camera: str, ttl: int, tolerance: int) -> str:
-        """Return the last DVLA-confirmed plate for this camera if within TTL and Levenshtein tolerance."""
-        if ttl <= 0 or tolerance <= 0:
-            return plate
-        with self._good_plate_lock:
-            cached = self._last_good_plate.get(camera)
-        if not cached:
-            return plate
-        good_plate, good_ts = cached
-        age = (dt.datetime.now(dt.UTC) - good_ts).total_seconds()
-        if age > ttl:
-            return plate
-        dist = Levenshtein.distance(plate, good_plate)
-        if 0 < dist <= tolerance:
-            log.info("Correcting %s -> %s via last known good (age=%.1fs dist=%d)", plate, good_plate, age, dist)
-            return good_plate
-        return plate
 
     def _get_event_image(self, event_id: str, camera: str) -> Image.Image | None:
         # Prefer the event-specific Frigate API snapshot — avoids stale MQTT cache from a subsequent vehicle
@@ -337,25 +324,19 @@ class FrigateHandler:
         return event_config, camera_settings, tracker, state_topic, image_topic
 
     def _schedule_autoclear(self, camera: str, event_config: EventSettings, state_topic: str, image_topic: str) -> None:
-        autoclear = event_config.autoclear
-        if not autoclear.enabled:
+        if not event_config.autoclear.enabled:
             return
-        with self._autoclear_lock:
-            existing = self._autoclear_timers.get(camera)
-            if existing is not None:
-                existing.cancel()
-            timer = threading.Timer(
-                autoclear.post_event, self._do_autoclear, args=(camera, event_config, state_topic, image_topic)
-            )
-            timer.daemon = True
-            timer.start()
-            self._autoclear_timers[camera] = timer
-        log.debug("Frigate autoclear scheduled in %ss for camera %s", autoclear.post_event, camera)
+        if camera not in self._autoclear_timers:
+            self._autoclear_timers[camera] = AutoclearTimer()
+        self._autoclear_timers[camera].schedule(
+            event_config,
+            lambda: self._do_autoclear(camera, event_config, state_topic, image_topic),
+            f"camera {camera}",
+        )
 
     def _do_autoclear(self, camera: str, event_config: EventSettings, state_topic: str, image_topic: str) -> None:
         log.info("Frigate autoclear firing for camera %s", camera)
         autoclear = event_config.autoclear
-        # We don't have a full camera_settings here — reconstruct it
         _, camera_settings, _, _, _ = self._resolve_camera_config(camera)
         if autoclear.state:
             self.publisher.post_state_message(state_topic, sighting=None, event_config=event_config, camera=camera_settings)
