@@ -7,7 +7,7 @@ from typing import Any, cast
 import structlog
 import tzlocal
 
-from anpr2mqtt.normalizers import NORMALIZERS, Normalizer, fuzzy_match
+from anpr2mqtt.normalizers import Normalizer, fuzzy_match
 from anpr2mqtt.settings import (
     Target,
     TargetSettings,
@@ -49,9 +49,7 @@ class Tracker:
         self.region: str | None = region
         self.normalizer: Normalizer | None = None
         if region and target_type:
-            normalizer_type: type[Normalizer] | None = NORMALIZERS.get(self.target_type, {}).get(region)
-            if normalizer_type is not None:
-                self.normalizer = normalizer_type()
+            self.normalizer = Normalizer(target_type=target_type, region=region)
 
     @property
     def target_config(self) -> TargetSettings | None:
