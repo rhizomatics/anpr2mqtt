@@ -5,7 +5,6 @@ plates found via file system
 ## Auto-correction
 - A recent plate with successful DVLA match will be used as a matching candidate for plates with poor match
 - Dupe messages reduced, and spurious visit counting, by a minimum time gap
-- New extensible Normalizer structure, initialized for Plate/UK combo
 - Auto correct for common alpha/digit swaps by OCRs, with built-in rules for recent UK,French and Italian registrations
 # 1.0.0
 ## Known Targets Configuration
