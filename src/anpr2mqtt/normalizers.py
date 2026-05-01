@@ -34,6 +34,9 @@ class Normalizer:
     def __init__(self, target_type: str | None = None, region: str | None = None) -> None:
         self.target_type: str | None = target_type
         self.region: str | None = region
+        self.rules: dict[str, RegionRules] = {
+            name: rule for name, rule in RULES.items() if (rule.target_type == self.target_type and rule.region == self.region)
+        }
 
     def _digit_swapped(self, plate: str, digit_pos: Collection[int], alpha_pos: Collection[int]) -> str | None:
         """Return OCR-confusable single-swap variants of a string.
@@ -42,11 +45,7 @@ class Normalizer:
         normalizer cannot fully repair (e.g. '9' seen as 'S') can still be caught
         by fuzzy matching against a variant that differs by only one edit.
         """
-        plate = plate.upper()
-        if len(plate) != 7:
-            return None
-
-        chars = list(plate)
+        chars = list(plate.upper())
         swaps: int = 0
         for i, ch in enumerate(chars):
             swap: str | None = None
@@ -64,13 +63,8 @@ class Normalizer:
     def normalize(self, target: str) -> str | None:
         """Return a corrected plate if I/1 or O/0 substitutions (position-aware) yield a valid plate."""
         plate = target.upper()
-        for rule in RULES.values():
-            if (
-                rule.target_type == self.target_type
-                and rule.region == self.region
-                and len(plate) == rule.length
-                and not rule.valid_re.match(plate)
-            ):
+        for rule in self.rules.values():
+            if len(plate) == rule.length and not rule.valid_re.match(plate):
                 # only 1 alternative so far
                 alt = self._digit_swapped(plate, digit_pos=rule.digit_pos, alpha_pos=rule.alpha_pos)
                 if alt:
