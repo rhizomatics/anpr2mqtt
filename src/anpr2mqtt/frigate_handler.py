@@ -144,7 +144,7 @@ class FrigateHandler:
             self._processed_events.add(event_id)
             # Bound memory usage
             if len(self._processed_events) > 5000:
-                self._processed_events = set(list(self._processed_events)[2500:])
+                self._processed_events = set(list(self._processed_events)[4000:])
 
         extra_info: dict[str, dict[str, Any]] = {"frigate": {}}
         if topic == "frigate/events":
@@ -168,10 +168,7 @@ class FrigateHandler:
             score = payload.get("score")
             description = payload.get("name") or "Unknown"
         if not plate:
-            if description and description == "car":
-                log.info("Frigate event %s for %s has no recognized plate", event_id, description)
-            else:
-                log.debug("Frigate event %s has no recognized plate", event_id)
+            log.debug("Frigate event %s has no recognized plate, %s", event_id, description)
             return
 
         if score is None:

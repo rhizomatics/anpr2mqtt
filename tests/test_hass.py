@@ -79,7 +79,7 @@ def test_on_message_offline(publisher: HomeAssistantPublisher, mock_client: Mock
 
 
 def test_on_message_online_after_offline(publisher: HomeAssistantPublisher, mock_client: Mock) -> None:
-    publisher.republish["test/topic"] = "payload"
+    publisher.republish["test/topic"] = {"payload": "123"}
     publisher.hass_online = False
     msg = Mock()
     msg.topic = "homeassistant/status"
@@ -87,7 +87,7 @@ def test_on_message_online_after_offline(publisher: HomeAssistantPublisher, mock
     with patch("time.sleep"), patch("random.randint", return_value=1):
         publisher.on_message(mock_client, None, msg)
     assert publisher.hass_online is True
-    mock_client.publish.assert_called_once_with("test/topic", "payload")
+    mock_client.publish.assert_called_once_with("test/topic", '{"payload": "123", "trigger": "homeassistant/status_online"}')
 
 
 def test_on_message_online_first_time(publisher: HomeAssistantPublisher, mock_client: Mock) -> None:
@@ -124,18 +124,18 @@ def test_on_message_unknown_topic(publisher: HomeAssistantPublisher, mock_client
 
 
 def test_republish_discovery_empty(publisher: HomeAssistantPublisher, mock_client: Mock) -> None:
-    publisher.republish_discovery()
+    publisher.republish_discovery("empty")
     mock_client.publish.assert_not_called()
 
 
 def test_republish_discovery_with_entries(publisher: HomeAssistantPublisher, mock_client: Mock) -> None:
-    publisher.republish["topic/a"] = "payloadA"
-    publisher.republish["topic/b"] = "payloadB"
+    publisher.republish["topic/a"] = {"payload": "A"}
+    publisher.republish["topic/b"] = {"payload": "B"}
     with patch("time.sleep"), patch("random.randint", return_value=1):
-        publisher.republish_discovery()
+        publisher.republish_discovery("entries")
     assert mock_client.publish.call_count == 2
-    mock_client.publish.assert_any_call("topic/a", "payloadA")
-    mock_client.publish.assert_any_call("topic/b", "payloadB")
+    mock_client.publish.assert_any_call("topic/a", '{"payload": "A", "trigger": "entries"}')
+    mock_client.publish.assert_any_call("topic/b", '{"payload": "B", "trigger": "entries"}')
 
 
 # --- publish_sensor_discovery ---

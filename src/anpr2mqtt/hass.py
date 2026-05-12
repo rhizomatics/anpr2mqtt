@@ -26,7 +26,7 @@ class HomeAssistantPublisher:
         self.hass_status_topic: str = cfg.status_topic
         self.discovery_topic_prefix: str = cfg.discovery_topic_root
         self.device_creation: bool = cfg.device_creation
-        self.republish: dict[str, Any] = {}
+        self.republish: dict[str, dict[str, Any]] = {}
         self.hass_online: bool | None = None
 
     def start(self) -> None:
@@ -65,9 +65,9 @@ class HomeAssistantPublisher:
                 self.hass_online = False
             elif decoded == "online":
                 if self.hass_online is False:
-                    log.info("Home Assistant back online")
+                    log.info("Home Assistant back online, republishing discoveries")
                     self.hass_online = True
-                    self.republish_discovery()
+                    self.republish_discovery(f"{msg.topic}_{decoded}")
                 else:
                     log.info("Home Assistant online")
                     self.hass_online = True
@@ -76,12 +76,13 @@ class HomeAssistantPublisher:
         else:
             log.debug("Unknown message on %s", msg.topic)
 
-    def republish_discovery(self) -> None:
+    def republish_discovery(self, source_event: str) -> None:
         for topic, payload in self.republish.items():
-            log.debug("Republishing to %s", topic)
+            log.debug("Republishing to %s for %s", topic, source_event)
             # add jitter to republish to reduce herd load on HA after restart
             time.sleep(random.randint(1, 10))  # noqa: S311
-            self.client.publish(topic, payload)
+            payload["trigger"] = source_event
+            self.client.publish(topic, json.dumps(payload))
 
     def publish_sensor_discovery(self, state_topic: str, event_config: EventSettings, camera: CameraSettings) -> None:
         name: str = event_config.description or f"{event_config.event} {camera.name}"
@@ -106,7 +107,7 @@ class HomeAssistantPublisher:
         topic: str = f"{self.discovery_topic_prefix}/sensor/{event_config.camera}/{event_config.event}/config"
         msg: str = json.dumps(payload)
         self.client.publish(topic, payload=msg, qos=0, retain=True)
-        self.republish[topic] = msg
+        self.republish[topic] = payload
         log.info("Published HA MQTT sensor Discovery message to %s", topic)
 
     def publish_image_discovery(
@@ -132,7 +133,7 @@ class HomeAssistantPublisher:
         topic = f"{self.discovery_topic_prefix}/image/{event_config.camera}/{event_config.event}/config"
         msg = json.dumps(payload)
         self.client.publish(topic, payload=msg, qos=0, retain=True)
-        self.republish[topic] = msg
+        self.republish[topic] = payload
         log.info("Published HA MQTT Discovery message to %s", topic)
 
     def publish_camera_discovery(
@@ -157,7 +158,7 @@ class HomeAssistantPublisher:
         topic = f"{self.discovery_topic_prefix}/camera/{camera.name}/{event_config.event}/config"
         msg = json.dumps(payload)
         self.client.publish(topic, payload=msg, qos=0, retain=True)
-        self.republish[topic] = msg
+        self.republish[topic] = payload
         log.info("Published HA MQTT Discovery message to %s", topic)
 
     def publish_target_sensor_discovery(
@@ -182,7 +183,7 @@ class HomeAssistantPublisher:
         topic = f"{self.discovery_topic_prefix}/sensor/{entity_id}/config"
         msg = json.dumps(payload)
         self.client.publish(topic, payload=msg, qos=0, retain=True)
-        self.republish[topic] = msg
+        self.republish[topic] = payload
         log.info("Published HA MQTT target sensor Discovery message to %s", topic)
 
     def publish_target_state(self, state_topic: str, time_analysis: dict[str, Any], description: str | None = None) -> None:
