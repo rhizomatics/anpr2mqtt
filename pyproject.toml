@@ -46,6 +46,8 @@ tools = "anpr2mqtt:tools"
 [tool.uv]
 compile-bytecode = true
 managed = true
+exclude-newer = "5 days"
+add-bounds = "major"
 
 [tool.uv.build-backend]
 namespace = true
