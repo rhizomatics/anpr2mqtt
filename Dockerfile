@@ -1,4 +1,4 @@
-FROM python:3.14-slim
+FROM python:3.14.6-slim
 
 ENV MQTT__HOST 127.0.0.1
 ENV MQTT__PORT 1883
