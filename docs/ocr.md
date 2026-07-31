@@ -47,3 +47,10 @@ Use the [debug tools](./debug_tools.md) to quickly iterate over an image, for ex
 ```bash
 uv run --with anpr2mqtt tools ocr_file 20260130174327627_K39ZTB_VEHICLE_DETECTION.jpg
 ```
+
+or to test cropping values:
+
+```bash
+uv run --with anpr2mqtt tools ocr_file example_image.jpg \
+  --ocr.crop.x 850 --ocr.crop.y 0 --ocr.crop.h 200 --ocr.crop.w 400
+```
