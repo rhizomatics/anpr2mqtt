@@ -1,4 +1,6 @@
 #!/bin/bash
+echo "Pull back GH PR changes ..."
+git pull
 echo "Upgrading uv ..."
 uv self update
 echo "Upgrading uv deps ..."
