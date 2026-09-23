@@ -6,7 +6,7 @@ Any number of textual fields can be scanned from the image. By default this happ
 
 Each field can have optional permitted values (`Unknown` returned if none of them found) and a set of corrections to handle occasional OCR errors, where corrections are simple strings or regular expressions.
 
-Use the [OCR Tool](debug_tools.md#ocr) for quick tests of configuration with a local image
+Use the [OCR Tool](debug_tools.md#ocr-ocr_file) for quick tests of configuration with a local image
 
 ## OCR Stages
 

@@ -3,3 +3,8 @@ pre-commit = "latest"
 ruff = "latest"
 ty = "latest"
 uv = "latest"
+
+[env]
+# Homebrew's cairo lives outside the default dylib search path on macOS,
+# so cairosvg (used by mkdocs-material for image optimization) can't find it otherwise.
+DYLD_FALLBACK_LIBRARY_PATH = "{% if os() == 'macos' %}/opt/homebrew/opt/cairo/lib{% endif %}"
