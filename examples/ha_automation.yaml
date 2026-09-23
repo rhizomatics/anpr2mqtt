@@ -20,16 +20,18 @@ actions:
       message: >-
         {{ trigger.to_state.attributes.description }} with {{
         trigger.to_state.attributes.plate }} spotted at {{
-        trigger.to_state.attributes.camera }} camera, moving {{
-        trigger.to_state.attributes.vehicle_direction }}
+        trigger.to_state.attributes.camera }} camera{% if
+        trigger.to_state.attributes.vehicle_direction is defined %}, moving {{
+        trigger.to_state.attributes.vehicle_direction }}{% endif %}
 
         {% if trigger.to_state.attributes.history.previous_sightings == 0 %} Not
         previously sighted  {% else %}  with {{
         trigger.to_state.attributes.history.previous_sightings }} previous
         sightings. {% endif %} {% if
-        trigger.to_state.attributes.history.last_sighting is defined %} last
-        seen on {{ trigger.to_state.attributes.history.last_sighting[:10] }} at
-        {{ trigger.to_state.attributes.history.last_sighting[11:16] }}   {%
+        trigger.to_state.attributes.history.last_seen is defined and
+        trigger.to_state.attributes.history.last_seen is not none %} last
+        seen on {{ trigger.to_state.attributes.history.last_seen[:10] }} at
+        {{ trigger.to_state.attributes.history.last_seen[11:16] }}   {%
         endif %}
 
         {% if 'reg_info' in trigger.to_state.attributes and
@@ -50,8 +52,9 @@ actions:
         spoken_message: >-
           {{ trigger.to_state.attributes.description }} with {{
           trigger.to_state.attributes.plate }} spotted at {{
-          trigger.to_state.attributes.camera }} camera, moving {{
-          trigger.to_state.attributes.vehicle_direction }}
+          trigger.to_state.attributes.camera }} camera{% if
+          trigger.to_state.attributes.vehicle_direction is defined %}, moving {{
+          trigger.to_state.attributes.vehicle_direction }}{% endif %}
         apply_scenarios: >-
           {% if trigger.to_state.attributes.known %}known_vehicle{% else
           %}unknown_vehicle{% endif %}

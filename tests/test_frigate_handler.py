@@ -266,12 +266,21 @@ def test_process_event_sets_frigate_ui_url(handler: FrigateHandler, mock_publish
     assert kwargs["frigate_ui_url"] == "http://frigate:5000/events?id=evt-123"
 
 
+def test_process_event_sets_event_image_url(handler: FrigateHandler, mock_publisher: Mock) -> None:
+    handler.frigate_settings = FrigateSettings(url="http://frigate:5000", min_score=0.70)
+    with patch.object(handler, "_get_event_image", return_value=None), patch.object(handler, "_schedule_autoclear"):
+        handler._process_event("frigate/events", _make_payload())
+    kwargs = mock_publisher.post_state_message.call_args[1]
+    assert kwargs["url"] == "http://frigate:5000/api/events/evt-123/snapshot.jpg"
+
+
 def test_process_event_no_url_leaves_ui_url_none(handler: FrigateHandler, mock_publisher: Mock) -> None:
     assert handler.frigate_settings.url is None
     with patch.object(handler, "_get_event_image", return_value=None), patch.object(handler, "_schedule_autoclear"):
         handler._process_event("frigate/events", _make_payload())
     kwargs = mock_publisher.post_state_message.call_args[1]
     assert kwargs["frigate_ui_url"] is None
+    assert kwargs["url"] is None
 
 
 def test_process_event_ignored_plate_skips_state_publish(

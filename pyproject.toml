@@ -71,7 +71,7 @@ dev = [
     "pytest-shell-utilities"
 ]
 docs=[
-    "mkdocs<2.0.0",
+    "properdocs",
     "mkdocs-material[imaging]",
     "mkdocs-material>=9.7.1",
     "mkdocstrings",

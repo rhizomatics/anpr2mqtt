@@ -58,16 +58,14 @@ jobs:
           echo "No changes to badges"
         fi
 
-    - name: Prep for mkdocs
-      run:  uv pip compile pyproject.toml -o requirements_docs.txt --group docs
+    - name: Install docs system packages
+      run: sudo apt-get install -y pngquant
 
     - name: Deploy docs
-      uses: mhausenblas/mkdocs-deploy-gh-pages@d77dd03172e96abbcdb081d8c948224762033653
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        EXTRA_PACKAGES: pngquant
-        REQUIREMENTS: requirements_docs.txt
-        CUSTOM_DOMAIN: anpr2mqtt.rhizomatics.org.uk
+      run: |
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        uv run --group docs properdocs gh-deploy --force --clean
 
 
 

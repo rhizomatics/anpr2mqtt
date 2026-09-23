@@ -241,8 +241,10 @@ class FrigateHandler:
             return
 
         frigate_ui_url: str | None = None
+        event_image_url: str | None = None
         if self.frigate_settings.url:
             frigate_ui_url = f"{self.frigate_settings.url}/events?id={event_id}"
+            event_image_url = f"{self.frigate_settings.url}/api/events/{event_id}/snapshot.jpg"
 
         self.publisher.post_state_message(
             state_topic,
@@ -256,6 +258,7 @@ class FrigateHandler:
             source="frigate",
             frigate_event_id=event_id,
             frigate_ui_url=frigate_ui_url,
+            url=event_image_url,
         )
 
         if image:

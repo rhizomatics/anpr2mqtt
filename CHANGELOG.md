@@ -1,11 +1,18 @@
+# 1.1.2
+## Frigate Integration
+- Populate `event_image_url` with snapshot so for payload compatibility with file system detected images
+## Example Home Assistant Integration
+- Fixed use of `vehicle_direction` and `history.last_sighting`
+## Internals
+- Dependency refresh
+- Documentation site build switched from `mkdocs` to `properdocs`
 # 1.1.1
 ## Diagnostics
 - When a message is republished because of HA restart or other event, this will be included as the `trigger` in the payload
 - Reduced noisy INFO logging for non-LPR Frigate events
 # 1.1.0
 ## Frigate Integration
-- Optionally listen on MQTT for LPR detections in Frigate, and apply the same encrichment (DVLA, known plates) and corrections as for
-plates found via file system
+- Optionally listen on MQTT for LPR detections in Frigate, and apply the same encrichment (DVLA, known plates) and corrections as for plates found via file system
 ## Auto-correction
 - A recent plate with successful DVLA match will be used as a matching candidate for plates with poor match
 - Dupe messages reduced, and spurious visit counting, by a minimum time gap

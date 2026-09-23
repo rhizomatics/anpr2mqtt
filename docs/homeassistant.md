@@ -11,32 +11,46 @@ Both the `sensor` and `image` attributes have the same extensive set of attribut
 The target value will also appear in a field named after `target_type`, for example, `plate` for
 easier to read Home Assistant automations.
 
-| Attribute          | Example                                                                                |
-|--------------------|----------------------------------------------------------------------------------------|
-| target             | J23TST                                                                                 |
-| target_type        | plate                                                                                  |
-| `target_type`      | J23TST                                                                                 |
-| vehicle_direction  | Forward                                                                                |
-| reg_info           | null                                                                                   |
-| area               | driveway                                                                               |
-| camera             | drivewacam                                                                             |
-| file_path          | /ftp/Driveway/20260108141528320_J23TST_VEHICLE_DETECTION.jpg                           |
-| event_image_url    | http://192.168.10.10/cctv//ftp/Driveway/20260108141528320_J23TST_VEHICLE_DETECTION.jpg |
-| orig_plate         | J23TST                                                                                 |
-| ignore             | false                                                                                  |
-| known              | true                                                                                   |
-| dangerous          | false                                                                                  |
-| priority           | medium                                                                                 |
-| description        | Amazon Prime                                                                           |
-| previous_sightings | 15                                                                                     |
-| last_sighting      | 2026-01-08T14:15:28.000319+00:00                                                       |
-| event_time         | 2026-01-08T14:15:28.000320+00:00                                                       |
-| image_event        | VEHICLE DETECTION                                                                      |
-| ext                | jpg                                                                                    |
-| image_size         | 124907                                                                                 |
+| Attribute               | Example                                                                                |
+|-------------------------|----------------------------------------------------------------------------------------|
+| target                  | J23TST                                                                                 |
+| target_type             | plate                                                                                  |
+| `target_type`           | J23TST                                                                                 |
+| source                  | filesystem                                                                             |
+| reg_info                | null                                                                                   |
+| area                    | driveway                                                                               |
+| camera                  | drivewacam                                                                             |
+| orig_target             | J23TST                                                                                 |
+| ignore                  | false                                                                                  |
+| known                   | true                                                                                   |
+| dangerous               | false                                                                                  |
+| priority                | medium                                                                                 |
+| description             | Amazon Prime                                                                           |
+| history.previous_sightings | 15                                                                                  |
+| history.last_seen       | 2026-01-08T14:15:28.000319+00:00                                                       |
+| event_time              | 2026-01-08T14:15:28.000320+00:00                                                       |
+| event_image_url         | http://192.168.10.10/cctv//ftp/Driveway/20260108141528320_J23TST_VEHICLE_DETECTION.jpg |
+| image_event             | VEHICLE DETECTION                                                                      |
+| ext                     | jpg                                                                                    |
+| image_size              | 124907                                                                                 |
 
 The `reg_info` will be populated with the licence plate API lookup, for example UK DVLA,
 if provided.
+
+Some attributes are only present for events from a particular source, since they don't apply to
+the other. `source` is always `filesystem` or `frigate`, and can be used to tell which set to expect:
+
+| Attribute          | Source     | Example                                                       |
+|--------------------|------------|----------------------------------------------------------------|
+| file_path          | filesystem | /ftp/Driveway/20260108141528320_J23TST_VEHICLE_DETECTION.jpg   |
+| vehicle_direction  | filesystem (OCR field, if configured) | Forward                             |
+| frigate_event_id   | frigate    | 1790171055.400738-28axk4                                       |
+| frigate_ui_url     | frigate    | http://192.168.10.10:5000/events?id=1790171055.400738-28axk4   |
+| frigate            | frigate    | `{"recognized_license_plate_score": 0.92}`                     |
+
+`event_image_url` is populated for both sources, pointing directly at the event image (the
+filesystem image on the local web server, or the Frigate event snapshot API), so notification
+automations can rely on it regardless of which source raised the event.
 
 ## Example Automation
 
