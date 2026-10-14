@@ -51,10 +51,10 @@ ANPR2MQTT uses [pydantic-settings](https://docs.pydantic.dev/latest/concepts/pyd
 Every configuration setting can be passed as a command line argument, using dot notation for nested settings. This is the highest-priority source and overrides all other configuration.
 
 ```bash
-uv run --with anpr2mqtt anpr2mqtt --mqtt.host 192.168.1.10 --mqtt.port 1884 --log_level DEBUG
+uvx anpr2mqtt --mqtt.host 192.168.1.10 --mqtt.port 1884 --log_level DEBUG
 ```
 
-Run `uv run --with anpr2mqtt anpr2mqtt --help` to see all available flags, and find more information at [Debug Tools](https://anpr2mqtt.rhizomatics.org.uk/debug_tools/index.md)
+Run `uvx anpr2mqtt --help` to see all available flags, and find more information at [Debug Tools](https://anpr2mqtt.rhizomatics.org.uk/debug_tools/index.md)
 
 ## Home Assistant Integration
 
