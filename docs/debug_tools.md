@@ -3,12 +3,13 @@
 ANPR2MQTT ships a `tools` CLI with subcommands to help debug file system integration or OCR.
 All options can also be discovered via `--help`:
 
-NOTE: if running from a checked out `anpr2mqtt` project with active `venv` then the `--with anpr2mqtt `part of each of these commands can be omitted.
+NOTE: if running from a checked out `anpr2mqtt` project with active `venv`, use `uv run tools ...`
+instead of `uvx --from anpr2mqtt tools ...` to run against your local checkout rather than the published package.
 
 ```bash
-uv run --with anpr2mqtt tools --help
-uv run --with anpr2mqtt tools ocr_file --help
-uv run --with anpr2mqtt tools list_dir --help
+uvx --from anpr2mqtt tools --help
+uvx --from anpr2mqtt tools ocr_file --help
+uvx --from anpr2mqtt tools list_dir --help
 ```
 
 ## OCR (`ocr_file`)
@@ -18,13 +19,13 @@ It ignores any YAML config file but respects environment variables.
 Useful for iterating quickly on bounding-box settings against a local image.
 
 ```bash
-uv run --with anpr2mqtt tools ocr_file 20241230152519495_N74DYX_VEHICLE_DETECTION.jpg
+uvx --from anpr2mqtt tools ocr_file 20241230152519495_N74DYX_VEHICLE_DETECTION.jpg
 ```
 
 All `event` and `ocr` settings can be overridden from the command line:
 
 ```bash
-uv run --with anpr2mqtt tools ocr_file fixtures/20250602103045407_B4DM3N_VEHICLE_DETECTION.jpg \
+uvx --from anpr2mqtt tools ocr_file fixtures/20250602103045407_B4DM3N_VEHICLE_DETECTION.jpg \
   --ocr.crop.x 850 --ocr.crop.y 0 --ocr.crop.h 200 --ocr.crop.w 400 \
   --ocr.invert False
 ```
@@ -47,7 +48,7 @@ If no `event` config is defined, the image is looked for in the current working 
 Lists images in a directory that match the ANPR image regular expression.
 
 ```bash
-uv run --with anpr2mqtt tools list_dir
+uvx --from anpr2mqtt tools list_dir
 ```
 
 Override any `event` setting from the command line, for example to test a different path or regex:
@@ -72,7 +73,7 @@ Performs a live DVLA vehicle enquiry for a registration plate and prints the JSO
 Useful for verifying your API key and checking what data the API returns for a given plate.
 
 ```bash
-uv run --with anpr2mqtt tools dvla_lookup AB12CDE --dvla.api_key YOUR_API_KEY
+uvx --from anpr2mqtt tools dvla_lookup AB12CDE --dvla.api_key YOUR_API_KEY
 ```
 
 The API key can also be supplied via the `DVLA__API_KEY` environment variable:
@@ -84,7 +85,7 @@ DVLA__API_KEY=your-key uv run tools dvla_lookup AB12CDE
 Use `--test` to hit the DVLA UAT environment instead of production:
 
 ```bash
-uv run --with anpr2mqtt tools dvla_lookup AB12CDE --dvla.api_key YOUR_KEY --test true
+uvx --from anpr2mqtt tools dvla_lookup AB12CDE --dvla.api_key YOUR_KEY --test true
 ```
 
 Key flags for `dvla_lookup`:
