@@ -1,10 +1,10 @@
 # 1.1.3
 - Moved docs theme to MaterialX
-- `anpr2mqtt` now installed as a `uv` tool inside container
+- `anpr2mqtt` and `tools` now installed as a `uv` tools inside container
 - Docs publish `llms.txt` / `llms-full.txt` and per-page Markdown links for AI agents
 # 1.1.2
 ## Frigate Integration
-- Populate `event_image_url` with snapshot so for payload compatibility with file system detected images
+- Populate `event_image_url` with snapshot for payload compatibility with file system detected images
 ## Example Home Assistant Integration
 - Fixed use of `vehicle_direction` and `history.last_sighting`
 ## Internals
