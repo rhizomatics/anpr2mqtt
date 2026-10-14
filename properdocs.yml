@@ -7,7 +7,7 @@ repo_url: https://github.com/rhizomatics/anpr2mqtt
 edit_uri: edit/main/docs/
 
 theme:
-  name: material
+  name: materialx
   highlightjs: true
   language: en
   logo: docs/assets/images/anpr2mqtt-dark-256x256.png
@@ -16,6 +16,7 @@ theme:
   features:
     - content.action.edit
     - content.action.view
+    - content.action.agents
     - content.code.copy
     - content.code.select
     - content.code.annotate
@@ -77,6 +78,26 @@ plugins:
             summary: true
             show_inheritance_diagram: true
             docstring_section_style: spacy
+  - llmstxt:
+      markdown_description: >
+        ANPR2MQTT watches a camera's exported snapshot/event files (or an FTP or MQTT
+        feed), runs OCR locally where needed, and publishes structured MQTT messages
+        and images for Home Assistant auto-discovery.
+      sections:
+        Usage:
+          - index.md: Project overview and quick start
+          - camera.md: Configuring supported ANPR cameras
+          - ocr.md: Configuring OCR field extraction
+          - homeassistant.md: Home Assistant MQTT integration
+          - api.md: DVLA / VES lookup API integration
+          - debug_tools.md: CLI debug tools
+        Examples:
+          - examples/*.md
+        Developer:
+          - developer/*.md
+        Reference:
+          - changelog.md: Release changelog
+      full_output: llms-full.txt
 
 
 markdown_extensions:

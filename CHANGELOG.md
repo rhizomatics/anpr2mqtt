@@ -1,3 +1,7 @@
+# 1.1.3
+- Moved docs theme to MaterialX
+- `anpr2mqtt` now installed as a `uv` tool inside container
+- Docs publish `llms.txt` / `llms-full.txt` and per-page Markdown links for AI agents
 # 1.1.2
 ## Frigate Integration
 - Populate `event_image_url` with snapshot so for payload compatibility with file system detected images

@@ -20,14 +20,18 @@ ADD uv.lock /app/uv.lock
 ADD pyproject.toml /app/pyproject.toml
 RUN uv sync --locked --no-install-project
 
-ADD src /app
+ADD src /app/src
 ADD scripts/healthcheck.sh /app
 RUN chmod ug+x /app/healthcheck.sh
 ADD README.md /app/README.md
 RUN mkdir /app/.cache && chmod a+rw /app/.cache
 
-RUN uv sync --locked
+# Install anpr2mqtt itself as a uv tool, exposing `anpr2mqtt` and `tools` as
+# regular commands on PATH (/usr/local/bin) so a shell started in the container
+# can call them directly, with no venv to activate.
+ENV UV_TOOL_BIN_DIR=/usr/local/bin
+RUN uv tool install --no-cache . && rm -rf /app/.venv
 
-ENV PATH="/app/.venv/bin:$PATH"
-# Use explicit path and python executable rather than `uv run` to get proper signal handling
-ENTRYPOINT ["python", "-m", "anpr2mqtt"]
+# Exec form, calling the installed command directly (not via `uv run`/a shell),
+# so the app's own process is PID 1 and gets proper signal handling.
+ENTRYPOINT ["anpr2mqtt"]

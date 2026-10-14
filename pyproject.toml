@@ -1,6 +1,6 @@
 [project]
 name = "anpr2mqtt"
-version = "1.1.2"
+version = "1.1.3"
 description = "ANPR MQTT bridge for Home Assistant"
 authors = [
     { name = "jey burrows", email = "jrb@rhizomatics.org.uk" }
@@ -35,6 +35,7 @@ classifiers = [
     "Intended Audience :: System Administrators",
     "Typing :: Typed",
     "Programming Language :: Python",
+    "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14"
 ]
 
@@ -72,8 +73,7 @@ dev = [
 ]
 docs=[
     "properdocs",
-    "mkdocs-material[imaging]",
-    "mkdocs-material>=9.7.1",
+    "mkdocs-materialx[imaging]",
     "mkdocstrings",
     "mkdocstrings-python",
     "mkdocs-minify-plugin",
@@ -87,7 +87,8 @@ docs=[
     "mkdocs-minify-html-plugin",
     "mkdocs-meta-descriptions-plugin",
     "mike",
-    "mkdocs-htmlproofer-plugin"
+    "mkdocs-htmlproofer-plugin",
+    "mkdocs-llmstxt"
 ]
 [build-system]
 requires = ["uv_build>=0.11.3,<0.13.0"]
