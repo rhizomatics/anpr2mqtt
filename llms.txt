@@ -1,0 +1,34 @@
+# ANPR2MQTT
+
+> Simple ANPR Camera Integration using File System and MQTT
+
+ANPR2MQTT watches a camera's exported snapshot/event files (or an FTP or MQTT feed), runs OCR locally where needed, and publishes structured MQTT messages and images for Home Assistant auto-discovery.
+
+
+## Usage
+
+- [ANPR2MQTT](https://anpr2mqtt.rhizomatics.org.uk/index.md): Project overview and quick start
+- [ANPR Camera Configuration](https://anpr2mqtt.rhizomatics.org.uk/camera/index.md): Configuring supported ANPR cameras
+- [OCR](https://anpr2mqtt.rhizomatics.org.uk/ocr/index.md): Configuring OCR field extraction
+- [HomeAssistant Integration](https://anpr2mqtt.rhizomatics.org.uk/homeassistant/index.md): Home Assistant MQTT integration
+- [API](https://anpr2mqtt.rhizomatics.org.uk/api/index.md): DVLA / VES lookup API integration
+- [Debug Tools](https://anpr2mqtt.rhizomatics.org.uk/debug_tools/index.md): CLI debug tools
+
+## Examples
+
+- [Example Configurations](https://anpr2mqtt.rhizomatics.org.uk/examples/index.md)
+- [Maximal Configuration](https://anpr2mqtt.rhizomatics.org.uk/examples/config_maximal/index.md)
+- [Minimal Configuration](https://anpr2mqtt.rhizomatics.org.uk/examples/config_minimal/index.md)
+- [Docker Compose](https://anpr2mqtt.rhizomatics.org.uk/examples/docker_compose/index.md)
+- [Environment File](https://anpr2mqtt.rhizomatics.org.uk/examples/env/index.md)
+- [Home Assistant Automation](https://anpr2mqtt.rhizomatics.org.uk/examples/ha_automation/index.md)
+
+## Developer
+
+- [Development Setup](https://anpr2mqtt.rhizomatics.org.uk/developer/setup/index.md)
+- [Coverage](https://anpr2mqtt.rhizomatics.org.uk/developer/coverage/index.md)
+
+## Reference
+
+- [What's New](https://anpr2mqtt.rhizomatics.org.uk/changelog/index.md): Release changelog
+

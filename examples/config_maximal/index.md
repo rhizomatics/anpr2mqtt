@@ -1,0 +1,123 @@
+# Maximal Configuration
+
+More extensive example configuration, using all the features
+
+```yaml
+---
+log_level: DEBUG
+
+events:
+- camera: driveway
+  event: anpr
+  description: Vehicle identified at driveway camera
+  watch_path: /ftp/Driveway
+  image_name_re: (?P<dt>[0-9]{17})_(?P<target>[A-Z0-9]+)_(?P<event>VEHICLE_DETECTION)\.(?P<ext>jpg|png|gif|jpeg)
+  image_url_base: http://192.168.10.10/CCTV
+  auto_match_tolerance: 2
+  ocr_field_ids:
+    - hik_direction
+- camera: shed
+  event: line_crossing
+  watch_path: /ftp/shedcam
+  description: Entry to back garden gate
+  image_name_re: (?P<dt>[0-9]{17})_(?P<target>[A-Z0-9]+)_(?P<event>LINE_CROSSING)\.(?P<ext>jpg|png|gif|jpeg)
+  image_url_base: http://192.168.10.10/CCTV
+  autoclear:
+    post_event: 360
+    state: True
+    image: False
+
+cameras:
+- name: driveway
+  area: Driveway
+  live_url: http://frigate.local/driveway
+- name: shed
+  area: back_garden
+mqtt:
+  host: 192.168.1.100
+  port: 1883
+  user: anpr2mqtt
+  password: topsecret901
+  topic_root: anpr2mqtt
+homeassistant:
+  discovery_topic_root: homeassistant
+  device_creation: true
+ocr:
+  hik_direction:
+    label: vehicle_direction
+    values: Reverse, Forward
+    invert: true
+    crop: 
+      x: 0
+      y: 850
+      h: 30
+      w: 650
+    correction:
+      Forward:
+      - F.*wd
+      Reverse:
+      - R.*v.*se
+      - Back.*
+image:
+  jpeg_opts:
+    quality: 30
+    progressive: true
+    optimize: true
+  png_opts:
+    quality: 30
+    dpi: "(60, 90)"
+    optimize: true
+tracker:
+  data_dir: /data
+
+frigate:
+    enabled: true
+    topic: 
+     - frigate/events
+     - frigate//tracked_object_update
+    min_score: 0.70
+    url: http://frigate.local:5000
+    cameras: 
+      - driveway
+      - garage
+
+dvla:
+  cache_ttl: 86400
+  cache_type: file
+  cache_dir: /data/cache
+  api_key: MY6676SECRET787KEY
+targets:
+  plate:
+    icon: mdi:car
+    groups:
+     - name: known
+       members:
+        - id: TJ912UKL
+          description: joe's mini conv
+          icon: mdi:car-convertible
+          entity_id: my_summer_car
+          correction:
+            - J912UKL
+            - TJ91.KL
+        - id: P001PAT
+          description: Postman
+        - id: MY13CAR
+          entity_id: my_truck
+          description: Homeowner's old pickup
+     - name: Amazon Prime
+       entity_id: delivery_vehicle
+       icon: "mdi:truck-delivery"
+       members:
+        - AM40PRM
+     - name: dangerous
+       priority: critical
+       members:
+         - id: B4DM3N
+           description: Rural watch reported vehicle
+    correction:
+      UN001TST:
+        - UN\d+1TST
+        - UN001TSK
+    ignore:
+      - ^I\dZ$ # mis-read of tanker logo
+```

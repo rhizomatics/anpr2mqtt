@@ -1,0 +1,53 @@
+# OCR
+
+Any number of textual fields can be scanned from the image. By default this happens for `vehicle_direction` as in this Hikvision example.
+
+Each field can have optional permitted values (`Unknown` returned if none of them found) and a set of corrections to handle occasional OCR errors, where corrections are simple strings or regular expressions.
+
+Use the [OCR Tool](https://anpr2mqtt.rhizomatics.org.uk/debug_tools/#ocr-ocr_file) for quick tests of configuration with a local image
+
+## OCR Stages
+
+1. Crop the image to a box starting at `x` and `y` position, measured from the bottom left of the image and a given height and width
+1. Optionally invert the image colours for better capture accuracy
+1. Run OCR over the cropped image
+1. Apply optional corrections
+1. Optionally restrict to a list of values, forcing case if needed
+
+## Example Configuration
+
+The configuration for this can be in the `anpr2mqtt.yaml` file, or in environment variables or command line arguments.
+
+In this example `hik_direction` is the `ocr_field_id` value that can be referenced in an event, and `label` is the name of the attribute that will appear in the Home Asssitant entity attributes.
+
+```yaml
+ocr:
+  hik_direction:
+    label: vehicle_direction
+    values: Reverse, Forward
+    invert: true
+    crop: 
+      x: 0
+      y: 850
+      h: 30
+      w: 650
+    correction:
+      Forward:
+      - F.*wd
+      Reverse:
+      - R.*v.*se
+      - Back.*
+```
+
+Use the [debug tools](https://anpr2mqtt.rhizomatics.org.uk/debug_tools/index.md) to quickly iterate over an image, for example:
+
+```bash
+uv run --with anpr2mqtt tools ocr_file 20260130174327627_K39ZTB_VEHICLE_DETECTION.jpg
+```
+
+or to test cropping values:
+
+```bash
+uv run --with anpr2mqtt tools ocr_file example_image.jpg \
+  --ocr.crop.x 850 --ocr.crop.y 0 --ocr.crop.h 200 --ocr.crop.w 400
+```
