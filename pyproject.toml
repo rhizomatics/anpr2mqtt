@@ -40,6 +40,13 @@ classifiers = [
 ]
 
 
+[project.urls]
+Homepage = "https://anpr2mqtt.rhizomatics.org.uk"
+Repository = "https://github.com/rhizomatics/anpr2mqtt"
+Documentation = "https://anpr2mqtt.rhizomatics.org.uk"
+Issues = "https://github.com/rhizomatics/anpr2mqtt/issues"
+Changelog = "https://github.com/rhizomatics/anpr2mqtt/blob/main/CHANGELOG.md"
+
 [project.scripts]
 anpr2mqtt = "anpr2mqtt:run"
 tools = "anpr2mqtt:tools"
