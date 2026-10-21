@@ -18,6 +18,11 @@ Loads an image, runs OCR on it (with optional crop and invert), and prints the r
 It ignores any YAML config file but respects environment variables.
 Useful for iterating quickly on bounding-box settings against a local image.
 
+NOTE: OCR needs the [tesseract-ocr](https://github.com/tesseract-ocr/tesseract) binary on your `PATH`, which isn't
+installed by `uv`/`uvx`. The Docker image includes it, but to run outside Docker install it first, e.g.
+`brew install tesseract` on macOS or `apt install tesseract-ocr-eng` on Debian/Ubuntu. Without it, `ocr_file` reports
+`tesseract is not installed or it's not in your PATH` instead of an OCR result.
+
 ```bash
 uvx --from anpr2mqtt tools ocr_file 20241230152519495_N74DYX_VEHICLE_DETECTION.jpg
 ```

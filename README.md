@@ -73,6 +73,8 @@ uvx anpr2mqtt --mqtt.host 192.168.1.10 --mqtt.port 1884 --log_level DEBUG
 
 Run `uvx anpr2mqtt --help` to see all available flags, and find more information at [Debug Tools](debug_tools.md)
 
+When running outside Docker, OCR also needs the `tesseract` binary installed, e.g. `brew install tesseract` on macOS.
+
 ## Home Assistant Integration
 
 See [Home Assistant Integration](homeassistant.md) for configuration and example notification automation.
