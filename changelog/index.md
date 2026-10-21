@@ -1,3 +1,9 @@
+# 1.1.5
+
+- Change pydantic dependency to `pydantic-settings[yaml]` since it now won't automatically import `pyyaml` otherwise
+- Docker image no longer sets `MQTT__HOST`, `MQTT__PORT` and `MQTT__TOPIC_ROOT` env vars, which silently overrode the same settings in the YAML config file
+- Test that the Docker image builds and the app starts inside it
+
 # 1.1.4
 
 - Security Fixes
