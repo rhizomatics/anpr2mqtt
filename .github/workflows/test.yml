@@ -38,3 +38,4 @@ jobs:
         path: |
           cov.xml
           junit/test-results.xml
+          htmlcov/
