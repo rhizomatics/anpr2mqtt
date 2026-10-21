@@ -12,7 +12,7 @@ requires-python = ">=3.13"
 license="Apache-2.0"
 dependencies = [
     "paho-mqtt>=2.1.0",
-    "pillow>=12.0.0",
+    "pillow>=13.0.0",
     "pytesseract>=0.3.13",
     "structlog>=25.4.0",
     "rich>=14.0.0",
@@ -55,7 +55,7 @@ tools = "anpr2mqtt:tools"
 compile-bytecode = true
 managed = true
 exclude-newer = "5 days"
-exclude-newer-package = { certifi=false }
+exclude-newer-package = { certifi=false, pillow=false }
 add-bounds = "major"
 
 [tool.uv.build-backend]
