@@ -21,7 +21,7 @@ dependencies = [
     "usingversion>=0.1.2",
     "niquests>=3.0.0",
     "requests-cache>=1.0.0",
-    "pydantic-settings>=2.12.0",
+    "pydantic-settings[yaml]>=2.12.0",
     "rapidfuzz>=3.14.5",
 ]
 
