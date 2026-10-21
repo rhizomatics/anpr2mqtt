@@ -1,0 +1,40 @@
+# Reusable lint and test run, called by deploy and the publish workflows so
+# nothing is published from a commit that fails tests.
+
+name: Test
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        persist-credentials: false
+    - name: Install uv
+      uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
+    - name: "Set up Python"
+      uses: actions/setup-python@v7
+      with:
+        python-version-file: "pyproject.toml"
+    - name: Install dependencies
+      run: |
+        sudo apt-get install tesseract-ocr-eng libyaml-dev
+        uv sync --locked --all-extras --dev
+    - name: Ruff
+      uses:  astral-sh/ruff-action@278981a28ce3188b1e39527901f38254bf3aac89
+    - name: Test with pytest
+      run: uv run pytest tests
+    - name: Store test results
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: test-results
+        path: |
+          cov.xml
+          junit/test-results.xml

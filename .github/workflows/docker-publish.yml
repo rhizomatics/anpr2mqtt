@@ -5,6 +5,7 @@ name: Create and publish a Docker image
 on:
   release:
     types: [published]
+  workflow_dispatch:
 
 
 # Defines two custom environment variables for the workflow. These are used for the Container registry domain, and a name for the Docker image that this workflow builds.
@@ -12,9 +13,18 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
-# There is a single job in this workflow. It's configured to run on the latest available version of Ubuntu.
+# Tests run first on a release, and the image is only built and pushed if they pass (or on a manual run).
 jobs:
+  test:
+    # Releases must pass tests before publishing; manual runs skip the gate
+    if: github.event_name == 'release'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/test.yml
+
   build-and-push-image:
+    needs: test
+    if: always() && (needs.test.result == 'success' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     # Sets the permissions granted to the `GITHUB_TOKEN` for the actions in this job.
     permissions:

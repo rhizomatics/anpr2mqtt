@@ -10,7 +10,11 @@ on:
     branches: [ "main" ]
 
 jobs:
+  test:
+    uses: ./.github/workflows/test.yml
+
   build:
+    needs: test
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -27,14 +31,11 @@ jobs:
       with:
         python-version-file: "pyproject.toml"
     - name: Install dependencies
-      run: |
-        sudo apt-get install tesseract-ocr-eng libyaml-dev 
-        uv sync --locked --all-extras --dev
-       
-    - name: Ruff
-      uses:  astral-sh/ruff-action@278981a28ce3188b1e39527901f38254bf3aac89
-    - name: Test with pytest
-      run: uv run pytest tests
+      run: uv sync --locked --all-extras --dev
+    - name: Fetch test results
+      uses: actions/download-artifact@v8
+      with:
+        name: test-results
     - name: Build a binary wheel and a source tarball
       run: uv build
     - name: Generate badges

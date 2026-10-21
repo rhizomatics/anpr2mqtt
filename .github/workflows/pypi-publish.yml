@@ -1,14 +1,26 @@
 name: Publish Python 🐍 distribution 📦 to PyPI and TestPyPI
 
-on: 
+on:
   push:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Package index to publish to (bypasses the test gate)
+        type: choice
+        options: [testpypi, pypi]
+        default: testpypi
 
 permissions:
   contents: read
 
 jobs:
+  test:
+    # Releases must pass tests before publishing; manual runs skip the gate
+    if: github.event_name == 'release'
+    uses: ./.github/workflows/test.yml
+
   build:
     name: Build distribution 📦
     runs-on: ubuntu-latest
@@ -34,9 +46,13 @@ jobs:
   publish-to-pypi:
     name: >-
       Publish Python 🐍 distribution 📦 to PyPI
-    # Only publish to PyPI on full releases (not pre-releases)
-    if: github.event_name == 'release' && github.event.action == 'published' && github.event.release.prerelease == false
+    # Full releases (not pre-releases) once tests pass, or manual run targeting PyPI
+    if: >-
+      always() && needs.build.result == 'success' && (
+        (github.event_name == 'release' && github.event.release.prerelease == false && needs.test.result == 'success')
+        || (github.event_name == 'workflow_dispatch' && inputs.target == 'pypi'))
     needs:
+    - test
     - build
     runs-on: ubuntu-latest
     environment:
@@ -56,9 +72,13 @@ jobs:
 
   publish-to-testpypi:
     name: Publish Python 🐍 distribution 📦 to TestPyPI
-    # Publish to TestPyPI on pre-releases
-    if: github.event_name == 'release' && github.event.action == 'published' && github.event.release.prerelease == true
+    # Pre-releases once tests pass, or manual run targeting TestPyPI
+    if: >-
+      always() && needs.build.result == 'success' && (
+        (github.event_name == 'release' && github.event.release.prerelease == true && needs.test.result == 'success')
+        || (github.event_name == 'workflow_dispatch' && inputs.target == 'testpypi'))
     needs:
+    - test
     - build
     runs-on: ubuntu-latest
 
