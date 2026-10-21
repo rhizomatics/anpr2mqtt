@@ -1,3 +1,11 @@
+# 1.1.4
+
+- Security Fixes
+- Pillow upgraded to v13.0.0 to remediate multiple CVEs
+- Build chain certificate update for eMudhra intermediate ca certs issue
+- Container rebuilt with latest `uv` version for eMudhra issue
+- Documentation updated to include new for `tesseract` install when running OCR tools outside of Docker
+
 # 1.1.3
 
 - Moved docs theme to MaterialX
