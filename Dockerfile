@@ -1,9 +1,5 @@
 FROM python:3.14-slim
 
-ENV MQTT__HOST 127.0.0.1
-ENV MQTT__PORT 1883
-ENV MQTT__TOPIC_ROOT anpr2mqtt
-
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 
 ENV UV_COMPILE_BYTECODE=1

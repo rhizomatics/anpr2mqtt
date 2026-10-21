@@ -1,6 +1,6 @@
 [project]
 name = "anpr2mqtt"
-version = "1.1.4"
+version = "1.1.5"
 description = "ANPR MQTT bridge for Home Assistant"
 authors = [
     { name = "jey burrows", email = "jrb@rhizomatics.org.uk" }
@@ -174,7 +174,8 @@ line-ending = "auto"
 
 [tool.pytest]
 markers = [
-    "manual: tests to be executed manually"
+    "manual: tests to be executed manually",
+    "docker: builds and runs the Docker image, skipped if no Docker daemon"
 ]
 testpaths = ["tests"]
 norecursedirs = [".git","templates"]
