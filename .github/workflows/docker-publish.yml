@@ -5,7 +5,13 @@ name: Create and publish a Docker image
 on:
   release:
     types: [published]
+  # Manual run, e.g. to rebuild a release tag; select the tag as the ref so semver tags are applied
   workflow_dispatch:
+    inputs:
+      force:
+        description: "Skip tests and publish anyway (emergency use only, e.g. security fix blocked by a minor build break)"
+        type: boolean
+        default: false
 
 
 # Defines two custom environment variables for the workflow. These are used for the Container registry domain, and a name for the Docker image that this workflow builds.
@@ -13,18 +19,18 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
-# Tests run first on a release, and the image is only built and pushed if they pass (or on a manual run).
+# Tests run first, and the image is only built and pushed if they pass (unless a manual run is forced).
 jobs:
   test:
-    # Releases must pass tests before publishing; manual runs skip the gate
-    if: github.event_name == 'release'
+    # Everything must pass tests before publishing, unless forced
+    if: ${{ !inputs.force }}
     permissions:
       contents: read
     uses: ./.github/workflows/test.yml
 
   build-and-push-image:
     needs: test
-    if: always() && (needs.test.result == 'success' || github.event_name == 'workflow_dispatch')
+    if: ${{ !cancelled() && (needs.test.result == 'success' || (inputs.force && needs.test.result == 'skipped')) }}
     runs-on: ubuntu-latest
     # Sets the permissions granted to the `GITHUB_TOKEN` for the actions in this job.
     permissions:
