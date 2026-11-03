@@ -1,32 +1,41 @@
-FROM python:3.14-slim
+# Build stage: resolve and install the app plus its dependencies into a venv
+FROM python:3.14-slim AS builder
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 
-ENV UV_COMPILE_BYTECODE=1
+# Use the base image's Python, so the venv works unchanged in the runtime stage
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_PYTHON_DOWNLOADS=never \
+    UV_PROJECT_ENVIRONMENT=/app/.venv
 
-# Install system dependencies and uv
-RUN apt-get -y update && \
-    apt-get -y upgrade && \
-    apt-get install -y tesseract-ocr-eng curl libyaml-dev mosquitto-clients
-
-# Copy project files
 WORKDIR /app
 
 ADD uv.lock /app/uv.lock
 ADD pyproject.toml /app/pyproject.toml
-RUN uv sync --locked --no-install-project
+RUN uv sync --locked --no-dev --no-install-project --no-cache
 
 ADD src /app/src
-ADD scripts/healthcheck.sh /app
-RUN chmod ug+x /app/healthcheck.sh
 ADD README.md /app/README.md
+RUN uv sync --locked --no-dev --no-editable --no-cache
+
+# Runtime stage: only the venv and runtime system packages, no uv or build tools
+FROM python:3.14-slim
+
+RUN apt-get -y update && \
+    apt-get -y upgrade && \
+    apt-get install -y --no-install-recommends tesseract-ocr-eng mosquitto-clients jq && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY --from=builder /app/.venv /app/.venv
+ADD --chmod=755 scripts/healthcheck.sh /app/healthcheck.sh
 RUN mkdir /app/.cache && chmod a+rw /app/.cache
 
-# Install anpr2mqtt itself as a uv tool, exposing `anpr2mqtt` and `tools` as
-# regular commands on PATH (/usr/local/bin) so a shell started in the container
-# can call them directly, with no venv to activate.
-ENV UV_TOOL_BIN_DIR=/usr/local/bin
-RUN uv tool install --no-cache . && rm -rf /app/.venv
+# Expose `anpr2mqtt` and `tools` as regular commands on PATH, so a shell
+# started in the container can call them directly, with no venv to activate.
+ENV PATH="/app/.venv/bin:$PATH"
 
 # Exec form, calling the installed command directly (not via `uv run`/a shell),
 # so the app's own process is PID 1 and gets proper signal handling.
