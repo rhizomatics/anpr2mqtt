@@ -2,6 +2,9 @@
 
 - Shrink docker image by removing build tooling
 - Fix healthcheck by including `jq` in image
+- Docker images now security scanned
+- Automated testing now covers Python 3.13, 3.14, 3.15
+- `tools` CLI renamed to `anprtools`, to avoid clashing with other packages' commands
 
 # 1.1.5
 
