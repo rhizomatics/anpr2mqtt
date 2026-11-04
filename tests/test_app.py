@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from anpr2mqtt.app import main_loop, on_connect, on_disconnect
+from anpr2mqtt.app import main_loop, on_connect, on_disconnect, shutdown_mqtt
 from anpr2mqtt.settings import EventSettings, Target, TargetGroup
 
 
@@ -30,6 +30,44 @@ def test_on_connect_not_authorized() -> None:
 def test_on_connect_failure() -> None:
     rc = _make_rc("Connection Refused", eq_zero=False)
     on_connect(Mock(), None, Mock(), rc)
+
+
+def test_on_connect_publishes_online() -> None:
+    client = Mock()
+    on_connect(client, {"availability_topic": "anpr2mqtt/availability"}, Mock(), _make_rc("Success", eq_zero=True))
+    client.publish.assert_called_once_with("anpr2mqtt/availability", payload="online", qos=1, retain=True)
+
+
+def test_on_connect_failure_does_not_publish_online() -> None:
+    client = Mock()
+    on_connect(client, {"availability_topic": "anpr2mqtt/availability"}, Mock(), _make_rc("Refused", eq_zero=False))
+    client.publish.assert_not_called()
+
+
+def test_shutdown_mqtt_publishes_offline_before_disconnect() -> None:
+    client = Mock()
+    client.is_connected.return_value = True
+    shutdown_mqtt(client, "anpr2mqtt/availability")
+    client.publish.assert_called_once_with("anpr2mqtt/availability", payload="offline", qos=1, retain=True)
+    client.publish.return_value.wait_for_publish.assert_called_once()
+    names = [c[0] for c in client.method_calls]
+    assert names.index("publish") < names.index("disconnect") < names.index("loop_stop")
+
+
+def test_shutdown_mqtt_not_connected_skips_offline() -> None:
+    client = Mock()
+    client.is_connected.return_value = False
+    shutdown_mqtt(client, "anpr2mqtt/availability")
+    client.publish.assert_not_called()
+    client.disconnect.assert_called_once()
+
+
+def test_shutdown_mqtt_publish_failure_still_disconnects() -> None:
+    client = Mock()
+    client.is_connected.return_value = True
+    client.publish.return_value.wait_for_publish.side_effect = RuntimeError("timeout")
+    shutdown_mqtt(client, "anpr2mqtt/availability")
+    client.disconnect.assert_called_once()
 
 
 def test_on_disconnect_success() -> None:
@@ -83,6 +121,8 @@ def test_main_loop_minimal() -> None:
 
     mock_observer.start.assert_called_once()
     mock_observer.stop.assert_called_once()
+    mock_client.will_set.assert_called_once_with("anpr2mqtt/availability", payload="offline", qos=1, retain=True)
+    mock_client.disconnect.assert_called_once()
 
 
 def test_main_loop_mqtt_protocol_31() -> None:

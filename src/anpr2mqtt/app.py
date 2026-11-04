@@ -14,7 +14,13 @@ from watchdog.observers import Observer
 import anpr2mqtt
 from anpr2mqtt.event_handler import EventHandler
 from anpr2mqtt.frigate_handler import CameraConfig, FrigateHandler
-from anpr2mqtt.hass import HomeAssistantPublisher
+from anpr2mqtt.hass import (
+    AVAILABILITY_OFFLINE,
+    OFFLINE_PUBLISH_TIMEOUT,
+    HomeAssistantPublisher,
+    availability_topic,
+    publish_availability,
+)
 from anpr2mqtt.settings import CameraSettings, EventSettings, Settings
 from anpr2mqtt.tracker import Tracker, compute_time_analysis
 
@@ -23,8 +29,8 @@ log = structlog.get_logger()
 
 
 def on_connect(
-    _client: mqtt.Client,
-    _userdata: Any,
+    client: mqtt.Client,
+    userdata: Any,
     _flags: mqtt.ConnectFlags,
     rc: ReasonCode,
     _props: Properties | None = None,
@@ -37,6 +43,9 @@ def on_connect(
         log.warning("Connection failed to broker", result_code=rc)
     else:
         log.debug("Connected to broker", result_code=rc)
+        if isinstance(userdata, dict) and userdata.get("availability_topic"):
+            # on every (re)connect, since the will may have marked us offline while disconnected
+            publish_availability(client, userdata["availability_topic"], online=True)
 
 
 def on_disconnect(
@@ -81,13 +90,17 @@ def main_loop() -> None:
         protocol = MQTTProtocolVersion.MQTTv311
     log.debug("MQTT protocol set to %r", protocol)
 
+    avail_topic: str = availability_topic(settings.mqtt.topic_root)
     try:
         client = mqtt.Client(
             callback_api_version=CallbackAPIVersion.VERSION2,
             clean_session=True if protocol != MQTTProtocolVersion.MQTTv5 else None,
             client_id="anpr2mqtt",
             protocol=protocol,
+            userdata={"availability_topic": avail_topic},
         )
+        # broker publishes this if the connection drops without a clean disconnect, e.g. a crash or kill
+        client.will_set(avail_topic, payload=AVAILABILITY_OFFLINE, qos=1, retain=True)
         client.on_connect = on_connect
         client.on_disconnect = on_disconnect
         client.username_pw_set(username=settings.mqtt.user, password=settings.mqtt.password)
@@ -96,7 +109,7 @@ def main_loop() -> None:
         client.loop_start()
         log.info(f"Connected to MQTT at {settings.mqtt.host}:{settings.mqtt.port} as {settings.mqtt.user}")
         log.info(f"Publishing at {settings.mqtt.topic_root}")
-        publisher = HomeAssistantPublisher(client, settings.homeassistant)
+        publisher = HomeAssistantPublisher(client, settings.homeassistant, availability_topic=avail_topic)
 
     except Exception as e:
         log.error("Failed to connect to MQTT: %s", e, exc_info=1)
@@ -232,6 +245,18 @@ def main_loop() -> None:
         observer.stop()
         observer.join()
         log.info("loop observer ended")
+        shutdown_mqtt(client, avail_topic)
+
+
+def shutdown_mqtt(client: mqtt.Client, avail_topic: str) -> None:
+    """Mark entities unavailable then disconnect, since a clean disconnect doesn't trigger the will"""
+    try:
+        if client.is_connected():
+            publish_availability(client, avail_topic, online=False).wait_for_publish(timeout=OFFLINE_PUBLISH_TIMEOUT)
+    except Exception as e:
+        log.warning("Unable to confirm offline availability published: %s", e)
+    client.disconnect()
+    client.loop_stop()
 
 
 class Anpr2MQTT(Settings):
@@ -247,4 +272,4 @@ def run() -> None:
         log.error("Unable to startup, validation error on settings, check configuration file, arguments or env vars")
         log.error("MQTT host, account and password are mandatory (if using env vars, be sure to use MQTT__HOST not MQTT_HOST)")
         log.error("Use --help for a full set of config")
-        log.error("Use the tools CLI for testing out directory watch, image analysis and APIs")
+        log.error("Use the anprtools CLI for testing out directory watch, image analysis and APIs")

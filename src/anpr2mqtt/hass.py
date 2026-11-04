@@ -19,10 +19,26 @@ from .const import ImageInfo
 
 log = structlog.get_logger()
 
+AVAILABILITY_ONLINE = "online"  # Home Assistant default payload_available
+AVAILABILITY_OFFLINE = "offline"  # Home Assistant default payload_not_available
+OFFLINE_PUBLISH_TIMEOUT = 2.0
+
+
+def availability_topic(topic_root: str) -> str:
+    return f"{topic_root}/availability"
+
+
+def publish_availability(client: mqtt.Client, topic: str, online: bool) -> mqtt.MQTTMessageInfo:
+    """Retained plain string payload, as expected by Home Assistant availability_topic"""
+    payload: str = AVAILABILITY_ONLINE if online else AVAILABILITY_OFFLINE
+    log.debug("Publishing availability %s to %s", payload, topic)
+    return client.publish(topic, payload=payload, qos=1, retain=True)
+
 
 class HomeAssistantPublisher:
-    def __init__(self, client: mqtt.Client, cfg: HomeAssistantSettings) -> None:
+    def __init__(self, client: mqtt.Client, cfg: HomeAssistantSettings, availability_topic: str | None = None) -> None:
         self.client: mqtt.Client = client
+        self.availability_topic: str | None = availability_topic
         self.hass_status_topic: str = cfg.status_topic
         self.discovery_topic_prefix: str = cfg.discovery_topic_root
         self.device_creation: bool = cfg.device_creation
@@ -104,6 +120,7 @@ class HomeAssistantPublisher:
             payload["icon"] = event_config.icon
         if self.device_creation:
             self.add_device_info(payload, camera)
+        self.add_availability(payload)
         topic: str = f"{self.discovery_topic_prefix}/sensor/{event_config.camera}/{event_config.event}/config"
         msg: str = json.dumps(payload)
         self.client.publish(topic, payload=msg, qos=0, retain=True)
@@ -130,6 +147,7 @@ class HomeAssistantPublisher:
         }
         if self.device_creation:
             self.add_device_info(payload, camera)
+        self.add_availability(payload)
         topic = f"{self.discovery_topic_prefix}/image/{event_config.camera}/{event_config.event}/config"
         msg = json.dumps(payload)
         self.client.publish(topic, payload=msg, qos=0, retain=True)
@@ -155,6 +173,7 @@ class HomeAssistantPublisher:
         }
         if self.device_creation:
             self.add_device_info(payload, camera)
+        self.add_availability(payload)
         topic = f"{self.discovery_topic_prefix}/camera/{camera.name}/{event_config.event}/config"
         msg = json.dumps(payload)
         self.client.publish(topic, payload=msg, qos=0, retain=True)
@@ -180,6 +199,7 @@ class HomeAssistantPublisher:
         }
         if icon:
             payload["icon"] = icon
+        self.add_availability(payload)
         topic = f"{self.discovery_topic_prefix}/sensor/{entity_id}/config"
         msg = json.dumps(payload)
         self.client.publish(topic, payload=msg, qos=0, retain=True)
@@ -196,6 +216,11 @@ class HomeAssistantPublisher:
             log.debug("Published target state to %s: %s", state_topic, payload)
         except Exception as e:
             log.error("Failed to publish target state to %s: %s", state_topic, e, exc_info=1)
+
+    def add_availability(self, payload: dict[str, Any]) -> None:
+        if self.availability_topic:
+            # payloads are the Home Assistant defaults, `online` and `offline`, so not repeated here
+            payload["availability_topic"] = self.availability_topic
 
     def add_device_info(self, payload: dict[str, Any], camera: CameraSettings) -> None:
         payload["dev"] = {

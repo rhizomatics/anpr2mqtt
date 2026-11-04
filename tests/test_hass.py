@@ -360,3 +360,50 @@ def test_post_state_message_with_camera_publish_exception(publisher: HomeAssista
     camera = CameraSettings(name="cam")
     # Should not raise
     publisher.post_state_message("test/topic", sighting=None, event_config=event_config, camera=camera)
+
+
+# --- availability ---
+
+
+def test_availability_topic() -> None:
+    from anpr2mqtt.hass import availability_topic
+
+    assert availability_topic("anpr2mqtt") == "anpr2mqtt/availability"
+
+
+@pytest.mark.parametrize(("online", "payload"), [(True, "online"), (False, "offline")])
+def test_publish_availability(mock_client: Mock, online: bool, payload: str) -> None:
+    from anpr2mqtt.hass import publish_availability
+
+    publish_availability(mock_client, "anpr2mqtt/availability", online=online)
+    mock_client.publish.assert_called_once_with("anpr2mqtt/availability", payload=payload, qos=1, retain=True)
+
+
+def _discovery_payloads(mock_client: Mock) -> list[dict[str, Any]]:
+    return [json.loads(c.kwargs["payload"]) for c in mock_client.publish.call_args_list]
+
+
+def _publish_all_discovery(pub: HomeAssistantPublisher, event_config: EventSettings, camera: CameraSettings) -> None:
+    pub.publish_sensor_discovery("s/state", event_config, camera)
+    pub.publish_image_discovery("s/state", "s/image", event_config, camera)
+    pub.publish_camera_discovery("s/state", "s/image", event_config, camera)
+    pub.publish_target_sensor_discovery("tgt", "plate", [Target(id="AB12CDE")], "t/state", None)
+
+
+def test_discovery_includes_availability_topic(
+    mock_client: Mock, event_config: EventSettings, camera: CameraSettings
+) -> None:
+    pub = HomeAssistantPublisher(
+        mock_client, HomeAssistantSettings(status_topic="homeassistant/status"), availability_topic="anpr2mqtt/availability"
+    )
+    _publish_all_discovery(pub, event_config, camera)
+    payloads = _discovery_payloads(mock_client)
+    assert len(payloads) == 4
+    assert all(p["availability_topic"] == "anpr2mqtt/availability" for p in payloads)
+
+
+def test_discovery_without_availability_topic(
+    publisher: HomeAssistantPublisher, mock_client: Mock, event_config: EventSettings, camera: CameraSettings
+) -> None:
+    _publish_all_discovery(publisher, event_config, camera)
+    assert all("availability_topic" not in p for p in _discovery_payloads(mock_client))
