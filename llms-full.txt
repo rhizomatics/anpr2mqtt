@@ -956,6 +956,7 @@ uv sync --frozen   # Use exact lockfile versions
 - Every discovery config includes this as its `availability_topic`
 - **Behaviour change**: while ANPR2MQTT is down, its entities in Home Assistant show as *unavailable* rather than keeping their last state. They come back when it reconnects
 - See [Home Assistant Integration](https://anpr2mqtt.rhizomatics.org.uk/homeassistant/#availability)
+- MQTT subscriptions, to Home Assistant status and Frigate events, are now renewed after a reconnect to the broker. Previously a dropped connection silently stopped Frigate events and Home Assistant restart detection until ANPR2MQTT was restarted
 
 # 1.1.5
 
