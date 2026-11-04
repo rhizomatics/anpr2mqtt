@@ -1,15 +1,15 @@
 # Debug Tools
 
-ANPR2MQTT ships a `tools` CLI with subcommands to help debug file system integration or OCR.
+ANPR2MQTT ships an `anprtools` CLI with subcommands to help debug file system integration or OCR.
 All options can also be discovered via `--help`:
 
-NOTE: if running from a checked out `anpr2mqtt` project with active `venv`, use `uv run tools ...`
-instead of `uvx --from anpr2mqtt tools ...` to run against your local checkout rather than the published package.
+NOTE: if running from a checked out `anpr2mqtt` project with active `venv`, use `uv run anprtools ...`
+instead of `uvx --from anpr2mqtt anprtools ...` to run against your local checkout rather than the published package.
 
 ```bash
-uvx --from anpr2mqtt tools --help
-uvx --from anpr2mqtt tools ocr_file --help
-uvx --from anpr2mqtt tools list_dir --help
+uvx --from anpr2mqtt anprtools --help
+uvx --from anpr2mqtt anprtools ocr_file --help
+uvx --from anpr2mqtt anprtools list_dir --help
 ```
 
 ## OCR (`ocr_file`)
@@ -24,13 +24,13 @@ installed by `uv`/`uvx`. The Docker image includes it, but to run outside Docker
 `tesseract is not installed or it's not in your PATH` instead of an OCR result.
 
 ```bash
-uvx --from anpr2mqtt tools ocr_file 20241230152519495_N74DYX_VEHICLE_DETECTION.jpg
+uvx --from anpr2mqtt anprtools ocr_file 20241230152519495_N74DYX_VEHICLE_DETECTION.jpg
 ```
 
 All `event` and `ocr` settings can be overridden from the command line:
 
 ```bash
-uvx --from anpr2mqtt tools ocr_file fixtures/20250602103045407_B4DM3N_VEHICLE_DETECTION.jpg \
+uvx --from anpr2mqtt anprtools ocr_file fixtures/20250602103045407_B4DM3N_VEHICLE_DETECTION.jpg \
   --ocr.crop.x 850 --ocr.crop.y 0 --ocr.crop.h 200 --ocr.crop.w 400 \
   --ocr.invert False
 ```
@@ -53,13 +53,13 @@ If no `event` config is defined, the image is looked for in the current working 
 Lists images in a directory that match the ANPR image regular expression.
 
 ```bash
-uvx --from anpr2mqtt tools list_dir
+uvx --from anpr2mqtt anprtools list_dir
 ```
 
 Override any `event` setting from the command line, for example to test a different path or regex:
 
 ```bash
-uv run tools list_dir \
+uv run anprtools list_dir \
   --event.watch_path /ftp/Driveway \
   --event.image_name_re '(?P<dt>[0-9]{17})_(?P<target>[A-Z0-9]+)_(?P<event>VEHICLE_DETECTION)\.(?P<ext>jpg|png|gif|jpeg)'
 ```
@@ -78,19 +78,19 @@ Performs a live DVLA vehicle enquiry for a registration plate and prints the JSO
 Useful for verifying your API key and checking what data the API returns for a given plate.
 
 ```bash
-uvx --from anpr2mqtt tools dvla_lookup AB12CDE --dvla.api_key YOUR_API_KEY
+uvx --from anpr2mqtt anprtools dvla_lookup AB12CDE --dvla.api_key YOUR_API_KEY
 ```
 
 The API key can also be supplied via the `DVLA__API_KEY` environment variable:
 
 ```bash
-DVLA__API_KEY=your-key uv run tools dvla_lookup AB12CDE
+DVLA__API_KEY=your-key uv run anprtools dvla_lookup AB12CDE
 ```
 
 Use `--test` to hit the DVLA UAT environment instead of production:
 
 ```bash
-uvx --from anpr2mqtt tools dvla_lookup AB12CDE --dvla.api_key YOUR_KEY --test true
+uvx --from anpr2mqtt anprtools dvla_lookup AB12CDE --dvla.api_key YOUR_KEY --test true
 ```
 
 Key flags for `dvla_lookup`:

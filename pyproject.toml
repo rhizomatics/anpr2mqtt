@@ -50,7 +50,7 @@ Changelog = "https://github.com/rhizomatics/anpr2mqtt/blob/main/CHANGELOG.md"
 
 [project.scripts]
 anpr2mqtt = "anpr2mqtt:run"
-tools = "anpr2mqtt:tools"
+anprtools = "anpr2mqtt:tools"
 
 [tool.uv]
 compile-bytecode = true

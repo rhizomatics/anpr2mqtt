@@ -33,7 +33,7 @@ COPY --from=builder /app/.venv /app/.venv
 ADD --chmod=755 scripts/healthcheck.sh /app/healthcheck.sh
 RUN mkdir /app/.cache && chmod a+rw /app/.cache
 
-# Expose `anpr2mqtt` and `tools` as regular commands on PATH, so a shell
+# Expose `anpr2mqtt` and `anprtools` as regular commands on PATH, so a shell
 # started in the container can call them directly, with no venv to activate.
 ENV PATH="/app/.venv/bin:$PATH"
 
