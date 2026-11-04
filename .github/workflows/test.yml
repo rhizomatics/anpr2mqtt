@@ -1,4 +1,4 @@
-# Reusable lint and test run, called by deploy and the publish workflows so
+# Reusable lint and test run, called by CI and the publish workflows so
 # nothing is published from a commit that fails tests.
 
 name: Test
@@ -12,26 +12,37 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Keep in step with the classifiers in pyproject.toml
+        python-version: ["3.13", "3.14", "3.15"]
+    env:
+      UV_PYTHON: ${{ matrix.python-version }}
+      # Test results and coverage are published (badges) from this version only
+      PRIMARY: ${{ matrix.python-version == '3.14' }}
     steps:
     - uses: actions/checkout@v7
       with:
         persist-credentials: false
     - name: Install uv
       uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e
-    - name: "Set up Python"
+    - name: "Set up Python ${{ matrix.python-version }}"
       uses: actions/setup-python@v7
       with:
-        python-version-file: "pyproject.toml"
+        python-version: ${{ matrix.python-version }}
+        allow-prereleases: true
     - name: Install dependencies
       run: |
         sudo apt-get install tesseract-ocr-eng libyaml-dev
         uv sync --locked --all-extras --dev
     - name: Ruff
+      if: env.PRIMARY == 'true'
       uses:  astral-sh/ruff-action@278981a28ce3188b1e39527901f38254bf3aac89
     - name: Test with pytest
       run: uv run pytest tests
     - name: Store test results
-      if: always()
+      if: always() && env.PRIMARY == 'true'
       uses: actions/upload-artifact@v7
       with:
         name: test-results

@@ -1,4 +1,5 @@
 [tools]
+jactionlint = { version = "latest", workflow = "release.yaml" }
 pre-commit = "latest"
 ruff = "latest"
 ty = "latest"
