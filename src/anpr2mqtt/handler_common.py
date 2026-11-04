@@ -2,6 +2,7 @@ import datetime as dt
 import threading
 from typing import Any
 
+import paho.mqtt.client as mqtt
 import structlog
 
 from anpr2mqtt.api_client import APIClient, DVLAClient
@@ -9,6 +10,21 @@ from anpr2mqtt.normalizers import Normalizer, fuzzy_match
 from anpr2mqtt.settings import TARGET_TYPE_PLATE, DVLASettings, EventSettings
 
 log = structlog.get_logger()
+
+SUBSCRIPTIONS = "subscriptions"
+
+
+def subscribe(client: mqtt.Client, topic: str) -> None:
+    """Subscribe, and record the topic in the client userdata so on_connect can renew it.
+
+    The client uses a clean session, so the broker drops subscriptions whenever the connection does.
+    """
+    userdata: Any = client.user_data_get()
+    if isinstance(userdata, dict):
+        topics: list[str] = userdata.setdefault(SUBSCRIPTIONS, [])
+        if topic not in topics:
+            topics.append(topic)
+    client.subscribe(topic)
 
 
 def build_dvla_client(dvla_settings: DVLASettings, target_type: str | None = None) -> APIClient | None:

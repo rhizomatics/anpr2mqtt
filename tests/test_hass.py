@@ -405,3 +405,11 @@ def test_discovery_without_availability_topic(
 ) -> None:
     _publish_all_discovery(publisher, event_config, camera)
     assert all("availability_topic" not in p for p in _discovery_payloads(mock_client))
+
+
+def test_start_records_subscription_once(publisher: HomeAssistantPublisher, mock_client: Mock) -> None:
+    userdata: dict = {"subscriptions": []}
+    mock_client.user_data_get.return_value = userdata
+    publisher.start()
+    publisher.start()
+    assert userdata["subscriptions"] == ["homeassistant/status"]

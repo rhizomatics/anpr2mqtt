@@ -648,3 +648,11 @@ def test_process_event_new_visit_publishes(handler: FrigateHandler, mock_publish
     with patch.object(handler, "_get_event_image", return_value=None), patch.object(handler, "_schedule_autoclear"):
         handler._process_event("frigate/events", _make_payload(event_id="new-visit-test"))
     mock_publisher.post_state_message.assert_called_once()
+
+
+def test_start_records_subscriptions_for_reconnect(handler: FrigateHandler, mock_mqtt: Mock) -> None:
+    userdata: dict = {"subscriptions": []}
+    mock_mqtt.user_data_get.return_value = userdata
+    handler.start()
+    assert "frigate/events" in userdata["subscriptions"]
+    assert "frigate/+/snapshot" in userdata["subscriptions"]

@@ -406,3 +406,35 @@ def test_main_loop_event_handler_setup_exception(tmp_path: Path) -> None:
         main_loop()  # should not raise; exception is caught per-event
 
     mock_observer.start.assert_called_once()
+
+
+def test_on_connect_resubscribes_tracked_topics() -> None:
+    client = Mock()
+    userdata = {"availability_topic": "anpr2mqtt/availability", "subscriptions": ["homeassistant/status", "frigate/events"]}
+    on_connect(client, userdata, Mock(), _make_rc("Success", eq_zero=True))
+    assert [c.args[0] for c in client.subscribe.call_args_list] == ["homeassistant/status", "frigate/events"]
+
+
+def test_on_connect_failure_does_not_resubscribe() -> None:
+    client = Mock()
+    on_connect(client, {"subscriptions": ["homeassistant/status"]}, Mock(), _make_rc("Refused", eq_zero=False))
+    client.subscribe.assert_not_called()
+
+
+def test_main_loop_tracks_subscriptions_for_reconnect() -> None:
+    mock_settings = _make_mock_settings()
+    mock_client = Mock()
+    mock_observer = Mock()
+    mock_observer.is_alive.return_value = False
+
+    with (
+        patch("anpr2mqtt.app.Settings", return_value=mock_settings),
+        patch("anpr2mqtt.app.mqtt.Client", return_value=mock_client) as client_cls,
+        patch("anpr2mqtt.app.Observer", return_value=mock_observer),
+    ):
+        userdata: dict = {}
+        mock_client.user_data_get.side_effect = lambda: userdata
+        client_cls.side_effect = lambda **kw: userdata.update(kw["userdata"]) or mock_client
+        main_loop()
+
+    assert userdata["subscriptions"] == ["homeassistant/status"]

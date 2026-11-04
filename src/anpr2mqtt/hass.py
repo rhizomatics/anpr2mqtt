@@ -16,6 +16,7 @@ from anpr2mqtt.settings import CameraSettings, EventSettings, HomeAssistantSetti
 from anpr2mqtt.tracker import Sighting
 
 from .const import ImageInfo
+from .handler_common import subscribe
 
 log = structlog.get_logger()
 
@@ -50,7 +51,7 @@ class HomeAssistantPublisher:
         self.client.on_message = self.on_message
         self.client.on_subscribe = self.on_subscribe
         self.client.on_unsubscribe = self.on_unsubscribe
-        self.client.subscribe(self.hass_status_topic)
+        subscribe(self.client, self.hass_status_topic)
 
     def on_subscribe(
         self,

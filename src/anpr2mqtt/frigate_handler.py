@@ -10,7 +10,7 @@ import structlog
 from PIL import Image
 
 from anpr2mqtt.const import ImageInfo
-from anpr2mqtt.handler_common import AutoclearTimer, CameraGatekeeper, build_dvla_client, correct_against_good_read
+from anpr2mqtt.handler_common import AutoclearTimer, CameraGatekeeper, build_dvla_client, correct_against_good_read, subscribe
 from anpr2mqtt.hass import HomeAssistantPublisher
 from anpr2mqtt.settings import (
     TARGET_TYPE_PLATE,
@@ -74,14 +74,14 @@ class FrigateHandler:
     def start(self) -> None:
         for topic in self.frigate_settings.topic:
             self.mqtt_client.message_callback_add(topic, self._on_event_message)
-            self.mqtt_client.subscribe(topic)
+            subscribe(self.mqtt_client, topic)
         if self.frigate_settings.cameras is None:
             self.mqtt_client.message_callback_add("frigate/+/snapshot", self._on_snapshot_message)
-            self.mqtt_client.subscribe("frigate/+/snapshot")
+            subscribe(self.mqtt_client, "frigate/+/snapshot")
         else:
             for camera in self.frigate_settings.cameras:
                 self.mqtt_client.message_callback_add(f"frigate/{camera}/snapshot", self._on_snapshot_message)
-                self.mqtt_client.subscribe(f"frigate/{camera}/snapshot")
+                subscribe(self.mqtt_client, f"frigate/{camera}/snapshot")
         log.info(
             "Frigate listener started, min_score=%.2f topic=%s",
             self.frigate_settings.min_score,

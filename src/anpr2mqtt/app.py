@@ -14,6 +14,7 @@ from watchdog.observers import Observer
 import anpr2mqtt
 from anpr2mqtt.event_handler import EventHandler
 from anpr2mqtt.frigate_handler import CameraConfig, FrigateHandler
+from anpr2mqtt.handler_common import SUBSCRIPTIONS
 from anpr2mqtt.hass import (
     AVAILABILITY_OFFLINE,
     OFFLINE_PUBLISH_TIMEOUT,
@@ -46,6 +47,11 @@ def on_connect(
         if isinstance(userdata, dict) and userdata.get("availability_topic"):
             # on every (re)connect, since the will may have marked us offline while disconnected
             publish_availability(client, userdata["availability_topic"], online=True)
+        if isinstance(userdata, dict):
+            # clean session, so the broker has dropped any subscriptions from a previous connection
+            for topic in list(userdata.get(SUBSCRIPTIONS, [])):
+                log.debug("(Re)subscribing", topic=topic)
+                client.subscribe(topic)
 
 
 def on_disconnect(
@@ -97,7 +103,7 @@ def main_loop() -> None:
             clean_session=True if protocol != MQTTProtocolVersion.MQTTv5 else None,
             client_id="anpr2mqtt",
             protocol=protocol,
-            userdata={"availability_topic": avail_topic},
+            userdata={"availability_topic": avail_topic, SUBSCRIPTIONS: []},
         )
         # broker publishes this if the connection drops without a clean disconnect, e.g. a crash or kill
         client.will_set(avail_topic, payload=AVAILABILITY_OFFLINE, qos=1, retain=True)
