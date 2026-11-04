@@ -4,6 +4,14 @@
 - Docker images now security scanned
 - Automated testing now covers Python 3.13, 3.14, 3.15
 - `tools` CLI renamed to `anprtools`, to avoid clashing with other packages' commands
+- Home Assistant entities now report availability on MQTT broker, consistent with Updates2MQTT
+  - ANPR2MQTT publishes
+    - `online` to `anpr2mqtt/availability` when it connects
+    - `offline` when it shuts down
+    - sets `offline` as its MQTT last will, so the broker publishes it if the service crashes or is killed
+  - Every discovery config includes this as its `availability_topic`
+  - **Behaviour change**: while ANPR2MQTT is down, its entities in Home Assistant show as *unavailable* rather than keeping their last state. They come back when it reconnects
+  - See [Home Assistant Integration](./homeassistant.md#availability)
 # 1.1.5
 - Change pydantic dependency to `pydantic-settings[yaml]` since it now won't automatically import `pyyaml` otherwise
 - Docker image no longer sets `MQTT__HOST`, `MQTT__PORT` and `MQTT__TOPIC_ROOT` env vars, which silently overrode the same settings in the YAML config file

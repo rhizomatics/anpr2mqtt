@@ -81,7 +81,7 @@ will then group the relevant entities together on this device page. Use `device_
 
 ## MQTT Topics
 
-There are 3 separate types of MQTT topic used for HomeAssisstant integration:
+There are 4 separate types of MQTT topic used for HomeAssisstant integration:
 
 - *Config* to support auto discovery. 
     - A topic is created per camera, with a name like `homeassistant/sensor/driveway/anpr/config`. 
@@ -90,6 +90,28 @@ There are 3 separate types of MQTT topic used for HomeAssisstant integration:
 - *State* to report the last plate seen and attributes
     - `anpr2mqtt/camera_name/state`
     - `anpr2mqtt/camera_name/image`
+- *Availability* to show whether ANPR2MQTT itself is running
+    - One topic per ANPR2MQTT instance, `anpr2mqtt/availability`, holding `online` or `offline`
+    - See [Availability](#availability) below
+
+## Availability
+
+ANPR2MQTT publishes whether it is running to a retained availability topic,
+`<topic_root>/availability`, by default `anpr2mqtt/availability`, and every entity's discovery
+config points to it as its `availability_topic`.
+
+- `online` is published whenever ANPR2MQTT connects or reconnects to the broker
+- `offline` is published when it shuts down cleanly
+- `offline` is also registered with the broker as the MQTT *last will*, so the broker publishes it
+  if ANPR2MQTT crashes, is killed or loses its connection
+
+While ANPR2MQTT is down, its entities show as *unavailable* in Home Assistant, rather than
+showing the last plate seen as if it were current. They come back once it reconnects.
+
+!!! note
+
+    Before 1.2.0, entities kept their last state while ANPR2MQTT was down. Automations or
+    dashboards that treat `unavailable` as an error may now see it during restarts and upgrades.
 
 
 ## Verifying it Works
