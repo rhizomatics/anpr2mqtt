@@ -12,6 +12,7 @@
   - Every discovery config includes this as its `availability_topic`
   - **Behaviour change**: while ANPR2MQTT is down, its entities in Home Assistant show as *unavailable* rather than keeping their last state. They come back when it reconnects
   - See [Home Assistant Integration](./homeassistant.md#availability)
+- MQTT subscriptions, to Home Assistant status and Frigate events, are now renewed after a reconnect to the broker. Previously a dropped connection silently stopped Frigate events and Home Assistant restart detection until ANPR2MQTT was restarted
 # 1.1.5
 - Change pydantic dependency to `pydantic-settings[yaml]` since it now won't automatically import `pyyaml` otherwise
 - Docker image no longer sets `MQTT__HOST`, `MQTT__PORT` and `MQTT__TOPIC_ROOT` env vars, which silently overrode the same settings in the YAML config file
