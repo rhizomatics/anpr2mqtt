@@ -390,9 +390,7 @@ def _publish_all_discovery(pub: HomeAssistantPublisher, event_config: EventSetti
     pub.publish_target_sensor_discovery("tgt", "plate", [Target(id="AB12CDE")], "t/state", None)
 
 
-def test_discovery_includes_availability_topic(
-    mock_client: Mock, event_config: EventSettings, camera: CameraSettings
-) -> None:
+def test_discovery_includes_availability_topic(mock_client: Mock, event_config: EventSettings, camera: CameraSettings) -> None:
     pub = HomeAssistantPublisher(
         mock_client, HomeAssistantSettings(status_topic="homeassistant/status"), availability_topic="anpr2mqtt/availability"
     )
