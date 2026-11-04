@@ -1,4 +1,4 @@
-# 1.1.6
+# 1.2.0
 
 - Shrink docker image by removing build tooling
 - Fix healthcheck by including `jq` in image
