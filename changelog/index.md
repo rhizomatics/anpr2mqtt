@@ -1,3 +1,9 @@
+# 1.2.1
+
+- Home Assistant target sensors (a target or group given an `entity_id`) now keep the same `unique_id` across restarts. Previously it was rebuilt from a randomised hash each time ANPR2MQTT started, so Home Assistant could add a new entity after each restart, with a `_2`, `_3` suffix, and leave the old one behind as no longer provided
+- After upgrading, delete any leftover target sensors from Home Assistant's entity list, and rename the remaining one back to its original entity ID if it picked up a suffix
+- Republishing discovery when Home Assistant restarts no longer blocks the MQTT connection for the jittered delay, which held up Frigate events and keepalives while it ran
+
 # 1.2.0
 
 - Shrink docker image by removing build tooling
