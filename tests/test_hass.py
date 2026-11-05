@@ -1,5 +1,6 @@
 import datetime as dt
 import json
+import threading
 from pathlib import Path
 from typing import Any
 from unittest.mock import Mock, patch
@@ -86,8 +87,31 @@ def test_on_message_online_after_offline(publisher: HomeAssistantPublisher, mock
     msg.payload = b"online"
     with patch("time.sleep"), patch("random.randint", return_value=1):
         publisher.on_message(mock_client, None, msg)
+        _join_republish()
     assert publisher.hass_online is True
     mock_client.publish.assert_called_once_with("test/topic", '{"payload": "123", "trigger": "homeassistant/status_online"}')
+
+
+def _join_republish() -> None:
+    for t in threading.enumerate():
+        if t.name == "hass-republish":
+            t.join(timeout=5)
+
+
+def test_on_message_republish_does_not_sleep_on_mqtt_thread(publisher: HomeAssistantPublisher, mock_client: Mock) -> None:
+    """Regression: the jittered sleeps ran in the paho callback, stalling keepalives and Frigate events"""
+    publisher.republish["test/topic"] = {"payload": "123"}
+    publisher.hass_online = False
+    msg = Mock()
+    msg.topic = "homeassistant/status"
+    msg.payload = b"online"
+    sleeping_threads: list[int] = []
+    with patch("time.sleep", side_effect=lambda _s: sleeping_threads.append(threading.get_ident())):
+        publisher.on_message(mock_client, None, msg)
+        _join_republish()
+    assert sleeping_threads
+    assert threading.get_ident() not in sleeping_threads
+    mock_client.publish.assert_called_once()
 
 
 def test_on_message_online_first_time(publisher: HomeAssistantPublisher, mock_client: Mock) -> None:
@@ -413,3 +437,10 @@ def test_start_records_subscription_once(publisher: HomeAssistantPublisher, mock
     publisher.start()
     publisher.start()
     assert userdata["subscriptions"] == ["homeassistant/status"]
+
+
+def test_target_sensor_unique_id_is_stable(publisher: HomeAssistantPublisher, mock_client: Mock) -> None:
+    """Regression: unique_id used hash(), which Python randomises per process, so every restart made a new entity"""
+    targets = [Target(id="AB12CDE"), Target(id="XY99ZZZ")]
+    publisher.publish_target_sensor_discovery("known_cars", "plate", targets, "t/state", None)
+    assert _discovery_payloads(mock_client)[0]["unique_id"] == "plate_known_cars"

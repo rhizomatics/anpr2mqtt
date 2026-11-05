@@ -1,5 +1,6 @@
 import json
 import random
+import threading
 import time
 from io import BytesIO
 from pathlib import Path
@@ -84,7 +85,10 @@ class HomeAssistantPublisher:
                 if self.hass_online is False:
                     log.info("Home Assistant back online, republishing discoveries")
                     self.hass_online = True
-                    self.republish_discovery(f"{msg.topic}_{decoded}")
+                    # off the paho network thread, since the jittered sleeps would stall keepalives and Frigate events
+                    threading.Thread(
+                        target=self.republish_discovery, args=(f"{msg.topic}_{decoded}",), name="hass-republish", daemon=True
+                    ).start()
                 else:
                     log.info("Home Assistant online")
                     self.hass_online = True
@@ -190,7 +194,8 @@ class HomeAssistantPublisher:
                 "sw": anpr2mqtt.version,  # pyright: ignore[reportAttributeAccessIssue]
                 "url": "https://anpr2mqtt.rhizomatics.org.uk",
             },
-            "unique_id": f"{target_type}_{hash(':'.join(t.id for t in targets))}",
+            # keyed like the discovery topic, so it survives restarts and group membership changes
+            "unique_id": f"{target_type}_{entity_id}",
             "default_entity_id": f"sensor.{entity_id}",
             "name": targets[0].description if len(targets) == 1 else entity_id,
             "state_topic": state_topic,
