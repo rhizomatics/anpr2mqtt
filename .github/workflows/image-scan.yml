@@ -63,6 +63,17 @@ jobs:
           fail-build: false
           output-format: json
 
+      # upload-sarif feeds code scanning only, so keep both reports with the run as well
+      - name: Keep reports with the run
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: image-scan-reports
+          path: |
+            ${{ steps.sarif.outputs.sarif }}
+            ${{ steps.json.outputs.json }}
+          if-no-files-found: warn
+
       # Only apt packages and the base image's own binaries change on a rebuild. Python packages are
       # held by uv.lock, and Go modules inside third-party binaries wait for their vendor's release.
       - name: Count what a rebuild would fix
