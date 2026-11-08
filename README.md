@@ -2,7 +2,7 @@
 
 # anpr2mqtt
 
-[![Rhizomatics Open Source](https://img.shields.io/badge/rhizomatics%20open%20source-lightseagreen)](https://github.com/rhizomatics)
+[![Rhizomatics Open Source](https://img.shields.io/badge/rhizomatics%20open%20source-lightseagreen)](https://github.com/rhizomatics) [![managed by hq](https://raw.githubusercontent.com/rhizomatics/hq/main/assets/badge-managed-by-hq.svg)](https://github.com/rhizomatics/hq)
 
 [![PyPI - Version](https://img.shields.io/pypi/v/anpr2mqtt)](https://pypi.org/project/anpr2mqtt/)
 [![PyPI Downloads](https://static.pepy.tech/personalized-badge/anpr2mqtt?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads)](https://pepy.tech/projects/anpr2mqtt)
