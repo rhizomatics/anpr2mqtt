@@ -5,6 +5,7 @@
 [![Rhizomatics Open Source](https://img.shields.io/badge/rhizomatics%20open%20source-lightseagreen)](https://github.com/rhizomatics)
 
 [![PyPI - Version](https://img.shields.io/pypi/v/anpr2mqtt)](https://pypi.org/project/anpr2mqtt/)
+[![PyPI Downloads](https://static.pepy.tech/personalized-badge/anpr2mqtt?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads)](https://pepy.tech/projects/anpr2mqtt)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/rhizomatics/anpr2mqtt)
 [![Coverage](https://raw.githubusercontent.com/rhizomatics/anpr2mqtt/refs/heads/badges/badges/coverage.svg)](https://anpr2mqtt.rhizomatics.org.uk/developer/coverage/)
 ![Tests](https://raw.githubusercontent.com/rhizomatics/anpr2mqtt/refs/heads/badges/badges/tests.svg)
