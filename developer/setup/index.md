@@ -40,11 +40,11 @@ uv venv                   # Create virtual environment
 
 ### Pre-commit Hooks
 
-This project uses pre-commit hooks:
+This project uses pre-commit hooks, run with [prek](https://prek.j178.dev) from `mise.toml`:
 
 ```bash
-uv run pre-commit install
-uv run pre-commit run --all-files
+prek install
+prek run --all-files
 ```
 
 ## Docker Build
