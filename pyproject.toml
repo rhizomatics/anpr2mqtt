@@ -55,7 +55,7 @@ anprtools = "anpr2mqtt:tools"
 [tool.uv]
 compile-bytecode = true
 managed = true
-exclude-newer = "5 days"
+exclude-newer = "7 days"
 exclude-newer-package = { certifi=false, pillow=false }
 add-bounds = "major"
 
@@ -66,11 +66,9 @@ module-name = "anpr2mqtt"
 [dependency-groups]
 dev = [
     "ruff>=0.5.0",
-    "pre-commit>=3.0.0",
     "pytest>=8.0.0",
     "pytest-mock>=3.15.0",
     "pytest-mqtt>=0.6.0",
-    "pre-commit>=3.0.0",
     "ruff>=0.5.0",
     "mypy>=1.11.0",
     "pytest-cov",
