@@ -24,8 +24,9 @@ the Hikvision example above, and expects `vehicle_direction` to be `Forward`. Th
 your own field settings, and logs either `Verified OCR` or an error. The app keeps running either way, but OCR
 fields will read as `Unknown` until a failure is fixed.
 
-Outside Docker, a failure usually means the `tesseract` binary isn't installed or isn't on the `PATH`. To turn
-the check off:
+Outside Docker, a failure usually means the `tesseract` binary isn't installed or isn't on the `PATH`. Every
+event reads the `hik_direction` field unless told otherwise, so if your images have no text worth reading, turn OCR
+off for each event with `ocr_field_ids: []`. That also skips this check. To skip only the check:
 
 ```yaml
 ocr:

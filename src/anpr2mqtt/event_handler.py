@@ -377,6 +377,10 @@ def scan_ocr_fields(image: Image.Image | None, event_config: EventSettings, ocr_
 
 OCR_SAMPLE_IMAGE = "hik_direction_forward.png"
 OCR_SAMPLE_EXPECTED = {"vehicle_direction": "Forward"}
+OCR_VERIFY_HINT = (
+    "If you don't need OCR, set `ocr_field_ids: []` on each event to turn it off, "
+    "or `ocr.verify_on_startup: false` to skip only this check"
+)
 
 
 def verify_ocr() -> bool:
@@ -388,7 +392,7 @@ def verify_ocr() -> bool:
     try:
         version = pytesseract.get_tesseract_version()
     except Exception as e:
-        log.error("OCR startup verification failed, Tesseract not available: %s", e)
+        log.error("OCR startup verification failed, Tesseract not available (%s). %s", e, OCR_VERIFY_HINT)
         return False
     with (files("anpr2mqtt") / "samples" / OCR_SAMPLE_IMAGE).open("rb") as f:
         image: Image.Image = Image.open(f)
@@ -401,5 +405,10 @@ def verify_ocr() -> bool:
     if results == OCR_SAMPLE_EXPECTED:
         log.info("Verified OCR using Tesseract %s on sample image, read %s", version, results)
         return True
-    log.error("OCR startup verification failed, expected %s from sample image but read %s", OCR_SAMPLE_EXPECTED, results)
+    log.error(
+        "OCR startup verification failed, expected %s from sample image but read %s. %s",
+        OCR_SAMPLE_EXPECTED,
+        results,
+        OCR_VERIFY_HINT,
+    )
     return False

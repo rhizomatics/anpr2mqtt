@@ -5,7 +5,16 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 
 from anpr2mqtt.app import main_loop, on_connect, on_disconnect, shutdown_mqtt
-from anpr2mqtt.settings import EventSettings, Target, TargetGroup
+from anpr2mqtt.settings import (
+    CameraSettings,
+    DVLASettings,
+    EventSettings,
+    ImageSettings,
+    OCRSettings,
+    Target,
+    TargetGroup,
+    TrackerSettings,
+)
 
 
 def _make_rc(name: str, eq_zero: bool = True) -> Mock:
@@ -438,3 +447,38 @@ def test_main_loop_tracks_subscriptions_for_reconnect() -> None:
         main_loop()
 
     assert userdata["subscriptions"] == ["homeassistant/status"]
+
+
+@pytest.mark.parametrize(("verify_on_startup", "ocr_field_ids", "called"), [
+    (True, ["hik_direction"], True),
+    (False, ["hik_direction"], False),
+    (True, [], False),
+])  # fmt: skip
+def test_main_loop_verifies_ocr_only_when_used(
+    tmp_path: Path, verify_on_startup: bool, ocr_field_ids: list[str], called: bool
+) -> None:
+    event_config = EventSettings(
+        camera="cam1",
+        event="anpr",
+        watch_path=tmp_path,
+        image_name_re=re.compile(r"(?P<dt>[0-9]{17})_(?P<target>[A-Z0-9]+)_(?P<event>VEHICLE_DETECTION)\.(?P<ext>jpg)"),
+        ocr_field_ids=ocr_field_ids,
+    )
+    settings = _make_mock_settings(events=[event_config])
+    settings.cameras = [CameraSettings(name="cam1")]
+    settings.ocr = OCRSettings(verify_on_startup=verify_on_startup)
+    settings.image = ImageSettings()
+    settings.dvla = DVLASettings()
+    settings.tracker = TrackerSettings(data_dir=tmp_path)
+    observer = Mock()
+    observer.is_alive.return_value = False
+
+    with (
+        patch("anpr2mqtt.app.Settings", return_value=settings),
+        patch("anpr2mqtt.app.mqtt.Client", return_value=Mock()),
+        patch("anpr2mqtt.app.Observer", return_value=observer),
+        patch("anpr2mqtt.app.verify_ocr") as verify,
+    ):
+        main_loop()
+
+    assert verify.called is called
