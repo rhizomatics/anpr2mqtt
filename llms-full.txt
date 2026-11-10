@@ -229,6 +229,17 @@ Use the [OCR Tool](https://anpr2mqtt.rhizomatics.org.uk/debug_tools/#ocr-ocr_fil
 1. Apply optional corrections
 1. Optionally restrict to a list of values, forcing case if needed
 
+## Startup Check
+
+When any event uses OCR fields, ANPR2MQTT reads a small bundled sample image at startup, the caption bar from the Hikvision example above, and expects `vehicle_direction` to be `Forward`. This checks the [Tesseract](https://github.com/tesseract-ocr/tesseract) OCR engine is installed and working, independently of your own field settings, and logs either `Verified OCR` or an error. The app keeps running either way, but OCR fields will read as `Unknown` until a failure is fixed.
+
+Outside Docker, a failure usually means the `tesseract` binary isn't installed or isn't on the `PATH`. To turn the check off:
+
+```yaml
+ocr:
+  verify_on_startup: false
+```
+
 ## Example Configuration
 
 The configuration for this can be in the `anpr2mqtt.yaml` file, or in environment variables or command line arguments.
@@ -953,6 +964,8 @@ uv sync --frozen   # Use exact lockfile versions
 # 1.2.2
 
 - Image rebuild for Debian CVE fixes
+- Fix OCR in the Docker image, broken since 1.2.0: the `tesseract` binary was no longer installed, only its English language data, so OCR fields such as `vehicle_direction` always came out as `Unknown`
+- OCR is checked at startup against a bundled sample image, logging `Verified OCR` or an error, so a missing or broken Tesseract shows up immediately rather than as every field reading `Unknown`. Turn off with `ocr.verify_on_startup: false`
 - Docker image now has a built-in `HEALTHCHECK`, using the new `anprtools healthcheck` command. It passes while the main loop is running and connected to MQTT, and needs no broker credentials
 - The old `/app/healthcheck.sh` script is removed. It waited for a heartbeat ANPR2MQTT never published, so it always failed. Remove any `healthcheck:` that calls it from your compose file
 - `mosquitto-clients` and `jq` are no longer installed in the image, reducing CVE exposure

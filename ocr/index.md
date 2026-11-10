@@ -14,6 +14,17 @@ Use the [OCR Tool](https://anpr2mqtt.rhizomatics.org.uk/debug_tools/#ocr-ocr_fil
 1. Apply optional corrections
 1. Optionally restrict to a list of values, forcing case if needed
 
+## Startup Check
+
+When any event uses OCR fields, ANPR2MQTT reads a small bundled sample image at startup, the caption bar from the Hikvision example above, and expects `vehicle_direction` to be `Forward`. This checks the [Tesseract](https://github.com/tesseract-ocr/tesseract) OCR engine is installed and working, independently of your own field settings, and logs either `Verified OCR` or an error. The app keeps running either way, but OCR fields will read as `Unknown` until a failure is fixed.
+
+Outside Docker, a failure usually means the `tesseract` binary isn't installed or isn't on the `PATH`. To turn the check off:
+
+```yaml
+ocr:
+  verify_on_startup: false
+```
+
 ## Example Configuration
 
 The configuration for this can be in the `anpr2mqtt.yaml` file, or in environment variables or command line arguments.
