@@ -35,6 +35,9 @@ theme:
     - toc.follow
     - toc.integrate
 
+extra_css:
+  - assets/stylesheets/extra.css
+
 extra:
   version:
     provider: mike
