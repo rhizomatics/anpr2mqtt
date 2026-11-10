@@ -27,10 +27,12 @@ RUN uv sync --locked --no-dev --no-editable --no-cache
 # Runtime stage: only the venv and runtime system packages, no uv or build tools
 FROM python:3.14-slim@sha256:9aaa474097d094040649f2162a627c0049b408f52138d980916788d80f04802f
 
-# Keep this list minimal: every package here is CVE surface that only a rebuild can patch
+# Keep this list minimal: every package here is CVE surface that only a rebuild can patch.
+# tesseract-ocr is the OCR binary; tesseract-ocr-eng is only its language data, which merely
+# recommends the binary, so with --no-install-recommends both must be named.
 RUN apt-get -y update && \
     apt-get -y upgrade && \
-    apt-get install -y --no-install-recommends tesseract-ocr-eng && \
+    apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-eng && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
