@@ -169,19 +169,23 @@ class OCRFieldSettings(BaseModel):
     values: list[str] | None = None
 
 
+def hik_direction_field() -> OCRFieldSettings:
+    """Field to read `direction` from the caption bar of the Hikvision DS-2CD4A25FWD-IZS"""
+    return OCRFieldSettings(
+        label="vehicle_direction",
+        invert=True,
+        crop=DimensionSettings(x=850, y=0, h=30, w=650),
+        values=["Forward", "Reverse", "Unknown"],
+        correction={"Forward": [re.compile(r"Fo.*rd")], "Reverse": [re.compile(r"Re.*rse"), re.compile(r"Bac.*rd")]},
+    )
+
+
 class OCRSettings(BaseModel):
     """Defaults for reading `direction` for the Hikvision DS-2CD4A25FWD-IZS"""
 
-    fields: dict[str, OCRFieldSettings] = Field(
-        default_factory=lambda: {
-            "hik_direction": OCRFieldSettings(
-                label="vehicle_direction",
-                invert=True,
-                crop=DimensionSettings(x=850, y=0, h=30, w=650),
-                values=["Forward", "Reverse", "Unknown"],
-                correction={"Forward": [re.compile(r"Fo.*rd")], "Reverse": [re.compile(r"Re.*rse"), re.compile(r"Bac.*rd")]},
-            )
-        }
+    fields: dict[str, OCRFieldSettings] = Field(default_factory=lambda: {"hik_direction": hik_direction_field()})
+    verify_on_startup: bool = Field(
+        default=True, description="OCR a bundled sample image at startup, to check Tesseract is installed and working"
     )
 
 

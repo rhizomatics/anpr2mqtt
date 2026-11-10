@@ -1,5 +1,10 @@
 # 1.2.2
 - Image rebuild for Debian CVE fixes
+- Fix OCR in the Docker image, broken since 1.2.0: the `tesseract` binary was no longer installed, only its
+  English language data, so OCR fields such as `vehicle_direction` always came out as `Unknown`
+- OCR is checked at startup against a bundled sample image, logging `Verified OCR` or an error, so a missing
+  or broken Tesseract shows up immediately rather than as every field reading `Unknown`. Turn off with
+  `ocr.verify_on_startup: false`
 - Docker image now has a built-in `HEALTHCHECK`, using the new `anprtools healthcheck` command. It passes
   while the main loop is running and connected to MQTT, and needs no broker credentials
   - The old `/app/healthcheck.sh` script is removed. It waited for a heartbeat ANPR2MQTT never published,

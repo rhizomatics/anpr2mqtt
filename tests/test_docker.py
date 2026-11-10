@@ -100,6 +100,8 @@ mqtt:
         while time.monotonic() < deadline and STARTED_MARKER not in container_logs(name) and is_running(name):
             time.sleep(1)
         assert STARTED_MARKER in container_logs(name), f"app did not start:\n{container_logs(name)}"
+        # startup OCR check on the bundled sample, which needs the tesseract binary from apt
+        assert "Verified OCR" in container_logs(name), f"OCR startup check failed:\n{container_logs(name)}"
         # still up shortly after, rather than crashing once the observer loop began
         time.sleep(2)
         assert is_running(name), f"app exited after startup:\n{container_logs(name)}"

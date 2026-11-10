@@ -12,7 +12,7 @@ from pydantic_settings import CliApp
 from watchdog.observers import Observer
 
 import anpr2mqtt
-from anpr2mqtt.event_handler import EventHandler
+from anpr2mqtt.event_handler import EventHandler, verify_ocr
 from anpr2mqtt.frigate_handler import CameraConfig, FrigateHandler
 from anpr2mqtt.handler_common import SUBSCRIPTIONS
 from anpr2mqtt.hass import (
@@ -82,6 +82,8 @@ def main_loop() -> None:
             len(settings.targets[target_type].correction),
             len(settings.targets[target_type].ignore),
         )
+    if settings.ocr.verify_on_startup and any(event.ocr_field_ids for event in settings.events):
+        verify_ocr()
 
     client: mqtt.Client
     publisher: HomeAssistantPublisher

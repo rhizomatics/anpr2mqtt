@@ -1,5 +1,6 @@
 import datetime as dt
 import re
+from importlib.resources import files
 from io import BytesIO
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -22,6 +23,7 @@ from anpr2mqtt.settings import (
     ImageSettings,
     OCRFieldSettings,
     OCRSettings,
+    hik_direction_field,
 )
 from anpr2mqtt.tracker import Sighting, Tracker
 
@@ -371,3 +373,33 @@ def scan_ocr_fields(image: Image.Image | None, event_config: EventSettings, ocr_
             results["OCR_ERROR"] = f"field:{field_settings.label}, error:{e}"
 
     return results
+
+
+OCR_SAMPLE_IMAGE = "hik_direction_forward.png"
+OCR_SAMPLE_EXPECTED = {"vehicle_direction": "Forward"}
+
+
+def verify_ocr() -> bool:
+    """OCR a bundled sample image, to check at startup that Tesseract is installed and reads text
+
+    Uses the built-in Hikvision direction field rather than the configured fields, so it checks the
+    OCR engine works independently of camera-specific crop and correction settings.
+    """
+    try:
+        version = pytesseract.get_tesseract_version()
+    except Exception as e:
+        log.error("OCR startup verification failed, Tesseract not available: %s", e)
+        return False
+    with (files("anpr2mqtt") / "samples" / OCR_SAMPLE_IMAGE).open("rb") as f:
+        image: Image.Image = Image.open(f)
+        image.load()
+    results = scan_ocr_fields(
+        image,
+        EventSettings(ocr_field_ids=["sample"]),
+        OCRSettings(fields={"sample": hik_direction_field()}),
+    )
+    if results == OCR_SAMPLE_EXPECTED:
+        log.info("Verified OCR using Tesseract %s on sample image, read %s", version, results)
+        return True
+    log.error("OCR startup verification failed, expected %s from sample image but read %s", OCR_SAMPLE_EXPECTED, results)
+    return False
