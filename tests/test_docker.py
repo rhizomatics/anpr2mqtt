@@ -20,6 +20,7 @@ pytestmark = pytest.mark.docker
 PROJECT_ROOT = Path(__file__).parent.parent
 STARTED_MARKER = "Starting observer loop"
 STARTUP_TIMEOUT = 60
+OCR_FIXTURE = "20250602103045407_B4DM3N_VEHICLE_DETECTION.jpg"
 
 
 def docker_available() -> bool:
@@ -107,3 +108,13 @@ mqtt:
         assert health.returncode == 0, f"healthcheck failed: {health.stdout}{health.stderr}"
     finally:
         docker("rm", "-f", name, check=False)
+
+
+def test_container_ocr(image: str) -> None:
+    """OCR needs the tesseract binary from apt, which pip/uv can't provide and a slim image omits"""
+    result = docker(
+        "run", "--rm", "--entrypoint", "anprtools",
+        "-v", f"{PROJECT_ROOT / 'fixtures'}:/fixtures:ro",
+        image, "ocr_file", "--event.watch_path", "/fixtures", OCR_FIXTURE,
+    )  # fmt: skip
+    assert "{'vehicle_direction': 'Forward'}" in result.stdout, result.stdout + result.stderr
