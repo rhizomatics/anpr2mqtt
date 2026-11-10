@@ -102,7 +102,7 @@ class FrigateHandler:
         except Exception as e:
             log.error("Frigate event processing error: %s", e, exc_info=True)
 
-    def _process_event(self, topic: str, raw: bytes) -> None:
+    def _process_event(self, topic: str, raw: bytes | bytearray) -> None:
         try:
             payload: dict[str, Any] = json.loads(raw)
         except json.JSONDecodeError as e:

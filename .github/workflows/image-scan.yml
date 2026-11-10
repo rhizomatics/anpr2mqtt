@@ -1,5 +1,5 @@
 # Scans the published image for vulnerabilities that have a fix available. The base image and apt
-# packages only change when the image is rebuilt, so the weekly run rebuilds the latest release
+# packages only change when the image is rebuilt, so the daily run rebuilds the latest release
 # under its existing version tags when a rebuild would pick up a fix. No new release is needed.
 #
 # Findings go to code scanning. The scan after each publish closes those the rebuild fixed, so what
@@ -8,7 +8,7 @@ name: Scan published image
 
 on:
   schedule:
-    - cron: "43 1 * * 1"
+    - cron: "43 1 * * *"
   workflow_dispatch:
     inputs:
       rebuild:
@@ -76,7 +76,7 @@ jobs:
 
       # Only apt packages and the base image's own binaries change on a rebuild. Python packages are
       # held by uv.lock, and Go modules inside third-party binaries wait for their vendor's release.
-      - name: Count what a rebuild would fix
+      - name: Count what a rebuild could fix
         id: fixable
         env:
           REPORT: ${{ steps.json.outputs.json }}
@@ -88,9 +88,31 @@ jobs:
           echo "$count critical/high findings a rebuild would fix"
           echo "count=$count" >> "$GITHUB_OUTPUT"
 
+      # A fix grype knows of may not be installable yet (e.g. a Debian fix only in a later suite),
+      # and a daily rebuild that changes nothing would still re-push the release tags. So only
+      # rebuild when apt has upgrades for the image, or its base tag now carries a newer Python.
+      - name: Check a rebuild would change the image
+        id: changed
+        if: steps.fixable.outputs.count != '0'
+        run: |
+          base=$(sed -nE 's/^FROM ([^@ ]+).*/\1/p' Dockerfile | tail -1)
+          docker pull -q "$IMAGE" >/dev/null
+          docker pull -q "$base" >/dev/null
+          upgradable=$(docker run --rm --user root --entrypoint sh "$IMAGE" -c \
+            'apt-get update -qq >/dev/null && apt list --upgradable 2>/dev/null | grep -c "upgradable from" || true')
+          pyver() { docker run --rm --entrypoint python "$1" -c 'import platform; print(platform.python_version())'; }
+          image_py=$(pyver "$IMAGE")
+          base_py=$(pyver "$base")
+          echo "$upgradable apt upgrades available; Python $image_py in image, $base_py in $base"
+          if [ "$upgradable" != "0" ] || [ "$image_py" != "$base_py" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Fixable findings remain, but a rebuild would not change the image yet"
+          fi
+
       # Never on workflow_run: that is the scan after a publish, and rebuilding from it could loop
       - name: Rebuild the latest release
-        if: steps.fixable.outputs.count != '0' && (github.event_name == 'schedule' || inputs.rebuild)
+        if: steps.changed.outputs.changed == 'true' && (github.event_name == 'schedule' || inputs.rebuild)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

@@ -331,7 +331,9 @@ class Settings(BaseSettings):
             for group in groups:
                 if not isinstance(group, dict):
                     continue
-                raw_members: list[object] = group.get("members") or []  # type: ignore[assignment]
+                raw_members = group.get("members")
+                if not isinstance(raw_members, list):
+                    continue
                 for i, member in enumerate(raw_members):
                     if isinstance(member, str):
                         raw_members[i] = {"id": member, "target_type": target_type}

@@ -1,7 +1,7 @@
 [project]
 name = "anpr2mqtt"
-version = "1.2.1"
-description = "ANPR MQTT bridge for Home Assistant"
+version = "1.2.2"
+description = "ANPR/ALPR MQTT bridge for Home Assistant"
 authors = [
     { name = "jey burrows", email = "jrb@rhizomatics.org.uk" }
 ]
@@ -100,9 +100,6 @@ docs=[
 requires = ["uv_build>=0.11.3"]
 build-backend = "uv_build"
 
-[mypy]
-plugins = "pydantic.mypy"
-
 [tool.bandit]
 exclude_dirs = ["tests"]
 skips = ["B311"]
@@ -195,3 +192,9 @@ directory="htmlcov"
 
 [tool.mypy]
 mypy_path=["./src","./tests"]
+plugins = ["pydantic.mypy"]
+
+# Third-party packages that ship no type information
+[[tool.mypy.overrides]]
+module = ["pytesseract", "usingversion"]
+ignore_missing_imports = true

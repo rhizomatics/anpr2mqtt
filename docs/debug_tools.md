@@ -104,3 +104,18 @@ Key flags for `dvla_lookup`:
 | `--dvla.cache_dir` | Caching directory | `/data/cache` |
 | `--test` | Use UAT environment | `False` |
 | `--log_level` | Logging verbosity | `INFO` |
+
+## Healthcheck (`healthcheck`)
+
+Reports whether ANPR2MQTT is running and connected to MQTT. While it is, the main loop touches a heartbeat
+file every 10 seconds, and `healthcheck` exits non-zero if that file is missing or older than `--max_age`
+seconds (default 60). The Docker image runs it as its `HEALTHCHECK`, so `docker ps` shows the container as
+`healthy` or `unhealthy` with no extra configuration.
+
+```bash
+docker exec anpr2mqtt anprtools healthcheck
+```
+
+The heartbeat file is `anpr2mqtt.heartbeat` in the system temporary directory (`/tmp` in the container),
+or the path in the `ANPR2MQTT_HEARTBEAT_FILE` environment variable, which must be set the same for both
+the app and the healthcheck.

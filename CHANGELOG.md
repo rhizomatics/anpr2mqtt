@@ -1,3 +1,11 @@
+# 1.2.2
+- Image rebuild for Debian CVE fixes
+- Docker image now has a built-in `HEALTHCHECK`, using the new `anprtools healthcheck` command. It passes
+  while the main loop is running and connected to MQTT, and needs no broker credentials
+  - The old `/app/healthcheck.sh` script is removed. It waited for a heartbeat ANPR2MQTT never published,
+    so it always failed. Remove any `healthcheck:` that calls it from your compose file
+  - `mosquitto-clients` and `jq` are no longer installed in the image, reducing CVE exposure
+- Base images are pinned by digest, and published images are scanned daily, rebuilding when a fix is available
 # 1.2.1
 - Home Assistant target sensors (a target or group given an `entity_id`) now keep the same `unique_id`
   across restarts. Previously it was rebuilt from a randomised hash each time ANPR2MQTT started, so

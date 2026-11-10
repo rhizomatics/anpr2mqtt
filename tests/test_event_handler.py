@@ -399,9 +399,7 @@ def test_on_closed_exception_path(event_handler: EventHandler) -> None:
 
 
 def _set_autoclear(handler: EventHandler, **kwargs: object) -> None:
-    handler.event_config = handler.event_config.model_copy(
-        update={"autoclear": AutoClearSettings(**kwargs)}  # type:ignore[arg-type]
-    )
+    handler.event_config = handler.event_config.model_copy(update={"autoclear": AutoClearSettings(**kwargs)})
 
 
 def test_do_autoclear_sensor_only(event_handler: EventHandler) -> None:

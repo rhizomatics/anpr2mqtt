@@ -13,7 +13,9 @@ if TYPE_CHECKING:
     from requests_cache.models.response import CachedResponse
 
 
-class _CachedSession(CacheMixin, niquests.Session):  # type: ignore[misc]
+# requests-cache's CacheMixin is typed against requests.Session, so combining it with niquests.Session
+# (API compatible at runtime) can't satisfy a type checker's override rules
+class _CachedSession(CacheMixin, niquests.Session):  # type: ignore[misc]  # ty:ignore[invalid-method-override, invalid-attribute-override, invalid-mutable-override]
     """requests-cache backed by niquests as the transport."""
 
 

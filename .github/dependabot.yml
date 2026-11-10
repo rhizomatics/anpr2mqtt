@@ -39,11 +39,12 @@ updates:
         applies-to: security-updates
         patterns: ["*"]
 
+  # Base images are pinned by digest, so this also raises a PR whenever python:3.14-slim is
+  # republished with security fixes. Weekly, not fortnightly, since those land between releases.
   - package-ecosystem: docker
     directory: /
     schedule:
-      interval: cron
-      cronjob: "0 6 1,15 * *"
+      interval: weekly
     cooldown:
       default-days: 7
     groups:

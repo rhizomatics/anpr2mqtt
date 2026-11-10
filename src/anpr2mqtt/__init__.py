@@ -1,4 +1,4 @@
-from usingversion import getattr_with_version  # type:ignore[import-not-found]
+from usingversion import getattr_with_version
 
 from anpr2mqtt.app import run as run
 from anpr2mqtt.tools import tools as tools

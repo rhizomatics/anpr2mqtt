@@ -1,4 +1,5 @@
 import json
+import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -15,6 +16,7 @@ from pydantic_settings import (
 
 from anpr2mqtt.api_client import DVLAClient
 from anpr2mqtt.event_handler import examine_file, scan_ocr_fields
+from anpr2mqtt.heartbeat import DEFAULT_MAX_AGE, heartbeat_age, heartbeat_path
 from anpr2mqtt.settings import DVLASettings, EventSettings, OCRFieldSettings, OCRSettings
 
 if TYPE_CHECKING:
@@ -52,7 +54,7 @@ class ListTool(BaseModel):
     def cli_cmd(self) -> None:
         structlog.configure(wrapper_class=structlog.make_filtering_bound_logger(self.log_level))
         log.info(f"list_dir: {self.event.event} from {self.event.watch_path.resolve()}")
-        for p in self.event.watch_path.iterdir():  # ty:ignore[invalid-argument-type]
+        for p in self.event.watch_path.iterdir():
             results: ImageInfo | None = examine_file(p, self.event.image_name_re)
             if results is not None:
                 print(f"{results.target}: timestamp={results.timestamp},ext={results.ext}")  # noqa: T201
@@ -83,6 +85,20 @@ class DVLATool(BaseModel):
         print(json.dumps(result, indent=2))  # noqa: T201
 
 
+class HealthcheckTool(BaseModel):
+    max_age: int = Field(default=DEFAULT_MAX_AGE, description="Seconds since the last heartbeat before failing")
+
+    def cli_cmd(self) -> None:
+        age: float | None = heartbeat_age()
+        if age is None:
+            print(f"UNHEALTHY: no heartbeat at {heartbeat_path()}")  # noqa: T201
+            sys.exit(1)
+        if age > self.max_age:
+            print(f"UNHEALTHY: heartbeat is {age:.0f}s old (limit {self.max_age}s)")  # noqa: T201
+            sys.exit(1)
+        print(f"HEALTHY: heartbeat is {age:.0f}s old")  # noqa: T201
+
+
 class Tools(BaseSettings, cli_parse_args=True, cli_exit_on_error=True):
     model_config = SettingsConfigDict(
         env_nested_delimiter="__",
@@ -92,6 +108,7 @@ class Tools(BaseSettings, cli_parse_args=True, cli_exit_on_error=True):
     ocr_file: CliSubCommand[OCRTool]
     list_dir: CliSubCommand[ListTool]
     dvla_lookup: CliSubCommand[DVLATool]
+    healthcheck: CliSubCommand[HealthcheckTool]
 
     def cli_cmd(self) -> None:
         CliApp.run_subcommand(self)

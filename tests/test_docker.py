@@ -102,5 +102,8 @@ mqtt:
         # still up shortly after, rather than crashing once the observer loop began
         time.sleep(2)
         assert is_running(name), f"app exited after startup:\n{container_logs(name)}"
+        # the image's HEALTHCHECK command passes once the loop is running and connected to the broker
+        health = docker("exec", name, "anprtools", "healthcheck", check=False)
+        assert health.returncode == 0, f"healthcheck failed: {health.stdout}{health.stderr}"
     finally:
         docker("rm", "-f", name, check=False)

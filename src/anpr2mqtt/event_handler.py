@@ -87,7 +87,7 @@ class EventHandler(RegexMatchingEventHandler):
         log.info("New complete file detected: %s", event.src_path)
 
         file_path = Path(str(event.src_path))
-        if not file_path.stat() or file_path.stat().st_size == 0:
+        if file_path.stat().st_size == 0:
             log.warning("Empty image file, ignoring, at %s", file_path)
             return
         url: str | None = (

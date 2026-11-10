@@ -12,6 +12,10 @@ on:
         description: "Skip tests and publish anyway (emergency use only, e.g. security fix blocked by a minor build break)"
         type: boolean
         default: false
+      float_base:
+        description: "Build on the current image for each base tag, ignoring the digests pinned in the Dockerfile (picks up base fixes when rebuilding an old release)"
+        type: boolean
+        default: true
 
 
 # Defines two custom environment variables for the workflow. These are used for the Container registry domain, and a name for the Docker image that this workflow builds.
@@ -42,6 +46,13 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
+      # Release builds use the pinned digests. A rebuild of a release tag would otherwise keep the base
+      # image that was current when it was cut, so drop the pins and take the latest image for each tag.
+      - name: Unpin base image digests for rebuild
+        if: github.event_name == 'workflow_dispatch' && inputs.float_base
+        run: |
+          sed -i -E 's/^((FROM |COPY --from=)[^@ ]+)@sha256:[0-9a-f]{64}/\1/' Dockerfile
+          grep -nE '^(FROM|COPY --from=)' Dockerfile
       # Uses the `docker/login-action` action to log in to the Container registry registry using the account and password that will publish the packages. Once published, the packages are scoped to the account defined here.
       - name: Log in to the Container registry
         uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6

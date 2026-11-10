@@ -1,6 +1,6 @@
 import logging
 import sys
-from typing import Any, cast
+from typing import Any
 
 import paho.mqtt.client as mqtt
 import structlog
@@ -22,6 +22,7 @@ from anpr2mqtt.hass import (
     availability_topic,
     publish_availability,
 )
+from anpr2mqtt.heartbeat import Heartbeat
 from anpr2mqtt.settings import CameraSettings, EventSettings, Settings
 from anpr2mqtt.tracker import Tracker, compute_time_analysis
 
@@ -37,7 +38,7 @@ def on_connect(
     _props: Properties | None = None,
 ) -> None:
     log.debug("on_connect, MQTT result code " + str(rc))
-    if cast("str", rc.getName()) == "Not authorized":
+    if rc.getName() == "Not authorized":
         log.error("Invalid MQTT credentials", result_code=rc)
         return
     if rc != 0:
@@ -70,7 +71,7 @@ def on_disconnect(
 def main_loop() -> None:
     """Watch a directory, post any matching files to MQTT after optionally analyzing the image"""
     structlog.configure(wrapper_class=structlog.make_filtering_bound_logger(logging.INFO))
-    settings: Settings = Settings()  # type: ignore[call-arg]
+    settings: Settings = Settings()
     if settings.log_level != "INFO":
         structlog.configure(wrapper_class=structlog.make_filtering_bound_logger(getattr(logging, str(settings.log_level))))
     log.info("ANPR2MQTT %s starting up", anpr2mqtt.version)  # pyright: ignore[reportAttributeAccessIssue]
@@ -161,9 +162,9 @@ def main_loop() -> None:
                 dvla_config=settings.dvla,
                 tracker=tracker,
                 mqtt_topic_root=settings.mqtt.topic_root,
-            )  # ty:ignore[invalid-argument-type]
+            )
             log.debug("Scheduling watchdog for %s", event_config.watch_path)
-            observer.schedule(event_handler, str(event_config.watch_path), recursive=event_config.watch_tree)  # ty:ignore[invalid-argument-type]
+            observer.schedule(event_handler, str(event_config.watch_path), recursive=event_config.watch_tree)
             publisher.publish_sensor_discovery(state_topic=state_topic, event_config=event_config, camera=camera)
             if settings.homeassistant.image_entity:
                 publisher.publish_image_discovery(
@@ -241,13 +242,18 @@ def main_loop() -> None:
     else:
         log.info("Frigate listener disabled")
 
+    heartbeat = Heartbeat()
     try:
         log.info("Starting observer loop")
         while observer.is_alive():
+            # only while connected, so the healthcheck also fails if the broker connection is lost
+            if client.is_connected():
+                heartbeat.beat()
             observer.join(1)
     except Exception as e:
         log.error("Failed in run observer loop: %s", e, exc_info=1)
     finally:
+        heartbeat.clear()
         observer.stop()
         observer.join()
         log.info("loop observer ended")

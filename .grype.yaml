@@ -1,0 +1,20 @@
+# Grype configuration, picked up from the working directory by anchore/scan-action in image-scan.yml
+# and by a local `grype ghcr.io/rhizomatics/anpr2mqtt:release`.
+#
+# Ignore a finding only once someone has checked it can't affect this image, and say why in
+# `reason`, so code scanning keeps only alerts that need action. Prefer the narrowest match:
+# a vulnerability ID plus package name, never a whole package or severity.
+#
+# Review each rule when its package is upgraded, and delete it once the fix ships.
+#
+# Example:
+#   - vulnerability: CVE-0000-00000
+#     package:
+#       name: zlib1g
+#       type: deb
+#     reason: "Flaw is in minizip, which is not built into zlib1g and not shipped in the image"
+
+# Only report findings that have a fix, matching the scan-action `only-fixed` input
+only-fixed: true
+
+ignore: []

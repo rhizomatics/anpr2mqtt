@@ -35,7 +35,7 @@ def test_load_yaml(config_name: str) -> None:
         ) -> tuple[PydanticBaseSettingsSource, ...]:
             return (YamlConfigSettingsSource(settings_cls, yaml_file=config_path),)
 
-    settings = YamlOnlySettings()  # type: ignore[call-arg]
+    settings = YamlOnlySettings()
 
     assert settings.mqtt.password is not None
     assert settings.events[0].watch_path is not None
