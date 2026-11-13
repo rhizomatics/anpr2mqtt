@@ -3,6 +3,11 @@
 ## 📝 Other changes
 
 - Correct version number for release
+- `niquests-cache` replaces `requests-cache`, also removes otherwise unnecessary `requests` dependency
+
+## 🐛 Bug fixes
+
+- Fixed error in handling a DVLA API rejection
 
 # 1.3.0
 

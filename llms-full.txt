@@ -146,7 +146,7 @@ Each known plate can be associated with a list of regular expressions and/or pla
 - **pytesseract** - OCR for direction detection
 - **structlog** - Structured logging
 - **niquests** - API Client
-- **requests-cache** - API result caching
+- **niquests-cache** - API result caching
 
 ## Distribution
 
@@ -985,6 +985,11 @@ No major changes are planned for ANPR2MQTT
 ## 📝 Other changes
 
 - Correct version number for release
+- `niquests-cache` replaces `requests-cache`, also removes otherwise unnecessary `requests` dependency
+
+## 🐛 Bug fixes
+
+- Fixed error in handling a DVLA API rejection
 
 # 1.3.0
 
