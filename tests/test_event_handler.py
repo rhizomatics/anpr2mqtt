@@ -80,6 +80,7 @@ def test_eventhandler_copes_with_malformed_reg_plate_event(event_handler: EventH
                 "camera": "test_cam",
                 "area": None,
                 "live_url": None,
+                "linked_cameras": {},
                 "reg_info": None,
                 "history": None,
                 "vehicle_direction": "Unknown",

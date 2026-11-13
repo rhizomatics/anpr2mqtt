@@ -9,7 +9,7 @@ import pytest
 from PIL import Image
 
 from anpr2mqtt.const import ImageInfo
-from anpr2mqtt.hass import HomeAssistantPublisher
+from anpr2mqtt.hass import DEVICE_MANUFACTURER, DEVICE_MODEL, HomeAssistantPublisher
 from anpr2mqtt.settings import CameraSettings, EventSettings, HomeAssistantSettings, Target
 from anpr2mqtt.tracker import Sighting
 
@@ -264,6 +264,29 @@ def test_add_device_info_with_area(publisher: HomeAssistantPublisher, camera_wit
     publisher.add_device_info(payload, camera_with_area)
     assert "dev" in payload
     assert payload["dev"]["suggested_area"] == "Driveway"
+    assert payload["dev"]["configuration_url"] == "http://cam1/live"
+
+
+def test_add_device_info_says_anpr2mqtt(publisher: HomeAssistantPublisher, camera: CameraSettings) -> None:
+    payload: dict[str, Any] = {}
+    publisher.add_device_info(payload, camera)
+    assert (
+        (payload["dev"]["manufacturer"], payload["dev"]["model"])
+        == (DEVICE_MANUFACTURER, DEVICE_MODEL)
+        == (
+            "Rhizomatics",
+            "anpr2mqtt",
+        )
+    )
+    # unchanged, so existing devices are kept
+    assert payload["dev"]["identifiers"] == ["cam1.anpr2mqtt"]
+    assert "configuration_url" not in payload["dev"]
+
+
+def test_add_device_info_skips_unusable_live_url(publisher: HomeAssistantPublisher) -> None:
+    payload: dict[str, Any] = {}
+    publisher.add_device_info(payload, CameraSettings(name="cam1", live_url="frigate.local/cam1"))
+    assert "configuration_url" not in payload["dev"]
 
 
 def test_add_device_info_without_area(publisher: HomeAssistantPublisher, camera: CameraSettings) -> None:
@@ -286,6 +309,15 @@ def test_post_state_message_minimal(
     assert payload["target"] is None
     assert payload["event"] == "anpr"
     assert payload["camera"] == "cam1"
+
+
+def test_post_state_message_linked_cameras(
+    publisher: HomeAssistantPublisher, mock_client: Mock, event_config: EventSettings
+) -> None:
+    camera = CameraSettings(name="cam1", linked_cameras={"frigate": "driveway_lpr", "viseron": "drive"})
+    publisher.post_state_message("anpr2mqtt/anpr/cam1/state", sighting=None, event_config=event_config, camera=camera)
+    _args, kwargs = mock_client.publish.call_args
+    assert json.loads(kwargs["payload"])["linked_cameras"] == {"frigate": "driveway_lpr", "viseron": "drive"}
 
 
 def test_post_state_message_with_all_fields(
@@ -331,6 +363,7 @@ def test_post_state_message_with_all_fields(
     assert payload["image_size"] == 12345
     assert payload["area"] == "Driveway"
     assert payload["live_url"] == "http://cam1/live"
+    assert payload["linked_cameras"] == {}
     assert payload["reg_info"] == {"make": "FORD"}
 
 

@@ -32,6 +32,12 @@ class CameraSettings(BaseModel):
     name: str = Field(default="driveway", description="Camera Identifier, used to build MQTT topic names")
     area: str | None = Field(default=None, description="Home Assistant area ID")
     live_url: str | None = Field(default=None, description="URL to watch camera feed live")
+    linked_cameras: dict[str, str] = Field(
+        default_factory=dict,
+        description="The same camera in other integrations, by the Home Assistant domain of each, such as frigate, "
+        "unifiprotect, viseron or blueiris, for integrations that join sightings to their events. The frigate camera "
+        "is also the one whose licence plate events are published as this camera, only needed where its name differs",
+    )
 
 
 class AutoClearSettings(BaseModel):
@@ -135,6 +141,22 @@ class FrigateSettings(BaseModel):
         default=None, description="Frigate base URL for API snapshot fallback and UI links, e.g. http://frigate:5000"
     )
     cameras: list[str] | None = Field(default=None, description="Camera names to process; None means all cameras")
+
+
+# the key of a linked Frigate camera, the Frigate integration's Home Assistant domain
+LINK_FRIGATE = "frigate"
+
+
+def linked_cameras(camera: CameraSettings, frigate: FrigateSettings) -> dict[str, str]:
+    """Find the cameras linked to this one, by the Home Assistant domain of each integration.
+
+    Those set are always kept. While the Frigate listener is on, and processes a camera of the same name, that Frigate
+    camera is linked too, unless another is set, since its licence plate events are published as this camera.
+    """
+    links = dict(camera.linked_cameras)
+    if frigate.enabled and LINK_FRIGATE not in links and (frigate.cameras is None or camera.name in frigate.cameras):
+        links[LINK_FRIGATE] = camera.name
+    return links
 
 
 class TrackerSettings(BaseModel):
