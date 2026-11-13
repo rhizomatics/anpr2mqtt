@@ -22,6 +22,21 @@ from anpr2mqtt.settings import (
 from anpr2mqtt.tracker import Tracker
 
 
+def pytest_addoption(parser: pytest.Parser) -> None:
+    parser.addoption("--runslow", action="store_true", default=False, help="run slow tests")
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    config.addinivalue_line("markers", "slow: mark test as slow to run")
+
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    skip_slow = pytest.mark.skip(reason="need --runslow option to run")
+    for item in items:
+        if "slow" in item.keywords and not config.getoption("--runslow"):
+            item.add_marker(skip_slow)
+
+
 @pytest.fixture(scope="session", autouse=True)
 def set_tz_env_variable() -> None:
     os.environ["TZ"] = "UTC"

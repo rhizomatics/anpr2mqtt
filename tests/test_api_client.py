@@ -13,9 +13,10 @@ def _make_response(status_code: int, json_data: object, from_cache: bool = False
     resp = MagicMock()
     resp.status_code = status_code
     resp.json.return_value = json_data
-    resp.from_cache = from_cache
+    # niquests-cache rebuilds cache hits from the stored entry, without a raw connection response
+    resp.raw = None if from_cache else MagicMock()
+    resp.headers = {}
     resp.history = None
-    resp.created_at = None
     return resp
 
 
@@ -75,6 +76,13 @@ def test_dvla_api_error_response(mocker: MockerFixture) -> None:
     assert isinstance(result, dict)
     assert "api_errors" in result
     assert result["api_status"] == 403
+
+
+def test_dvla_api_gateway_rejection(mocker: MockerFixture) -> None:
+    _mock_session(mocker, 403, {"Message": "User is not authorized to access this resource"})
+    result = DVLAClient("bad_key").lookup("SP13TST")
+    assert result["api_status"] == 403
+    assert result["api_errors"] == [{"title": "User is not authorized to access this resource"}]
 
 
 def test_dvla_api_exception(mocker: MockerFixture) -> None:
@@ -143,7 +151,7 @@ def test_dvla_verify_plate_failure(mocker: MockerFixture) -> None:
 def test_lookup_cached_response_logs_cache_hit(mocker: MockerFixture) -> None:
     """from_cache=True triggers the cache-hit log (line 91)."""
     resp = _make_response(200, {"registrationNumber": "SP13TST"}, from_cache=True)
-    resp.created_at = __import__("datetime").datetime(2025, 1, 1)
+    resp.headers = {"Date": "Wed, 01 Jan 2025 00:00:00 GMT"}
     session = MagicMock()
     session.__enter__ = lambda s: s
     session.__exit__ = MagicMock(return_value=False)
@@ -151,9 +159,10 @@ def test_lookup_cached_response_logs_cache_hit(mocker: MockerFixture) -> None:
     mocker.patch("anpr2mqtt.api_client._CachedSession", return_value=session)
     result = DVLAClient("key").lookup("SP13TST")
     assert result["cache"]["cached"] is True
+    assert result["cache"]["created"] == "2025-01-01T00:00:00+00:00"
 
 
-@pytest.mark.skip
+@pytest.mark.slow
 def test_real_api_call() -> None:
     """Require a UAT env key; exercises the default (in-memory) cache."""
     import os
@@ -168,7 +177,7 @@ def test_real_api_call() -> None:
     assert "reg_match_fail" not in result
 
 
-@pytest.mark.skip
+@pytest.mark.slow
 def test_real_api_call_with_file_cache(tmp_path: Path) -> None:
     """Require a UAT env key; exercises the FileCache backend and verifies second call is served from cache."""
     import os
@@ -176,10 +185,10 @@ def test_real_api_call_with_file_cache(tmp_path: Path) -> None:
     api_key: str | None = os.environ.get("DVLA_API_KEY")
     assert api_key
     reg: str = "AA19AAA"  # see https://developer-portal.driver-vehicle-licensing.api.gov.uk/apis/vehicle-enquiry-service/mock-responses.html#test-vrns
-    result: dict[str, Any] = DVLAClient(api_key=api_key, cache_dir=tmp_path, test=True).lookup(reg)
+    result: dict[str, Any] = DVLAClient(api_key=api_key, cache_dir=tmp_path, cache_type=CacheType.FILE, test=True).lookup(reg)
     assert result
     assert "api_errors" not in result
     assert "api_exception" not in result
     assert "reg_match_fail" not in result
-    cached_result = DVLAClient(api_key=api_key, cache_dir=tmp_path, test=True).lookup(reg)
+    cached_result = DVLAClient(api_key=api_key, cache_dir=tmp_path, cache_type=CacheType.FILE, test=True).lookup(reg)
     assert cached_result["cache"]["cached"] is True

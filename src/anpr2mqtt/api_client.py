@@ -1,23 +1,15 @@
+import datetime as dt
 import re
+from email.utils import parsedate_to_datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, cast
+from typing import Any, Literal, cast
 
 import niquests
 import structlog
-from requests_cache.backends.filesystem import FileCache
-from requests_cache.session import CacheMixin
+from niquests_cache import CachedSession as _CachedSession
+from niquests_cache.backends import FileCache
 
 from anpr2mqtt.settings import CacheType
-
-if TYPE_CHECKING:
-    from requests_cache.models.response import CachedResponse
-
-
-# requests-cache's CacheMixin is typed against requests.Session, so combining it with niquests.Session
-# (API compatible at runtime) can't satisfy a type checker's override rules
-class _CachedSession(CacheMixin, niquests.Session):  # type: ignore[misc]  # ty:ignore[invalid-method-override, invalid-attribute-override, invalid-mutable-override]
-    """requests-cache backed by niquests as the transport."""
-
 
 log = structlog.get_logger()
 
@@ -69,7 +61,7 @@ class DVLAClient(APIClient):
             if result and result["success"]:
                 log.info("Verified DVLA API lookup using %s, details: %s", verify_plate, result["plate"])
             else:
-                log.error("DVLA startup verificatio failed: %s", result)
+                log.error("DVLA startup verification failed: %s", result)
 
     def lookup(self, reg: str) -> dict[str, Any]:
         if not re.match(self.REG_RE, reg):
@@ -80,33 +72,37 @@ class DVLAClient(APIClient):
             return {"lookup_fail": "missing cache", "plate": {}, "success": False}
         try:
             with self.cache_session as client:
-                log.debug(f"Fetching DVLA info from API, cache_ttl={self.cache_session.expire_after}")
-                response: CachedResponse = cast(
-                    "CachedResponse",
-                    client.post(
-                        url=f"https://{self.env_prefix}driver-vehicle-licensing.api.gov.uk/vehicle-enquiry/v1/vehicles",
-                        headers={"x-api-key": self.api_key, "Content-Type": "application/json"},
-                        json={"registrationNumber": reg.upper()},
-                    ),
+                log.debug(f"Fetching DVLA info from API, cache_ttl={self.cache_session.settings.expire_after}")
+                # niquests-cache keys on method, url and headers only, not the body, so the reg goes in the
+                # url fragment to give each plate its own cache entry; fragments are never sent to the server
+                response: niquests.Response = client.post(
+                    url=f"https://{self.env_prefix}driver-vehicle-licensing.api.gov.uk/vehicle-enquiry/v1/vehicles#{reg.upper()}",
+                    headers={"x-api-key": self.api_key, "Content-Type": "application/json"},
+                    json={"registrationNumber": reg.upper()},
                 )
-                if response.from_cache:
-                    log.debug("DVLA API cached response, created %s", response.created_at)
+                # cache hits are rebuilt from the stored entry, so have no underlying raw connection response
+                from_cache: bool = response.raw is None
+                created_at: dt.datetime | None = _response_date(response)
+                if from_cache:
+                    log.debug("DVLA API cached response, created %s", created_at)
                 if response.status_code == 200:
                     plate: dict[str, Any] = cast("dict[str,Any]", response.json())
                     return {
                         "cache": {
                             "calls": len(response.history) if response.history else 0,
-                            "cached": response.from_cache,
-                            "created": response.created_at.isoformat() if response.created_at else None,
+                            "cached": from_cache,
+                            "created": created_at.isoformat() if created_at else None,
                         },
                         "plate": plate,
                         "description": f"{plate.get('colour', '').title()} {plate.get('make', '').title()}" if plate else None,
                         "success": True,
                     }
 
-                log.error("DVLA API FAIL: %s", response.json())
+                body: dict[str, Any] = cast("dict[str,Any]", response.json()) if response.content else {}
+                log.error("DVLA API FAIL: %s", body)
                 return {
-                    "api_errors": response.json()["errors"],
+                    # DVLA errors come as a list under "errors", AWS API gateway rejections as a "Message"
+                    "api_errors": body.get("errors") or ([{"title": body["Message"]}] if "Message" in body else []),
                     "api_status": response.status_code,
                     "plate": {},
                     "success": False,
@@ -114,3 +110,14 @@ class DVLAClient(APIClient):
         except Exception as e:
             log.exception("Failed to fetch DVLA reg data")
             return {"api_exception": str(e), "plate": {}, "success": False}
+
+
+def _response_date(response: niquests.Response) -> dt.datetime | None:
+    """Original response time from the Date header, which is preserved in cached entries."""
+    date_header: str | None = response.headers.get("Date") if response.headers else None
+    if not date_header:
+        return None
+    try:
+        return parsedate_to_datetime(date_header)
+    except (TypeError, ValueError):
+        return None

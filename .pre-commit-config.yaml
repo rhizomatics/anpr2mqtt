@@ -64,7 +64,7 @@ repos:
           - pydantic
           - pydantic-settings
           - rapidfuzz
-          - requests-cache
+          - niquests-cache
           - niquests
           - tzlocal
           - pytest-mock

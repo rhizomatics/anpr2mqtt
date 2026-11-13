@@ -162,7 +162,7 @@ Each known plate can be associated with a list of regular expressions and/or pla
 - **pytesseract** - OCR for direction detection
 - **structlog** - Structured logging
 - **niquests** - API Client
-- **requests-cache** - API result caching
+- **niquests-cache** - API result caching
 
 ## Distribution
 
