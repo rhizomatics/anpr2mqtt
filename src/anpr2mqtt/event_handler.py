@@ -64,7 +64,12 @@ class EventHandler(RegexMatchingEventHandler):
         self.mqtt_topic_root: str = mqtt_topic_root
         self.api_client: APIClient | None = build_dvla_client(dvla_config, event_config.target_type)
         if self.api_client:
-            log.info("Configured gov API lookup, cache type %s, ttl %s", dvla_config.cache_type, dvla_config.cache_ttl)
+            log.info(
+                "Configured gov API lookup, cache type %s (%s), ttl %s",
+                dvla_config.cache_type,
+                dvla_config.cache_dir or "N/A",
+                dvla_config.cache_ttl,
+            )
         else:
             log.info("No gov API lookup configured")
 
