@@ -1,5 +1,9 @@
 # 1.3.0
 
+This version adds support for an upcoming Camera AutoNotify release that will support ANPR2MQTT. The changes may also be generally useful where this app used in conjunction with Frigate.
+
+## ✨ Enhancements
+
 - Home Assistant devices now have manufacturer `Rhizomatics` and model `anpr2mqtt`, so integrations building on anpr2mqtt, such as Camera AutoNotify, can recognise them for certain. The device identifier is unchanged, so existing devices are kept
 - A camera's `live_url` is its device's configuration URL in Home Assistant, where it's an `http` or `https` address
 - New `linked_cameras` camera setting, naming the same camera in other integrations, such as Frigate, UniFi Protect, Viseron or Blue Iris, keyed by the Home Assistant domain of each, `frigate`, `unifiprotect`, `viseron` or `blueiris`
@@ -8,15 +12,25 @@
 
 # 1.2.2
 
-- Image rebuild for Debian CVE fixes
-- Fix OCR in the Docker image, broken since 1.2.0: the `tesseract` binary was no longer installed, only its English language data, so OCR fields such as `vehicle_direction` always came out as `Unknown`
-- OCR is checked at startup against a bundled sample image, logging `Verified OCR` or an error, so a missing or broken Tesseract shows up immediately rather than as every field reading `Unknown`. Turn off with `ocr.verify_on_startup: false`
+## ✨ Enhancements
+
 - Docker image now has a built-in `HEALTHCHECK`, using the new `anprtools healthcheck` command. It passes while the main loop is running and connected to MQTT, and needs no broker credentials
 - The old `/app/healthcheck.sh` script is removed. It waited for a heartbeat ANPR2MQTT never published, so it always failed. Remove any `healthcheck:` that calls it from your compose file
 - `mosquitto-clients` and `jq` are no longer installed in the image, reducing CVE exposure
+- OCR is checked at startup against a bundled sample image, logging `Verified OCR` or an error, so a missing or broken Tesseract shows up immediately rather than as every field reading `Unknown`. Turn off with `ocr.verify_on_startup: false`
+
+## 🐛 Bug fixes
+
+- Fix OCR in the Docker image, broken since 1.2.0: the `tesseract` binary was no longer installed, only its English language data, so OCR fields such as `vehicle_direction` always came out as `Unknown`
+
+## 📝 Other changes
+
+- Image rebuild for Debian CVE fixes
 - Base images are pinned by digest, and published images are scanned daily, rebuilding when a fix is available
 
 # 1.2.1
+
+## 🐛 Bug fixes
 
 - Home Assistant target sensors (a target or group given an `entity_id`) now keep the same `unique_id` across restarts. Previously it was rebuilt from a randomised hash each time ANPR2MQTT started, so Home Assistant could add a new entity after each restart, with a `_2`, `_3` suffix, and leave the old one behind as no longer provided
 - After upgrading, delete any leftover target sensors from Home Assistant's entity list, and rename the remaining one back to its original entity ID if it picked up a suffix
@@ -24,11 +38,12 @@
 
 # 1.2.0
 
-- Shrink docker image by removing build tooling
-- Fix healthcheck by including `jq` in image
-- Docker images now security scanned
-- Automated testing now covers Python 3.13, 3.14, 3.15
+## 🚨 Breaking changes
+
 - `tools` CLI renamed to `anprtools`, to avoid clashing with other packages' commands
+
+## ✨ Enhancements
+
 - Home Assistant entities now report availability on MQTT broker, consistent with Updates2MQTT
 - ANPR2MQTT publishes
   - `online` to `anpr2mqtt/availability` when it connects
@@ -39,7 +54,19 @@
 - See [Home Assistant Integration](https://anpr2mqtt.rhizomatics.org.uk/homeassistant/#availability)
 - MQTT subscriptions, to Home Assistant status and Frigate events, are now renewed after a reconnect to the broker. Previously a dropped connection silently stopped Frigate events and Home Assistant restart detection until ANPR2MQTT was restarted
 
+## 📝 Other changes
+
+- Shrink docker image by removing build tooling
+- Docker images now security scanned
+- Automated testing now covers Python 3.13, 3.14, 3.15
+
+## 🐛 Bug fixes
+
+- Fix healthcheck by including `jq` in image
+
 # 1.1.5
+
+## 📝 Other changes
 
 - Change pydantic dependency to `pydantic-settings[yaml]` since it now won't automatically import `pyyaml` otherwise
 - Docker image no longer sets `MQTT__HOST`, `MQTT__PORT` and `MQTT__TOPIC_ROOT` env vars, which silently overrode the same settings in the YAML config file
@@ -47,29 +74,43 @@
 
 # 1.1.4
 
+## 📝 Other changes
+
 - Security Fixes
 - Pillow upgraded to v13.0.0 to remediate multiple CVEs
 - Build chain certificate update for eMudhra intermediate ca certs issue
 - Container rebuilt with latest `uv` version for eMudhra issue
+
+## 📚 Documentation
+
 - Documentation updated to include new for `tesseract` install when running OCR tools outside of Docker
 
 # 1.1.3
 
+## 📝 Other changes
+
 - Moved docs theme to MaterialX
 - `anpr2mqtt` and `tools` now installed as a `uv` tools inside container
+
+## 📚 Documentation
+
 - Docs publish `llms.txt` / `llms-full.txt` and per-page Markdown links for AI agents
 
 # 1.1.2
 
-## Frigate Integration
+## ✨ Enhancements
+
+### Frigate Integration
 
 - Populate `event_image_url` with snapshot for payload compatibility with file system detected images
 
-## Example Home Assistant Integration
+## 🐛 Bug fixes
+
+### Example Home Assistant Integration
 
 - Fixed use of `vehicle_direction` and `history.last_sighting`
 
-## Internals
+## 📝 Other changes
 
 - Dependency refresh
 - Documentation site build switched from `mkdocs` to `properdocs`
