@@ -24,6 +24,9 @@ log = structlog.get_logger()
 AVAILABILITY_ONLINE = "online"  # Home Assistant default payload_available
 AVAILABILITY_OFFLINE = "offline"  # Home Assistant default payload_not_available
 OFFLINE_PUBLISH_TIMEOUT = 2.0
+# on every device, so an integration building on anpr2mqtt can tell its devices for certain
+DEVICE_MANUFACTURER = "Rhizomatics"
+DEVICE_MODEL = "anpr2mqtt"
 
 
 def availability_topic(topic_root: str) -> str:
@@ -229,14 +232,19 @@ class HomeAssistantPublisher:
             payload["availability_topic"] = self.availability_topic
 
     def add_device_info(self, payload: dict[str, Any], camera: CameraSettings) -> None:
+        # manufacturer and model together say for certain that a device is anpr2mqtt's, for integrations that build on it
         payload["dev"] = {
             "name": f"anpr2mqtt on {camera.name}",
             "sw_version": anpr2mqtt.version,  # pyright: ignore[reportAttributeAccessIssue]
-            "manufacturer": "rhizomatics",
+            "manufacturer": DEVICE_MANUFACTURER,
+            "model": DEVICE_MODEL,
             "identifiers": [f"{camera.name}.anpr2mqtt"],
         }
         if camera.area:
             payload["dev"]["suggested_area"] = camera.area
+        # Home Assistant rejects the whole discovery message for a configuration URL it can't use
+        if camera.live_url and camera.live_url.startswith(("http://", "https://")):
+            payload["dev"]["configuration_url"] = camera.live_url
 
     def post_state_message(
         self,
@@ -266,6 +274,7 @@ class HomeAssistantPublisher:
                 "camera": camera.name or "UNKNOWN",
                 "area": camera.area,
                 "live_url": camera.live_url,
+                "linked_cameras": camera.linked_cameras,
                 "reg_info": reg_info,
                 "history": time_analysis,
             }

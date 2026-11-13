@@ -23,7 +23,7 @@ from anpr2mqtt.hass import (
     publish_availability,
 )
 from anpr2mqtt.heartbeat import Heartbeat
-from anpr2mqtt.settings import CameraSettings, EventSettings, Settings
+from anpr2mqtt.settings import LINK_FRIGATE, CameraSettings, EventSettings, Settings, linked_cameras
 from anpr2mqtt.tracker import Tracker, compute_time_analysis
 
 log = structlog.get_logger()
@@ -142,6 +142,8 @@ def main_loop() -> None:
                     camera = camera_config
             if camera is None:
                 camera = CameraSettings(name=event_config.camera)
+            # resolved once, so Home Assistant is told the same Frigate camera that events are routed by
+            camera = camera.model_copy(update={"linked_cameras": linked_cameras(camera, settings.frigate)})
             state_topic = f"{settings.mqtt.topic_root}/{event_config.event}/cameras/{camera.name}/state"
             image_topic = f"{settings.mqtt.topic_root}/{event_config.event}/cameras/{camera.name}/image"
             tracker = Tracker(
@@ -151,8 +153,10 @@ def main_loop() -> None:
                 region=event_config.region,
                 auto_match_tolerance=event_config.auto_match_tolerance,
             )
-            if camera.name not in frigate_camera_configs:
-                frigate_camera_configs[camera.name] = (event_config, camera, tracker, state_topic, image_topic)
+            # keyed by the Frigate camera, so a differently named one is published as this camera
+            frigate_key = camera.linked_cameras.get(LINK_FRIGATE, camera.name)
+            if frigate_key not in frigate_camera_configs:
+                frigate_camera_configs[frigate_key] = (event_config, camera, tracker, state_topic, image_topic)
             event_handler = EventHandler(
                 publisher=publisher,
                 event_config=event_config,

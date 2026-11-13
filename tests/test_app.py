@@ -225,6 +225,52 @@ def test_main_loop_with_events(tmp_path: Path) -> None:
     mock_observer.schedule.assert_called_once()
 
 
+def test_main_loop_routes_linked_frigate_camera(tmp_path: Path) -> None:
+    """A Frigate camera named differently is routed to the camera that names it, and published with it."""
+    from anpr2mqtt.settings import (
+        CameraSettings,
+        DVLASettings,
+        EventSettings,
+        FrigateSettings,
+        ImageSettings,
+        OCRSettings,
+        TrackerSettings,
+    )
+
+    event_config = EventSettings(
+        camera="drive",
+        event="anpr",
+        watch_path=tmp_path,
+        image_name_re=re.compile(r"(?P<dt>[0-9]{17})_(?P<target>[A-Z0-9]+)_(?P<event>VEHICLE_DETECTION)\.(?P<ext>jpg)"),
+        ocr_field_ids=[],
+    )
+    mock_settings = _make_mock_settings(events=[event_config])
+    mock_settings.cameras = [CameraSettings(name="drive", linked_cameras={"frigate": "driveway_lpr"})]
+    mock_settings.frigate = FrigateSettings(enabled=True)
+    mock_settings.ocr = OCRSettings()
+    mock_settings.image = ImageSettings()
+    mock_settings.dvla = DVLASettings()
+    mock_settings.tracker = TrackerSettings(data_dir=tmp_path)
+    mock_settings.homeassistant.image_entity = False
+    mock_settings.homeassistant.camera_entity = False
+
+    mock_observer = Mock()
+    mock_observer.is_alive.return_value = False
+
+    with (
+        patch("anpr2mqtt.app.Settings", return_value=mock_settings),
+        patch("anpr2mqtt.app.mqtt.Client", return_value=Mock()),
+        patch("anpr2mqtt.app.Observer", return_value=mock_observer),
+        patch("anpr2mqtt.app.FrigateHandler") as frigate_handler,
+    ):
+        main_loop()
+
+    camera_configs = frigate_handler.call_args.kwargs["camera_configs"]
+    assert list(camera_configs) == ["driveway_lpr"]
+    assert camera_configs["driveway_lpr"][1].name == "drive"
+    assert camera_configs["driveway_lpr"][1].linked_cameras == {"frigate": "driveway_lpr"}
+
+
 def test_main_loop_with_event_no_matching_camera(tmp_path: Path) -> None:
     """Event with camera not in cameras list creates a default CameraSettings."""
     from anpr2mqtt.settings import DVLASettings, EventSettings, ImageSettings, OCRSettings, TrackerSettings

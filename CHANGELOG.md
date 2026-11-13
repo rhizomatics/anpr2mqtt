@@ -1,14 +1,17 @@
+# 1.3.0
+
+- Home Assistant devices now have manufacturer `Rhizomatics` and model `anpr2mqtt`, so integrations building on anpr2mqtt, such as Camera AutoNotify, can recognise them for certain. The device identifier is unchanged, so existing devices are kept
+- A camera's `live_url` is its device's configuration URL in Home Assistant, where it's an `http` or `https` address
+- New `linked_cameras` camera setting, naming the same camera in other integrations, such as Frigate, UniFi Protect, Viseron or Blue Iris, keyed by the Home Assistant domain of each, `frigate`, `unifiprotect`, `viseron` or `blueiris`
+- A Frigate camera named differently from the anpr2mqtt camera its plates should be published as can be linked by `linked_cameras.frigate`. Without it, the Frigate camera of the same name is used, as before
+- Every state has a `linked_cameras` attribute, those set, and the Frigate camera matched by name while the Frigate listener is on, for integrations such as Camera AutoNotify that join sightings to the events of those cameras
+
 # 1.2.2
 - Image rebuild for Debian CVE fixes
-- Fix OCR in the Docker image, broken since 1.2.0: the `tesseract` binary was no longer installed, only its
-  English language data, so OCR fields such as `vehicle_direction` always came out as `Unknown`
-- OCR is checked at startup against a bundled sample image, logging `Verified OCR` or an error, so a missing
-  or broken Tesseract shows up immediately rather than as every field reading `Unknown`. Turn off with
-  `ocr.verify_on_startup: false`
-- Docker image now has a built-in `HEALTHCHECK`, using the new `anprtools healthcheck` command. It passes
-  while the main loop is running and connected to MQTT, and needs no broker credentials
-  - The old `/app/healthcheck.sh` script is removed. It waited for a heartbeat ANPR2MQTT never published,
-    so it always failed. Remove any `healthcheck:` that calls it from your compose file
+- Fix OCR in the Docker image, broken since 1.2.0: the `tesseract` binary was no longer installed, only its English language data, so OCR fields such as `vehicle_direction` always came out as `Unknown`
+- OCR is checked at startup against a bundled sample image, logging `Verified OCR` or an error, so a missing or broken Tesseract shows up immediately rather than as every field reading `Unknown`. Turn off with `ocr.verify_on_startup: false`
+- Docker image now has a built-in `HEALTHCHECK`, using the new `anprtools healthcheck` command. It passes while the main loop is running and connected to MQTT, and needs no broker credentials
+  - The old `/app/healthcheck.sh` script is removed. It waited for a heartbeat ANPR2MQTT never published, so it always failed. Remove any `healthcheck:` that calls it from your compose file
   - `mosquitto-clients` and `jq` are no longer installed in the image, reducing CVE exposure
 - Base images are pinned by digest, and published images are scanned daily, rebuilding when a fix is available
 # 1.2.1
