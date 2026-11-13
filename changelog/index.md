@@ -4,6 +4,8 @@
 
 - Correct version number for release
 - `niquests-cache` replaces `requests-cache`, also removes otherwise unnecessary `requests` dependency
+- Existing `requests-cache` files will be ignored, so requests re-cached that would otherwise be within `ttl` first time round
+- Cache file location logged at startup. Cache files are easily distinguished - 64 char hashes for `niquests-cache` vs 16 for `requests-cache`. The two can co-exist until old ones tidied up.
 
 ## 🐛 Bug fixes
 
