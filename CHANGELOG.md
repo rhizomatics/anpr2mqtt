@@ -1,6 +1,6 @@
 # 1.3.0
 
-This version adds support for an upcoming [Camera AutoNotify]() release that will support ANPR2MQTT. The changes may also be generally useful where this app used in conjunction with Frigate.
+This version adds support for an upcoming [Camera AutoNotify](https://camera-autonotify.rhizomatics.org.uk/developer/design/rfcs/rfc0003_anpr2mqtt/) release that will support ANPR2MQTT. The changes may also be generally useful where this app used in conjunction with Frigate.
 
 ## ✨ Enhancements
 - Home Assistant devices now have manufacturer `Rhizomatics` and model `anpr2mqtt`, so integrations building on anpr2mqtt, such as Camera AutoNotify, can recognise them for certain. The device identifier is unchanged, so existing devices are kept
