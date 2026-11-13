@@ -19,6 +19,7 @@ The target value will also appear in a field named after `target_type`, for exam
 | reg_info                   | null                                                                                   |
 | area                       | driveway                                                                               |
 | camera                     | drivewacam                                                                             |
+| linked_cameras             | `{"frigate": "driveway"}`, the same camera in other integrations, by domain            |
 | orig_target                | J23TST                                                                                 |
 | ignore                     | false                                                                                  |
 | known                      | true                                                                                   |
@@ -134,6 +135,8 @@ The `homeassistant` default topic prefix matches the default ANPR2MQTT config, i
 ## Device Creation
 
 A Home Assistant device will be created for each ANPR2MQTT camera, and Home Assistant will then group the relevant entities together on this device page. Use `device_creation: false` in the `homeassistant` config block if you want to switch off this behaviour.
+
+Every device has manufacturer `Rhizomatics` and model `anpr2mqtt`, so other integrations can tell for certain that it's anpr2mqtt's, and its configuration URL is the camera's `live_url`, where that's an `http` or `https` address.
 
 ## MQTT Topics
 

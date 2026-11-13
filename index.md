@@ -10,6 +10,18 @@ While intended for vehicle plate detection, it can be used to watch for and anal
 
 The enrichment, including DVLA lookup, can also be extended to licence plates recognized by Frigate ( see [Frigate License Plate Recognition](https://docs.frigate.video/configuration/license_plate_recognition)), assuming that `frigate/events` and `frigate/tracked_object_update` topics are on the same MQTT broker.
 
+A Frigate camera's plates are published as the camera of the same name in the `cameras` config. Where the names differ, link the camera to the Frigate camera by name in `linked_cameras`:
+
+```yaml
+cameras:
+- name: drive
+  linked_cameras:
+    frigate: driveway_lpr
+    unifiprotect: Driveway G4
+```
+
+`linked_cameras` can also name the same camera in any other integration that sees it, such as UniFi Protect, Viseron or Blue Iris, each keyed by its Home Assistant domain, `unifiprotect`, `viseron` or `blueiris`. They're given to Home Assistant as the `linked_cameras` attribute, along with the Frigate camera matched by name, for integrations that join anpr2mqtt sightings to the events of the cameras they supplement.
+
 ## Features
 
 - Minimal configuration

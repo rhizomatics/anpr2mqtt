@@ -19,6 +19,18 @@ While intended for vehicle plate detection, it can be used to watch for and anal
 
 The enrichment, including DVLA lookup, can also be extended to licence plates recognized by Frigate ( see [Frigate License Plate Recognition](https://docs.frigate.video/configuration/license_plate_recognition)), assuming that `frigate/events` and `frigate/tracked_object_update` topics are on the same MQTT broker.
 
+A Frigate camera's plates are published as the camera of the same name in the `cameras` config. Where the names differ, link the camera to the Frigate camera by name in `linked_cameras`:
+
+```yaml
+cameras:
+- name: drive
+  linked_cameras:
+    frigate: driveway_lpr
+    unifiprotect: Driveway G4
+```
+
+`linked_cameras` can also name the same camera in any other integration that sees it, such as UniFi Protect, Viseron or Blue Iris, each keyed by its Home Assistant domain, `unifiprotect`, `viseron` or `blueiris`. They're given to Home Assistant as the `linked_cameras` attribute, along with the Frigate camera matched by name, for integrations that join anpr2mqtt sightings to the events of the cameras they supplement.
+
 ## Features
 
 - Minimal configuration
@@ -299,6 +311,7 @@ The target value will also appear in a field named after `target_type`, for exam
 | reg_info                   | null                                                                                   |
 | area                       | driveway                                                                               |
 | camera                     | drivewacam                                                                             |
+| linked_cameras             | `{"frigate": "driveway"}`, the same camera in other integrations, by domain            |
 | orig_target                | J23TST                                                                                 |
 | ignore                     | false                                                                                  |
 | known                      | true                                                                                   |
@@ -414,6 +427,8 @@ The `homeassistant` default topic prefix matches the default ANPR2MQTT config, i
 ## Device Creation
 
 A Home Assistant device will be created for each ANPR2MQTT camera, and Home Assistant will then group the relevant entities together on this device page. Use `device_creation: false` in the `homeassistant` config block if you want to switch off this behaviour.
+
+Every device has manufacturer `Rhizomatics` and model `anpr2mqtt`, so other integrations can tell for certain that it's anpr2mqtt's, and its configuration URL is the camera's `live_url`, where that's an `http` or `https` address.
 
 ## MQTT Topics
 
@@ -960,6 +975,14 @@ uv sync --frozen   # Use exact lockfile versions
 ```
 
 # Reference
+
+# 1.3.0
+
+- Home Assistant devices now have manufacturer `Rhizomatics` and model `anpr2mqtt`, so integrations building on anpr2mqtt, such as Camera AutoNotify, can recognise them for certain. The device identifier is unchanged, so existing devices are kept
+- A camera's `live_url` is its device's configuration URL in Home Assistant, where it's an `http` or `https` address
+- New `linked_cameras` camera setting, naming the same camera in other integrations, such as Frigate, UniFi Protect, Viseron or Blue Iris, keyed by the Home Assistant domain of each, `frigate`, `unifiprotect`, `viseron` or `blueiris`
+- A Frigate camera named differently from the anpr2mqtt camera its plates should be published as can be linked by `linked_cameras.frigate`. Without it, the Frigate camera of the same name is used, as before
+- Every state has a `linked_cameras` attribute, those set, and the Frigate camera matched by name while the Frigate listener is on, for integrations such as Camera AutoNotify that join sightings to the events of those cameras
 
 # 1.2.2
 

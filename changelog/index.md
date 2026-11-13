@@ -1,3 +1,11 @@
+# 1.3.0
+
+- Home Assistant devices now have manufacturer `Rhizomatics` and model `anpr2mqtt`, so integrations building on anpr2mqtt, such as Camera AutoNotify, can recognise them for certain. The device identifier is unchanged, so existing devices are kept
+- A camera's `live_url` is its device's configuration URL in Home Assistant, where it's an `http` or `https` address
+- New `linked_cameras` camera setting, naming the same camera in other integrations, such as Frigate, UniFi Protect, Viseron or Blue Iris, keyed by the Home Assistant domain of each, `frigate`, `unifiprotect`, `viseron` or `blueiris`
+- A Frigate camera named differently from the anpr2mqtt camera its plates should be published as can be linked by `linked_cameras.frigate`. Without it, the Frigate camera of the same name is used, as before
+- Every state has a `linked_cameras` attribute, those set, and the Frigate camera matched by name while the Frigate listener is on, for integrations such as Camera AutoNotify that join sightings to the events of those cameras
+
 # 1.2.2
 
 - Image rebuild for Debian CVE fixes
