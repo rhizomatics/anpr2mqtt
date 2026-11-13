@@ -1,3 +1,9 @@
+# 1.3.1
+
+## 📝 Other changes
+
+- Correct version number for release
+
 # 1.3.0
 
 This version adds support for an upcoming [Camera AutoNotify](https://camera-autonotify.rhizomatics.org.uk/developer/design/rfcs/rfc0003_anpr2mqtt/) release that will support ANPR2MQTT. The changes may also be generally useful where this app used in conjunction with Frigate.

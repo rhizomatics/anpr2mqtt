@@ -41,6 +41,11 @@
         <changefreq>daily</changefreq>
     </url>
     <url>
+        <loc>https://anpr2mqtt.rhizomatics.org.uk/developer/design/roadmap/</loc>
+        <lastmod>2026-11-13</lastmod>
+        <changefreq>daily</changefreq>
+    </url>
+    <url>
         <loc>https://anpr2mqtt.rhizomatics.org.uk/examples/</loc>
         <lastmod>2026-11-13</lastmod>
         <changefreq>daily</changefreq>

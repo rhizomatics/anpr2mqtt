@@ -974,7 +974,17 @@ uv lock --upgrade  # Update all packages
 uv sync --frozen   # Use exact lockfile versions
 ```
 
+# Roadmap
+
+No major changes are planned for ANPR2MQTT
+
 # Reference
+
+# 1.3.1
+
+## 📝 Other changes
+
+- Correct version number for release
 
 # 1.3.0
 

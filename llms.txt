@@ -26,6 +26,7 @@ ANPR2MQTT watches a camera's exported snapshot/event files (or an FTP or MQTT fe
 ## Developer
 
 - [Development Setup](https://anpr2mqtt.rhizomatics.org.uk/developer/setup/index.md)
+- [Roadmap](https://anpr2mqtt.rhizomatics.org.uk/developer/design/roadmap/index.md)
 - [Coverage](https://anpr2mqtt.rhizomatics.org.uk/developer/coverage/index.md)
 
 ## Reference
