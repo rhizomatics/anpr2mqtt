@@ -42,9 +42,9 @@ class OCRTool(BaseModel):
             ocr_settings = OCRSettings()
         log.debug("ocr_files: ocr_settings->%s", ocr_settings)
         if image and self.event:
-            print(scan_ocr_fields(image, self.event, ocr_settings))  # noqa: T201
+            print(scan_ocr_fields(image, self.event, ocr_settings))  # ruff: ignore[print]
         else:
-            print("Image can't be loaded")  # noqa: T201
+            print("Image can't be loaded")  # ruff: ignore[print]
 
 
 class ListTool(BaseModel):
@@ -57,7 +57,7 @@ class ListTool(BaseModel):
         for p in self.event.watch_path.iterdir():
             results: ImageInfo | None = examine_file(p, self.event.image_name_re)
             if results is not None:
-                print(f"{results.target}: timestamp={results.timestamp},ext={results.ext}")  # noqa: T201
+                print(f"{results.target}: timestamp={results.timestamp},ext={results.ext}")  # ruff: ignore[print]
 
 
 class DVLATool(BaseModel):
@@ -69,9 +69,9 @@ class DVLATool(BaseModel):
     def cli_cmd(self) -> None:
         structlog.configure(wrapper_class=structlog.make_filtering_bound_logger(self.log_level))
         if not self.dvla.api_key:
-            print("Error: DVLA API key required (--dvla.api_key or DVLA__API_KEY env var)")  # noqa: T201
+            print("Error: DVLA API key required (--dvla.api_key or DVLA__API_KEY env var)")  # ruff: ignore[print]
             return
-        print(  # noqa: T201
+        print(  # ruff: ignore[print]
             "Caching for {} at {}".format(self.dvla.cache_ttl, "in memory" if not self.dvla.cache_dir else self.dvla.cache_dir)
         )
         client = DVLAClient(
@@ -82,7 +82,7 @@ class DVLATool(BaseModel):
             test=self.test,
         )
         result: dict[str, Any] = client.lookup(self.registration.upper())
-        print(json.dumps(result, indent=2))  # noqa: T201
+        print(json.dumps(result, indent=2))  # ruff: ignore[print]
 
 
 class HealthcheckTool(BaseModel):
@@ -91,12 +91,12 @@ class HealthcheckTool(BaseModel):
     def cli_cmd(self) -> None:
         age: float | None = heartbeat_age()
         if age is None:
-            print(f"UNHEALTHY: no heartbeat at {heartbeat_path()}")  # noqa: T201
+            print(f"UNHEALTHY: no heartbeat at {heartbeat_path()}")  # ruff: ignore[print]
             sys.exit(1)
         if age > self.max_age:
-            print(f"UNHEALTHY: heartbeat is {age:.0f}s old (limit {self.max_age}s)")  # noqa: T201
+            print(f"UNHEALTHY: heartbeat is {age:.0f}s old (limit {self.max_age}s)")  # ruff: ignore[print]
             sys.exit(1)
-        print(f"HEALTHY: heartbeat is {age:.0f}s old")  # noqa: T201
+        print(f"HEALTHY: heartbeat is {age:.0f}s old")  # ruff: ignore[print]
 
 
 class Tools(BaseSettings, cli_parse_args=True, cli_exit_on_error=True):

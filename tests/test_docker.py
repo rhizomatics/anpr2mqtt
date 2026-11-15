@@ -37,7 +37,7 @@ if not docker_available():
 
 
 def docker(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(["docker", *args], capture_output=True, text=True, check=check)  # noqa: S603
+    return subprocess.run(["docker", *args], capture_output=True, text=True, check=check)  # ruff: ignore[subprocess-without-shell-equals-true]
 
 
 def container_logs(name: str) -> str:

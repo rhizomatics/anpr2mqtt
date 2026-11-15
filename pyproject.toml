@@ -141,6 +141,7 @@ exclude = [
 ]
 
 [tool.ruff.lint]
+preview=true
 select = ["E", "C","R", "F", "B", "W", "I", "C90", "N", "D", "UP", "YTT", 
     "RUF","PGH","PT","T20","DTZ","TD","PTH","ARG","INT","TCH","TID","SIM","PERF","ASYNC","ANN","S","A","COM","C4"]
 ignore = [

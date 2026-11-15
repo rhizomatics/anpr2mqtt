@@ -20,8 +20,8 @@ from anpr2mqtt.settings import (
 def _make_rc(name: str, eq_zero: bool = True) -> Mock:
     rc = MagicMock()
     rc.getName.return_value = name
-    rc.__eq__ = lambda self, other: eq_zero and other == 0  # type: ignore[method-assign,misc,assignment]  # noqa: ARG005
-    rc.__ne__ = lambda self, other: not (eq_zero and other == 0)  # type: ignore[method-assign,misc,assignment]  # noqa: ARG005
+    rc.__eq__ = lambda self, other: eq_zero and other == 0  # type: ignore[method-assign,misc,assignment]  # ruff: ignore[unused-lambda-argument]
+    rc.__ne__ = lambda self, other: not (eq_zero and other == 0)  # type: ignore[method-assign,misc,assignment]  # ruff: ignore[unused-lambda-argument]
     rc.__str__.return_value = name  # type: ignore[attr-defined]
     return rc
 
@@ -99,7 +99,7 @@ def _make_mock_settings(protocol: str = "3.11", events: list[EventSettings] | No
     settings.mqtt.host = "localhost"
     settings.mqtt.port = 1883
     settings.mqtt.user = "test"
-    settings.mqtt.password = "pass"  # noqa: S105
+    settings.mqtt.password = "pass"  # ruff: ignore[hardcoded-password-string]
     settings.mqtt.topic_root = "anpr2mqtt"
     settings.homeassistant = HomeAssistantSettings(status_topic="homeassistant/status")
     settings.frigate = FrigateSettings()
@@ -110,7 +110,7 @@ def _make_mock_settings(protocol: str = "3.11", events: list[EventSettings] | No
     settings.dvla = Mock()
     settings.dvla.api_key = None
     settings.tracker = Mock()
-    settings.tracker.data_dir = Path("/tmp/tracker_test")  # noqa: S108
+    settings.tracker.data_dir = Path("/tmp/tracker_test")  # ruff: ignore[hardcoded-temp-file]
     return settings
 
 

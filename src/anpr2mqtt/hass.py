@@ -78,7 +78,7 @@ class HomeAssistantPublisher:
         log.debug("on_unsubscribe, userdata=%s, mid=%s, reasons=%s, properties=%s", userdata, mid, reason_code_list, properties)
 
     def on_message(self, _client: mqtt.Client, _userdata: Any, msg: mqtt.MQTTMessage) -> None:
-        """Callback for incoming MQTT messages"""  # noqa: D401
+        """Callback for incoming MQTT messages"""  # ruff: ignore[non-imperative-mood]
         if msg.topic == self.hass_status_topic:
             decoded: str | None = msg.payload.decode("utf-8") if msg.payload else None
             if decoded == "offline":
@@ -104,7 +104,7 @@ class HomeAssistantPublisher:
         for topic, payload in self.republish.items():
             log.debug("Republishing to %s for %s", topic, source_event)
             # add jitter to republish to reduce herd load on HA after restart
-            time.sleep(random.randint(1, 10))  # noqa: S311
+            time.sleep(random.randint(1, 10))  # ruff: ignore[suspicious-non-cryptographic-random-usage]
             payload["trigger"] = source_event
             self.client.publish(topic, json.dumps(payload))
 
