@@ -142,8 +142,8 @@ exclude = [
 
 [tool.ruff.lint]
 preview=true
-select = ["E", "C","R", "F", "B", "W", "I", "C90", "N", "D", "UP", "YTT", 
-    "RUF","PGH","PT","T20","DTZ","TD","PTH","ARG","INT","TCH","TID","SIM","PERF","ASYNC","ANN","S","A","COM","C4"]
+select = ["E", "C","RET", "F", "B", "W", "I", "C90", "N", "D", "UP", "YTT", 
+    "RUF","PGH","PT","T20","DTZ","TD","PTH","ARG","INT","TC","TID","SIM","PERF","ASYNC","ANN","S","A","COM","C4"]
 ignore = [
     "tab-indentation","indentation-with-invalid-multiple","indentation-with-invalid-multiple-comment","over-indented","docstring-tab-indentation","triple-single-quotes","bad-quotes-inline-string","bad-quotes-multiline-string","missing-trailing-comma","prohibited-trailing-comma","single-line-implicit-string-concatenation","multi-line-implicit-string-concatenation", # std formatter conflicts
     "incorrect-blank-line-before-class","multi-line-summary-second-line", # other formatter clashes
