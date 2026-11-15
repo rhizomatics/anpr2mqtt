@@ -8,6 +8,7 @@ edit_uri: edit/main/docs/
 
 theme:
   name: materialx
+  custom_dir: overrides
   highlightjs: true
   language: en
   logo: docs/assets/images/anpr2mqtt-dark-256x256.png
