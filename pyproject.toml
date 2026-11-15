@@ -88,7 +88,6 @@ docs=[
     "mkdocs-autorefs",
     "mkdocs-coverage",
     "mkdocs-pagetree-plugin",
-    "mkdocs",
     "mkdocs-git-revision-date-localized-plugin",
     "mkdocs-minify-html-plugin",
     "mkdocs-meta-descriptions-plugin",
@@ -145,12 +144,12 @@ exclude = [
 select = ["E", "C","R", "F", "B", "W", "I", "C90", "N", "D", "UP", "YTT", 
     "RUF","PGH","PT","T20","DTZ","TD","PTH","ARG","INT","TCH","TID","SIM","PERF","ASYNC","ANN","S","A","COM","C4"]
 ignore = [
-    "W191","E111","E114","E117","D206","D300","Q000","Q001","COM812","COM819","ISC001","ISC002", # std formatter conflicts
-    "D203","D213", # other formatter clashes
-    "TD002","TD003","TD005",
-    "D103","D100","D101","D102","D104","D107","D415","D400","D415","ANN401",
-    "S101","C901","FURB113",
-    "S602","S607","S404" ] # subprocess usage
+    "tab-indentation","indentation-with-invalid-multiple","indentation-with-invalid-multiple-comment","over-indented","docstring-tab-indentation","triple-single-quotes","bad-quotes-inline-string","bad-quotes-multiline-string","missing-trailing-comma","prohibited-trailing-comma","single-line-implicit-string-concatenation","multi-line-implicit-string-concatenation", # std formatter conflicts
+    "incorrect-blank-line-before-class","multi-line-summary-second-line", # other formatter clashes
+    "missing-todo-author","missing-todo-link","missing-todo-description",
+    "undocumented-public-function","undocumented-public-module","undocumented-public-class","undocumented-public-method","undocumented-public-package","undocumented-public-init","missing-terminal-punctuation","missing-trailing-period","missing-terminal-punctuation","any-type",
+    "assert","complex-structure","repeated-append",
+    "subprocess-popen-with-shell-equals-true","start-process-with-partial-path","suspicious-subprocess-import" ] # subprocess usage
 unfixable = ["B"]
 
 [tool.ruff.format]
