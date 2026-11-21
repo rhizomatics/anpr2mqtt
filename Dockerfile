@@ -4,7 +4,7 @@
 # current image for the tag, since the pin in an old release tag would otherwise never move.
 
 # Build stage: resolve and install the app plus its dependencies into a venv
-FROM python:3.14-slim@sha256:9aaa474097d094040649f2162a627c0049b408f52138d980916788d80f04802f AS builder
+FROM python:3.15-slim@sha256:65a65fc7b30b06cb6df4930fd4650697cb23f4c2698ab81fc87e4b031bc36928 AS builder
 
 COPY --from=ghcr.io/astral-sh/uv:0.13.7@sha256:96f40d3904aad8d0bd010539001d36c8e2188b981e1334471a90c4a1d93bb490 /uv /bin/uv
 
@@ -25,7 +25,7 @@ ADD README.md /app/README.md
 RUN uv sync --locked --no-dev --no-editable --no-cache
 
 # Runtime stage: only the venv and runtime system packages, no uv or build tools
-FROM python:3.14-slim@sha256:9aaa474097d094040649f2162a627c0049b408f52138d980916788d80f04802f
+FROM python:3.15-slim@sha256:65a65fc7b30b06cb6df4930fd4650697cb23f4c2698ab81fc87e4b031bc36928
 
 # Keep this list minimal: every package here is CVE surface that only a rebuild can patch.
 # tesseract-ocr is the OCR binary; tesseract-ocr-eng is only its language data, which merely
