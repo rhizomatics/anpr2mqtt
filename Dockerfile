@@ -5,7 +5,7 @@ ARG BASE_IMAGE=python-base
 
 # Pinned base image, kept here in one place and updated by Dependabot, which moves the digest as well
 # as the tag, after its own cooldown, so a release build is reproducible.
-FROM python:3.14-slim@sha256:9aaa474097d094040649f2162a627c0049b408f52138d980916788d80f04802f AS python-base
+FROM python:3.15-slim@sha256:65a65fc7b30b06cb6df4930fd4650697cb23f4c2698ab81fc87e4b031bc36928 AS python-base
 
 # Build stage: resolve and install the app plus its dependencies into a venv
 FROM ${BASE_IMAGE} AS builder
