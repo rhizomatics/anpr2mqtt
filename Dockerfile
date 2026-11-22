@@ -1,10 +1,14 @@
-# Base images are pinned by digest so a release build is reproducible, and Dependabot raises a PR
-# whenever the image behind the tag is republished. Keep both python stages on the same digest.
-# A manual or scheduled rebuild of a release (docker-publish.yml) strips the digests to pick up the
-# current image for the tag, since the pin in an old release tag would otherwise never move.
+# Base for the build and runtime stages, normally the pinned python-base stage below. The weekly
+# rebuild in image-scan.yml overrides it with a newer digest of the same tag, once that digest has
+# been out for its cooldown, to pick up fixes without waiting for a release.
+ARG BASE_IMAGE=python-base
+
+# Pinned base image, kept here in one place and updated by Dependabot, which moves the digest as well
+# as the tag, after its own cooldown, so a release build is reproducible.
+FROM python:3.14-slim@sha256:9aaa474097d094040649f2162a627c0049b408f52138d980916788d80f04802f AS python-base
 
 # Build stage: resolve and install the app plus its dependencies into a venv
-FROM python:3.14-slim@sha256:9aaa474097d094040649f2162a627c0049b408f52138d980916788d80f04802f AS builder
+FROM ${BASE_IMAGE} AS builder
 
 COPY --from=ghcr.io/astral-sh/uv:0.13.7@sha256:96f40d3904aad8d0bd010539001d36c8e2188b981e1334471a90c4a1d93bb490 /uv /bin/uv
 
@@ -25,7 +29,7 @@ ADD README.md /app/README.md
 RUN uv sync --locked --no-dev --no-editable --no-cache
 
 # Runtime stage: only the venv and runtime system packages, no uv or build tools
-FROM python:3.14-slim@sha256:9aaa474097d094040649f2162a627c0049b408f52138d980916788d80f04802f
+FROM ${BASE_IMAGE}
 
 # Keep this list minimal: every package here is CVE surface that only a rebuild can patch.
 # tesseract-ocr is the OCR binary; tesseract-ocr-eng is only its language data, which merely
