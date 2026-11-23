@@ -4,6 +4,12 @@
 
  The MQTT image entity can be used in the same way as a `camera` entity, so can be included in mobile push, email etc notifications, or added to a Home Assistant dashboard. See the example below, or use [Supernotify](https://supernotify.rhizomatics.org.uk) camera support.
 
+## Auto Notify
+
+![AutoNotify](https://camera-autonotify.rhizomatics.org.uk/assets/images/icon.png){width=100}
+
+Use [Camera AutoNotify](https://camera-autonotify.rhizomatics.org.uk) to automatically set up notifications with **zero YAML** and **no automations** required. It will also do plate enrichment, such as by tracking previous sightings, corrections, ignoring, classifying as known, prioritizing based on plate and UK DVLA lookup.
+
 ## Attributes
 
 Both the `sensor` and `image` attributes have the same extensive set of attributes.

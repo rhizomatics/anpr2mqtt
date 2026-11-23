@@ -22,43 +22,32 @@ All that is needed is for the camera to be configured to upload images on plate 
 
 While intended for vehicle plate detection, it can be used to watch for and analyze any file, so for example uploaded face detection, missing object, unattended baggage or line crossing images. A single `anpr2mqtt` instance can watch multiple paths and patterns for different cameras and events.
 
-The enrichment, including DVLA lookup, can also be extended to licence plates recognized by Frigate (
-see [Frigate License Plate Recognition](https://docs.frigate.video/configuration/license_plate_recognition)), assuming that `frigate/events` and `frigate/tracked_object_update` topics are on the same MQTT broker.
-
-A Frigate camera's plates are published as the camera of the same name in the `cameras` config. Where the names
-differ, link the camera to the Frigate camera by name in `linked_cameras`:
-
-```yaml
-cameras:
-- name: drive
-  linked_cameras:
-    frigate: driveway_lpr
-    unifiprotect: Driveway G4
-```
-
-`linked_cameras` can also name the same camera in any other integration that sees it, such as UniFi Protect, Viseron
-or Blue Iris, each keyed by its Home Assistant domain, `unifiprotect`, `viseron` or `blueiris`. They're given to Home
-Assistant as the `linked_cameras` attribute, along with the Frigate camera matched by name, for integrations that
-join anpr2mqtt sightings to the events of the cameras they supplement.
+!!! info
+    The enrichment features, such as DVLA lookup and previous sightings, are now integrated
+    directly into the Home Assistant Marketplace integration [Camera AutoNotify](https://camera-autonotify.rhizomatics.org.uk) and this is now the recommended method, and with this integration there is no longer any reason to divert Frigate messages via `anpr2mqtt`.
+    
+    The functionality can still be used in `anpr2mqtt`, which may be needed if transitioning to AutoNotify or using something or than Home Assistant. There is also an import function in AutoNotify
+    to pull in previous sightings and plate classifications from `anpr2mqtt` configuration.
 
 ## Features
 
-* Minimal configuration
+* **Minimal configuration**
     - Ready configured to work with popular Hikvision ANPR camera settings
        - See [Example Camera Configuration](camera.md)
-* File System Integration
+* **File System Integration**
     - Watches directory for ANPR camera images using [Watchdog](https://python-watchdog.readthedocs.io/en/stable/index.html)
         - Uses [inotify](https://www.man7.org/linux/man-pages/man7/inotify.7.html) on Linux, or equiv on other operating systems for efficient listening to file system events without continual polling
     - Extracts target ( for example licence plate ), timestamp and event type information from filenames
-* [Home Assistant Integration](homeassistant.md). 
+* **[Home Assistant Integration](homeassistant.md)**
     - Publishes events to MQTT for Home Assistant as a [MQTT Sensor Entity](https://www.home-assistant.io/integrations/sensor.mqtt/)
     - Auto-discovery configuration for Home Assistant
     - Creates [MQTT Image Entity](https://www.home-assistant.io/integrations/image.mqtt/) on Home Assistant for image snapshot, so no web access to ftp needed
     - Optionally also creates an [MQTT Camera Entity](https://www.home-assistant.io/integrations/camera.mqtt/)
-* Plate Enrichment
+* **Integrated OCR** (Text Recognition)
     - OCR-based extraction of fields using [tesseract-ocr](https://github.com/tesseract-ocr/tesseract)
-        - By default direction detection (Forward/Reverse) 
+        - By default direction detection (*Forward*/*Reverse*) for example as stamped on an image by a Hikvision ANPR camera
         - Corrections by regular expression to fix OCR mis-readings
+* Plate Enrichment
     - Tracks and counts previous sightings
     - Configurable to classify plates as known, to be ignored or as a potential threat
     - Regular expression based corrections, for known plates that the ANPR sometimes mis-reads
@@ -66,13 +55,18 @@ join anpr2mqtt sightings to the events of the cameras they supplement.
     - UK Only
         - [DVLA Lookup](api.md) if API_KEY provided, for detailed MOT and tax information
         - Lookups cached for configurable time
+     - For Home Assistant, [Camera AutoNotify](https://camera-autonotify.rhizomatics.org.uk) is recommended to do this rather than in anpr2mqtt.
+* Frigate Integration
+    - All the same enrichments, including DVLA lookup, can also be extended to licence plates recognized by Frigate ( see [Frigate License Plate Recognition](https://docs.frigate.video/configuration/license_plate_recognition)), assuming that `frigate/events` and `frigate/tracked_object_update` topics are on the same MQTT broker.
+    - Shares same sighting tracking as local images
+    - For Home Assistant, [Camera AutoNotify](https://camera-autonotify.rhizomatics.org.uk) is recommended to do this rather than in anpr2mqtt.
 * Auto clear vehicle state optionally, after configurable time
 * [Debug Tools](debug_tools.md) built-in
 
 
-## Docker Deployment
+## Container Deployment
 
-Build and run with Docker, example [docker-compose.yaml](examples/docker_compose.md) provided.
+Build and run with Docker or Podman, example [docker-compose.yaml](examples/docker_compose.md) provided.
 
 ## Configuration
 
@@ -153,6 +147,21 @@ The Levenshtein method is used to compare the plate against a list of known plat
 ### Regex / String Matching
 
 Each known plate can be associated with a list of regular expressions and/or plain strings, and these will be checked for every discovered licence plate.
+
+### Working with Frigate
+
+A Frigate camera's plates are published as the camera of the same name in the `cameras` config. Where the namesdiffer, link the camera to the Frigate camera by name in `linked_cameras`:
+
+```yaml
+cameras:
+- name: drive
+  linked_cameras:
+    frigate: driveway_lpr
+    unifiprotect: Driveway G4
+```
+
+`linked_cameras` can also name the same camera in any other integration that sees it, such as UniFi Protect, Viseron or Blue Iris, each keyed by its Home Assistant domain, `unifiprotect`, `viseron` or `blueiris`. They're given to Home Assistant as the `linked_cameras` attribute, along with the Frigate camera matched by name, for integrations that join anpr2mqtt sightings to the events of the cameras they supplement.
+
 
 ## Primary Dependencies
 
