@@ -5,7 +5,6 @@
 ## 📝 Other changes
 - Rebuilt container image to use an astral.sh reproducible Python build
 - Also fixes CVE-2026-5435 and CVE-2026-19499 although neither of these had no exploits in the app.
-## 📝 Other changes
 - Minor fixes for test readability
 ## 📚 Documentation
 - Updated to reflect new recommendation to use [Camera AutoNotify](https://camera-autonotify.rhizomatics.org.uk) and that this is now recommended for Frigate enrichment rather than anpr2mqtt.
