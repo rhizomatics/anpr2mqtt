@@ -1,3 +1,10 @@
+# 1.3.2
+
+## 📝 Other changes
+- Rebuilt container image to base on a newer version of `python:3.14-slim` base image that has fixes for CVE-2026-5435 and CVE-2026-19499 although neither of these had no exploits in the app.
+## 📚 Documentation
+- Updated to reflect new recommendation to use [Camera AutoNotify](https://camera-autonotify.rhizomatics.org.uk) and that this is now recommended for Frigate enrichment rather than anpr2mqtt.
+
 # 1.3.1
 
 ## 📝 Other changes
