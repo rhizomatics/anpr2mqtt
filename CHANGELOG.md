@@ -1,7 +1,12 @@
 # 1.3.2
 
+## 🐛 Bug fixes
+- Italian and French plate validation patterns corrected to `AA123AA` format, and rules renamed `ITALY_1994` and `FRANCE_2009` to match the year each format was introduced
 ## 📝 Other changes
-- Rebuilt container image to base on a newer version of `python:3.14-slim` base image that has fixes for CVE-2026-5435 and CVE-2026-19499 although neither of these had no exploits in the app.
+- Rebuilt container image to use an astral.sh reproducible Python build
+- Also fixes CVE-2026-5435 and CVE-2026-19499 although neither of these had no exploits in the app.
+## 📝 Other changes
+- Minor fixes for test readability
 ## 📚 Documentation
 - Updated to reflect new recommendation to use [Camera AutoNotify](https://camera-autonotify.rhizomatics.org.uk) and that this is now recommended for Frigate enrichment rather than anpr2mqtt.
 

@@ -25,8 +25,8 @@ RULES: dict[str, RegionRules] = {
     # UK current-format plate: AA99AAA  (2001+, ~95% of plates in use, since Sept 2001)
     # https://assets.publishing.service.gov.uk/media/6694e379fc8e12ac3edafc60/inf104-vehicle-registration-numbers-and-number-plates.pdf
     "UK_2001": RegionRules("plate", "UK", {2, 3}, {0, 1, 4, 5, 6}, re.compile(r"^[A-Z]{2}[0-9]{2}[A-Z]{3}$")),
-    "ITALY_1999": RegionRules("plate", "IT", {2, 3, 4}, {0, 1, 5, 6}, re.compile(r"^[A-Z]{2}[0-9]{2}[A-Z]{3}$")),
-    "FRANCE_2001": RegionRules("plate", "FR", {2, 3, 4}, {0, 1, 5, 6}, re.compile(r"^[A-Z]{2}[0-9]{2}[A-Z]{3}$")),
+    "ITALY_1994": RegionRules("plate", "IT", {2, 3, 4}, {0, 1, 5, 6}, re.compile(r"^[A-Z]{2}[0-9]{3}[A-Z]{2}$")),
+    "FRANCE_2009": RegionRules("plate", "FR", {2, 3, 4}, {0, 1, 5, 6}, re.compile(r"^[A-Z]{2}[0-9]{3}[A-Z]{2}$")),
 }
 
 

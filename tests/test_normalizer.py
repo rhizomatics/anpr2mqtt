@@ -56,22 +56,22 @@ def test_normalise_uk_plate_lowercase_input() -> None:
     assert uut.normalize("abi2cde") == "AB12CDE"
 
 
-def test_digit_swapped_swaps_digit_1_to_i() -> None:
+def test_digit_swapped_swaps_digit_i_to_1() -> None:
     uut = Normalizer(target_type="plate", region="UK")
     assert uut.normalize("XPI9TCY") == "XP19TCY"
 
 
-def test_digit_swapped_swaps_digit_0_to_o() -> None:
+def test_digit_swapped_swaps_digit_o_to_0() -> None:
     uut = Normalizer(target_type="plate", region="UK")
     assert uut.normalize("AB1OCDE") == "AB10CDE"
 
 
-def test_digit_swapped_swaps_letter_i_to_1() -> None:
+def test_digit_swapped_swaps_letter_1_to_i() -> None:
     uut = Normalizer(target_type="plate", region="UK")
     assert uut.normalize("1B12CDE") == "IB12CDE"
 
 
-def test_digit_swapped_swaps_letter_o_to_0() -> None:
+def test_digit_swapped_swaps_letter_0_to_o() -> None:
     uut = Normalizer(target_type="plate", region="UK")
     assert uut.normalize("0B12CDE") == "OB12CDE"
 
@@ -99,3 +99,31 @@ def test_correct_via_alternative_not_direct_fuzzy_match() -> None:
     assert correct_against_good_read("SPISTCY", cached, ttl=60, tolerance=1) == "SPISTCY"
     # With normalizer, "SPI9TCY" alternative is distance 1 from "SPISTCY" → corrected
     assert correct_against_good_read("SPISTCY", cached, ttl=60, tolerance=1, normalizer=uut) == "SP19TCY"
+
+
+def test_normalise_italy_valid_plate_unchanged() -> None:
+    uut = Normalizer(target_type="plate", region="IT")
+    assert uut.normalize("AB123CD") is None
+
+
+def test_normalise_italy_letter_o_in_digits() -> None:
+    uut = Normalizer(target_type="plate", region="IT")
+    assert uut.normalize("AB1O3CD") == "AB103CD"
+
+
+def test_normalise_france_valid_plate_unchanged() -> None:
+    uut = Normalizer(target_type="plate", region="FR")
+    assert uut.normalize("AB123CD") is None
+
+
+def test_normalise_france_digit_0_in_letters() -> None:
+    uut = Normalizer(target_type="plate", region="FR")
+    assert uut.normalize("AB1230D") == "AB123OD"
+
+
+def test_region_rules_regex_consistent_with_positions() -> None:
+    from anpr2mqtt.normalizers import RULES
+
+    for name, rule in RULES.items():
+        sample = "".join("1" if i in rule.digit_pos else "A" for i in range(rule.length))
+        assert rule.valid_re.match(sample), name

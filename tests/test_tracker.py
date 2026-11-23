@@ -222,7 +222,6 @@ def test_classify_target_no_config(tracker: Tracker) -> None:
 def test_classify_target_empty_target(tracker: Tracker) -> None:
     result: Sighting = tracker.find("")
     assert result.target.group is None
-    assert result.target.group != "known"
 
 
 def test_classify_target_dangerous_no_description(tracker: Tracker) -> None:
