@@ -1,11 +1,11 @@
 [project]
 name = "anpr2mqtt"
 version = "1.4.0"
-description = "ANPR/ALPR MQTT bridge for Home Assistant"
+description = "Camera event to MQTT bridge for Home Assistant, specialising in ANPR/ALPR"
 authors = [
     { name = "jey burrows", email = "jrb@rhizomatics.org.uk" }
 ]
-keywords=["anpr","alpr","lpr","mqtt","hass","homeassistant","homeautomation","cctv","ocr","security","hikvision"]
+keywords=["anpr","alpr","lpr","mqtt","hass","homeassistant","homeautomation","cctv","ocr","security","hikvision","ftp","face"]
 
 readme = "README.md"
 requires-python = ">=3.13"

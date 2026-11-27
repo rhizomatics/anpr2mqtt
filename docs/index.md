@@ -1,5 +1,5 @@
 ---
 title: ANPR2MQTT
-description: Simple ANPR Camera Integration using File System and MQTT
+description: Simple camera integration using file system and MQTT, specialising in ANPR
 ---
 --8<-- "README.md"

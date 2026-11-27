@@ -501,6 +501,8 @@ def test_publish_event_discovery(publisher: HomeAssistantPublisher, mock_client:
     assert payload["state_topic"] == "anpr2mqtt/scene_change/cameras/cam1/event"
     assert payload["event_types"] == ["scene_change"]
     assert payload["json_attributes_topic"] == "anpr2mqtt/scene_change/cameras/cam1/state"
+    assert "images" in payload["json_attributes_template"]
+    assert "event_time" not in payload["json_attributes_template"]
     assert payload["icon"] == "mdi:cctv"
     assert payload["dev"]["model"] == DEVICE_MODEL
     assert kwargs["retain"] is True
@@ -582,3 +584,12 @@ def test_state_carries_image_counts_and_refreshes(mock_client: Mock, camera: Cam
 def test_refresh_without_stats_does_nothing(publisher: HomeAssistantPublisher, mock_client: Mock) -> None:
     publisher.refresh_image_stats()
     mock_client.publish.assert_not_called()
+
+
+def test_camera_entity_id_suffix_only_for_plates(
+    publisher: HomeAssistantPublisher, mock_client: Mock, event_config: EventSettings, camera: CameraSettings
+) -> None:
+    publisher.publish_camera_discovery("s", "i", event_config, camera)
+    assert json.loads(mock_client.publish.call_args.kwargs["payload"])["default_entity_id"] == "camera.anpr_cam1_anpr"
+    publisher.publish_camera_discovery("s", "i", _scene_event(), camera)
+    assert json.loads(mock_client.publish.call_args.kwargs["payload"])["default_entity_id"] == "camera.scene_change_cam1"

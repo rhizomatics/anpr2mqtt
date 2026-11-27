@@ -169,7 +169,9 @@ class HomeAssistantPublisher:
             "default_entity_id": f"event.{event_config.event}_{event_config.camera}",
             "unique_id": f"{event_config.event}_{event_config.camera}",
             "state_topic": event_topic,
+            # the event's own details come with each event; only the image counts, refreshed between events, from state
             "json_attributes_topic": state_topic,
+            "json_attributes_template": "{{ {'images': value_json.images | default(None)} | tojson }}",
             "event_types": [event_config.event],
             "name": name,
         }
@@ -238,7 +240,8 @@ class HomeAssistantPublisher:
                 "url": "https://anpr2mqtt.rhizomatics.org.uk",
             },
             "unique_id": f"{event_config.event}_{camera.name}",
-            "default_entity_id": f"camera.{event_config.event}_{camera.name}_anpr",
+            # plates keep their _anpr suffix, so existing entity ids don't change
+            "default_entity_id": f"camera.{event_config.event}_{camera.name}" + ("_anpr" if event_config.is_plate else ""),
             "topic": image_topic,
             "json_attributes_topic": state_topic,
             "icon": event_config.icon,

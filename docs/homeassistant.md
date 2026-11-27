@@ -13,7 +13,9 @@ Use [Camera AutoNotify](https://camera-autonotify.rhizomatics.org.uk) to automat
 ## Attributes
 
 Both the `sensor` and `image` attributes have the same extensive set of attributes. For events other than plates,
-the event entity has them too, with `event_type` as the event's name.
+the event entity has them too, with `event_type` as the event's name, all from the event itself, so they're always
+those of the event that changed its state, apart from [image counts](#image-counts), which are refreshed between
+events.
 
 The target value will also appear in a field named after `target_type`, for example, `plate` for
 easier to read Home Assistant automations.

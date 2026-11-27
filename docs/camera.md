@@ -7,9 +7,15 @@ tags:
 - ftp
 - alpr
 - lpr
-description: Suggestions for integrating Hikvision ANPR camera functionality into Home Assistant
+- face capture
+- scene change
+description: Suggestions for integrating Hikvision ANPR cameras, and other camera events such as face capture, into Home Assistant
 ---
-# ANPR Camera Configuration
+# Camera Configuration
+
+Any camera that can upload an image for an event, by ftp, to a NAS or otherwise, with a timestamp in its file name, can
+be used with `anpr2mqtt`. ANPR is its speciality, so the Hikvision ANPR camera below is the main example, followed by
+[Other Events](#other-events), such as face capture and scene change, from the same or other cameras.
 
 ## Hikvision
 
@@ -73,7 +79,7 @@ These commands can now be used in Home Assistant automations as actions, trigger
 
 ![Home Assistant Automation Example](assets/images/ha_mount_scenario_automation.png){width=500}
 
-### Other Events
+## Other Events
 
 Hikvision cameras have many other events besides ANPR, such as face capture, scene change, line crossing, region entry
 or unattended baggage, and can ftp images for any of them. Any of these can be added as an event, so long as the camera
@@ -119,7 +125,7 @@ There's usually no `target` in these file names, so nothing to look up, correct 
 records when each was seen. Where a camera sends several images a second or so apart for the same thing,
 `min_event_gap_seconds` makes them one event, publishing only the first within that many seconds of the last.
 
-#### Face Capture
+### Face Capture
 
 Some cameras send two images per face: a `FACE_SNAP` cropped to the face, and a `FACE_BACKGROUND` of the whole scene,
 a few milliseconds later, such as `10.180.10.20_01_20261120175018129_FACE_SNAP.jpg`. With `secondary_image_event`, the
@@ -141,11 +147,11 @@ another event, so there's one event per face, with the `FACE_SNAP` as its image.
 Other cameras send only one image per face, `FACE_DETECTION`, often several a second or so apart. Match that event
 name, leave out `secondary_image_event`, and set `min_event_gap_seconds`, such as `10`.
 
-### Other Cameras
+## Other ANPR Cameras
 
 - See [Which Hikvision ANPR Camera Should I Buy in 2025?](https://www.use-ip.co.uk/forum/threads/which-hikvision-anpr-camera-should-i-buy-in-2025.12271/) FAQ from [use-IP Forum](https://www.use-ip.co.uk/forum/)
 
-### Other Ways to Integrate
+## Other Ways to Integrate
 
 - Home Assistant built-in [Hikvision Integration](https://www.home-assistant.io/integrations/hikvision/) 
     - Has support for

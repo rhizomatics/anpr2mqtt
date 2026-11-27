@@ -16,11 +16,11 @@
 
 # ANPR MQTT Bridge
 
-A simple way to integrate any CCTV camera that can upload files via FTP, NAS etc into Home Assistant or other MQTT consumers. Specializes in **ANPR** (**Automatic Number Plate Recognition**, aka **ALPR** or **Automatic License Plate Recognition**) with support for face events, and configurable for other event types. Running under Docker is preferred but not necessary.
+A simple way to integrate into Home Assistant (or other MQTT consumers) any CCTV camera that can upload files via FTP, NAS etc into a monitored directory. Specializes in **ANPR** (**Automatic Number Plate Recognition**, aka **ALPR** or **Automatic License Plate Recognition**) with support for face events, and configurable for other event types. Running under Docker is preferred but not necessary.
 
-All that is needed is for the camera to be configured to upload images on plate recognition, by ftp, NAS or whatever else. ANPR2MQTT monitors the directory where the images lands and publishes plate information to MQTT. Its simple, requires no proprietary vendor APIs ( or differing ONVIF implementations ), and Home Assistant gets a copy of the actual annotated detection image to use on dashboards or to attach to notifications.
+All that is needed is for the camera to be configured to upload images on plate recognition, or any other event, by ftp, NAS or whatever else. ANPR2MQTT monitors the directory where the images lands and publishes plate, or other event, information to MQTT. Its simple, requires no proprietary vendor APIs ( or differing ONVIF implementations ), and Home Assistant gets a copy of the actual annotated detection image to use on dashboards or to attach to notifications.
 
-While intended for vehicle plate detection, it can be used to watch for and analyze any file, so for example uploaded face detection, missing object, unattended baggage or line crossing images. A single `anpr2mqtt` instance can watch multiple paths and patterns for different cameras and events.
+While it specialises in vehicle plate detection, it can watch for any camera event that uploads images, such as face capture, scene change, missing object, unattended baggage or line crossing, defined by configuration alone, without `anpr2mqtt` needing to know about each one. See [Other Events](camera.md#other-events). A single `anpr2mqtt` instance can watch multiple paths and patterns for different cameras and events.
 
 !!! info
     The enrichment features, such as DVLA lookup and previous sightings, are now integrated
@@ -35,11 +35,17 @@ While intended for vehicle plate detection, it can be used to watch for and anal
     - Ready configured to work with popular Hikvision ANPR camera settings
        - See [Example Camera Configuration](camera.md)
 * **File System Integration**
-    - Watches directory for ANPR camera images using [Watchdog](https://python-watchdog.readthedocs.io/en/stable/index.html)
+    - Watches directory for camera images using [Watchdog](https://python-watchdog.readthedocs.io/en/stable/index.html)
         - Uses [inotify](https://www.man7.org/linux/man-pages/man7/inotify.7.html) on Linux, or equiv on other operating systems for efficient listening to file system events without continual polling
     - Extracts target ( for example licence plate ), timestamp and event type information from filenames
+* **[Other Camera Events](camera.md#other-events)**
+    - Face capture, scene change, line crossing, region entry or any other event a camera uploads images for, by configuration
+    - Kept apart from plates, with no plate lookups or corrections
+    - Paired images, such as a face crop and its whole scene, as one event
+    - Minimum gap between events, for noisy or repeating events
 * **[Home Assistant Integration](homeassistant.md)**
-    - Publishes events to MQTT for Home Assistant as a [MQTT Sensor Entity](https://www.home-assistant.io/integrations/sensor.mqtt/)
+    - Publishes plates to MQTT for Home Assistant as a [MQTT Sensor Entity](https://www.home-assistant.io/integrations/sensor.mqtt/), and other events as a [MQTT Event Entity](https://www.home-assistant.io/integrations/event.mqtt/)
+    - [Image counts](homeassistant.md#image-counts) per event, camera and overall, for today, this week and in total, for health checks such as a camera that's stopped sending images
     - Auto-discovery configuration for Home Assistant
     - Creates [MQTT Image Entity](https://www.home-assistant.io/integrations/image.mqtt/) on Home Assistant for image snapshot, so no web access to ftp needed
     - Optionally also creates an [MQTT Camera Entity](https://www.home-assistant.io/integrations/camera.mqtt/)
@@ -111,7 +117,8 @@ Expected format: `YYYYMMDDHHMMSSmmm_PLATE_VEHICLE_DETECTION.jpg`
 
 Example: `20180502174029596_A2GEO_VEHICLE_DETECTION.jpg`
 
-A regular expression can be defined to match different file name formats.
+A regular expression can be defined to match different file name formats, such as for other events,
+`10.180.10.30_01_20261127071024588_SCENE_CHANGE_DETECTION.jpg`, see [Other Events](camera.md#other-events).
 
 ## Image Box Coordinates
 

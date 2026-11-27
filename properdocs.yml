@@ -1,6 +1,6 @@
 site_name: ANPR2MQTT
 site_url: 'https://anpr2mqtt.rhizomatics.org.uk'
-site_description: Simple ANPR Camera Integration using File System and MQTT
+site_description: Simple camera integration using file system and MQTT, specialising in ANPR
 
 repo_name: rhizomatics/anpr2mqtt
 repo_url: https://github.com/rhizomatics/anpr2mqtt
