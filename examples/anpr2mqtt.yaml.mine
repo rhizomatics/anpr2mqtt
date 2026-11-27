@@ -5,7 +5,8 @@ cameras:
     area: Driveway
     live_url: http://10.111.10.100:5000/#driveway
 events:
-  - watch_path: /ftp/Driveway
+  - target_type: plate
+    watch_path: /ftp/Driveway
 mqtt:
   host: 10.111.10.111
   user: anpr2mqtt

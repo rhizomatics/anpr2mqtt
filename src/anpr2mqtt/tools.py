@@ -55,9 +55,10 @@ class ListTool(BaseModel):
         structlog.configure(wrapper_class=structlog.make_filtering_bound_logger(self.log_level))
         log.info(f"list_dir: {self.event.event} from {self.event.watch_path.resolve()}")
         for p in self.event.watch_path.iterdir():
-            results: ImageInfo | None = examine_file(p, self.event.image_name_re)
+            results: ImageInfo | None = examine_file(p, self.event.image_name_re, require_target=self.event.has_target)
             if results is not None:
-                print(f"{results.target}: timestamp={results.timestamp},ext={results.ext}")  # ruff: ignore[print]
+                label: str | None = results.target if self.event.has_target else results.event
+                print(f"{label}: timestamp={results.timestamp},ext={results.ext}")  # ruff: ignore[print]
 
 
 class DVLATool(BaseModel):

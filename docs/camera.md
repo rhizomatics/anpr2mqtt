@@ -91,14 +91,17 @@ then the event's own name:
 - `10.180.10.30_01_20261127071024588_SCENE_CHANGE_DETECTION.jpg`
 - `10.180.10.40_01_20261125175413139_FACE_DETECTION.jpg`
 
-An event that isn't a plate needs its own `target_type`, which can be anything other than `plate`, and an
-`image_name_re` matching its file names. It can be on the same camera as an ANPR event, and share the same
+Every event should have a `target_type`, `plate` for ANPR, and anything else for other events, along with an
+`image_name_re` matching its file names. Leaving out `target_type` means `plate`, so that configurations from before
+other events were supported still work. But that turns an event into a plate event, with a plate sensor and an empty
+*Unknown vehicle* state, even on a camera with no ANPR. It can be on the same camera as an ANPR event, and share the same
 `watch_path`, since each event only picks up files matching its own `image_name_re`.
 
 ```yaml
 events:
 - camera: shed
   event: anpr
+  target_type: plate
   watch_path: /ftp/Shed
 - camera: shed
   event: scene_change
@@ -118,8 +121,10 @@ These events are kept apart from plates:
 - **Integrations that take an anpr2mqtt device's sensors as plates**, such as
   [Camera AutoNotify](https://camera-autonotify.rhizomatics.org.uk), don't see them
 - **No plate handling**: no DVLA lookup, plate correction or Frigate licence plates
-- **Defaults**: `default_description` comes from the event name, here `Scene change`, and `icon` is `mdi:cctv`, rather
-  than the plate defaults `Unknown vehicle` and `mdi:car-back`
+- **Defaults**: none of the plate defaults. `event` is the `target_type`, so `event: scene_change` above could be left
+  out, rather than `anpr`. `default_description` comes from the event name, here `Scene change`, rather than `Unknown
+  vehicle`. `icon` is `mdi:cctv` rather than `mdi:car-back`. There's no OCR, rather than the Hikvision vehicle
+  direction, so `ocr_field_ids: []` isn't needed
 
 There's usually no `target` in these file names, so nothing to look up, correct or track, and the event entity
 records when each was seen. Where a camera sends several images a second or so apart for the same thing,

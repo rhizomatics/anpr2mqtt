@@ -170,3 +170,20 @@ def test_defaults_follow_target_type() -> None:
 def test_missing_target_suggests_target_type() -> None:
     with pytest.raises(ValidationError, match="set target_type"):
         EventSettings(image_name_re=re.compile(r"(?P<dt>[0-9]{17})_SCENE_CHANGE_DETECTION\.jpg"))
+
+
+def test_non_plate_event_name_and_ocr_default_from_target_type() -> None:
+    face = EventSettings(target_type="face", image_name_re=re.compile(r"(?P<dt>[0-9]{17})_FACE\.jpg"))
+    assert face.event == "face"
+    assert face.ocr_field_ids == []
+    assert face.default_description == "Face"
+    plate = EventSettings()
+    assert plate.event == "anpr"
+    assert plate.ocr_field_ids == ["hik_direction"]
+    named = EventSettings(
+        event="front_face",
+        target_type="face",
+        ocr_field_ids=["hik_direction"],
+        image_name_re=re.compile(r"(?P<dt>[0-9]{17})_FACE\.jpg"),
+    )
+    assert (named.event, named.ocr_field_ids) == ("front_face", ["hik_direction"])
