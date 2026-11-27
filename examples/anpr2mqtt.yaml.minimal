@@ -1,6 +1,7 @@
 ---
 events:
-  - watch_path: /ftp/hikcam2
+  - target_type: plate
+    watch_path: /ftp/hikcam2
 mqtt:
   user: anpr2mqtt
   password: my_secret_password

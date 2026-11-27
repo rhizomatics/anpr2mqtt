@@ -5,6 +5,7 @@ log_level: DEBUG
 events:
 - camera: driveway
   event: anpr
+  target_type: plate
   description: Vehicle identified at driveway camera
   watch_path: /ftp/Driveway
   image_name_re: (?P<dt>[0-9]{17})_(?P<target>[A-Z0-9]+)_(?P<event>VEHICLE_DETECTION)\.(?P<ext>jpg|png|gif|jpeg)

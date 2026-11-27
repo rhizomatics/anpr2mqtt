@@ -57,8 +57,9 @@ class EventSettings(BaseModel):
     description: str | None = Field(default=None, description="Free text description of event")
     target_type: str = Field(
         default="plate",
-        description="Type of target for this event, 'plate' if ANPR. Any other type, such as 'face' or 'scene_change', "
-        "is published as a Home Assistant event entity rather than a sensor, and has no plate lookups or corrections",
+        description="Type of target for this event, 'plate' if ANPR, best always given. Any other type, such as 'face' or "
+        "'scene_change', is published as a Home Assistant event entity rather than a sensor, and has no plate lookups or "
+        "corrections. Defaults to 'plate', so configurations from before other events were supported still work",
     )
     region: str | None = Field(default="UK", description="Region for applying correction, normalization rules")
     default_description: str | None = Field(

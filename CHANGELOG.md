@@ -14,7 +14,10 @@
 - MQTT v5 login rejections, such as EMQX's `Bad user name or password`, are now logged as invalid credentials. paho also reports these as a `Protocol error` disconnect, which is the same failure
 - Frigate licence plates are only matched to plate events, where previously the first event configured for a camera was used
 - The milliseconds in an image name's 17 digit timestamp were read as microseconds, so `event_time` and the sighting history were up to a second early, such as `10:30:45.000407` for `10:30:45.407`. Sightings recorded before upgrading keep their old times
+## 📚 Documentation
+- Docs and examples give every event a `target_type`, including `plate`. It still defaults to `plate`, for older configurations, but an event without it is a plate event, with a plate sensor, even on a camera with no ANPR
 ## 📝 Other changes
+- `anprtools list_dir` works for events without a target, with `--event.target_type`, listing each file's event name
 - `mise.toml` installs Tesseract, via conda-forge, so OCR tests run locally
 
 # 1.3.2

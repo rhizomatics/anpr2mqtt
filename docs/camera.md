@@ -91,14 +91,17 @@ then the event's own name:
 - `10.180.10.30_01_20261127071024588_SCENE_CHANGE_DETECTION.jpg`
 - `10.180.10.40_01_20261125175413139_FACE_DETECTION.jpg`
 
-An event that isn't a plate needs its own `target_type`, which can be anything other than `plate`, and an
-`image_name_re` matching its file names. It can be on the same camera as an ANPR event, and share the same
+Every event should have a `target_type`, `plate` for ANPR, and anything else for other events, along with an
+`image_name_re` matching its file names. Leaving out `target_type` means `plate`, so that configurations from before
+other events were supported still work. But that turns an event into a plate event, with a plate sensor and an empty
+*Unknown vehicle* state, even on a camera with no ANPR. It can be on the same camera as an ANPR event, and share the same
 `watch_path`, since each event only picks up files matching its own `image_name_re`.
 
 ```yaml
 events:
 - camera: shed
   event: anpr
+  target_type: plate
   watch_path: /ftp/Shed
 - camera: shed
   event: scene_change

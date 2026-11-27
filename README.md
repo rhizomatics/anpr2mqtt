@@ -117,6 +117,10 @@ Expected format: `YYYYMMDDHHMMSSmmm_PLATE_VEHICLE_DETECTION.jpg`
 
 Example: `20180502174029596_A2GEO_VEHICLE_DETECTION.jpg`
 
+Each event should say what it's for with `target_type`, `plate` for ANPR, or anything else for other events.
+Leaving it out means `plate`, so older configurations still work, but any event without it becomes a plate event,
+with a plate sensor, even on a camera with no ANPR.
+
 A regular expression can be defined to match different file name formats, such as for other events,
 `10.180.10.30_01_20261127071024588_SCENE_CHANGE_DETECTION.jpg`, see [Other Events](camera.md#other-events).
 
@@ -133,6 +137,7 @@ or change the time lag, or also clear image ) using the `autoclear` configuratio
 
 ```yaml title="configuration snippet"
 - camera: shed
+  target_type: plate
   watch_path: /ftp/shedcam
   autoclear:
     post_event: 360

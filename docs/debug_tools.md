@@ -56,7 +56,8 @@ Lists images in a directory that match the ANPR image regular expression.
 uvx --from anpr2mqtt anprtools list_dir
 ```
 
-Override any `event` setting from the command line, for example to test a different path or regex:
+Override any `event` setting from the command line, for example to test a different path or regex, or events
+other than plates with `--event.target_type`:
 
 ```bash
 uv run anprtools list_dir \
@@ -70,6 +71,7 @@ Key flags for `list_dir`:
 |------|-------------|---------|
 | `--event.watch_path` | Directory to list | `.` (current dir) |
 | `--event.image_name_re` | Regex to match filenames | Hikvision default |
+| `--event.target_type` | `plate`, or another type, such as `face`, for an `image_name_re` without a `target` group, listing each file's event name instead of its plate | `plate` |
 | `--log_level` | Logging verbosity | `INFO` |
 
 ## DVLA Lookup (`dvla_lookup`)

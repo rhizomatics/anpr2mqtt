@@ -75,3 +75,25 @@ def test_list_tool_cli_cmd_empty_dir(tmp_path: Path) -> None:
         tool.cli_cmd()
     # structlog uses print internally; no image targets should be printed
     assert not any("timestamp=" in t for t in printed_targets)
+
+
+def test_list_tool_lists_events_without_target(tmp_path: Path) -> None:
+    """ListTool with a non-plate target_type lists files whose names have no target, by their event name."""
+    (tmp_path / "10.180.10.40_01_20261125175413139_FACE_DETECTION.jpg").write_bytes(b"fake")
+    (tmp_path / "20250602103045407_B4DM3N_VEHICLE_DETECTION.jpg").write_bytes(b"fake")
+    event = EventSettings(
+        camera="barn",
+        event="face",
+        target_type="face",
+        watch_path=tmp_path,
+        image_name_re=re.compile(
+            r"(?P<ip>[0-9.]+)_(?P<channel>[0-9]+)_(?P<dt>[0-9]{17})_(?P<event>FACE_DETECTION)\.(?P<ext>jpg|png|gif|jpeg)"
+        ),
+        ocr_field_ids=[],
+    )
+    printed: list[str] = []
+    with patch("builtins.print", side_effect=lambda *a, **_k: printed.append(str(a))):
+        ListTool(event=event).cli_cmd()
+    listed = [p for p in printed if "timestamp=" in p]
+    assert len(listed) == 1, "only the face file, not the plate one"
+    assert "FACE_DETECTION: timestamp=2026-11-25 17:54:13.139000" in listed[0]
