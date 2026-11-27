@@ -36,6 +36,14 @@ def test_on_connect_not_authorized() -> None:
     on_connect(Mock(), None, Mock(), rc)
 
 
+def test_on_connect_bad_credentials_v5() -> None:
+    client = Mock()
+    on_connect(
+        client, {"availability_topic": "anpr2mqtt/availability"}, Mock(), _make_rc("Bad user name or password", eq_zero=False)
+    )
+    client.publish.assert_not_called()
+
+
 def test_on_connect_failure() -> None:
     rc = _make_rc("Connection Refused", eq_zero=False)
     on_connect(Mock(), None, Mock(), rc)

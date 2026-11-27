@@ -2,14 +2,18 @@ import re
 import warnings
 from enum import StrEnum, auto
 from pathlib import Path
-from typing import Final, Literal
+from typing import Any, Final, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic_settings import (
     BaseSettings,
     CliSettingsSource,
+    DotEnvSettingsSource,
+    EnvSettingsSource,
+    InitSettingsSource,
     NestedSecretsSettingsSource,
     PydanticBaseSettingsSource,
+    SecretsSettingsSource,
     SettingsConfigDict,
     YamlConfigSettingsSource,
 )
@@ -384,3 +388,45 @@ class Settings(BaseSettings):
             YamlConfigSettingsSource(settings_cls),
             init_settings,
         )
+
+
+SOURCE_LABELS: Final[dict[type[PydanticBaseSettingsSource], str]] = {
+    CliSettingsSource: "command line",
+    EnvSettingsSource: "environment variable",
+    DotEnvSettingsSource: "dotenv file",
+    NestedSecretsSettingsSource: "secrets",
+    YamlConfigSettingsSource: "config file",
+    InitSettingsSource: "init",
+}
+
+
+def setting_source(settings_cls: type[BaseSettings], *path: str) -> str | None:
+    """Name the highest priority settings source that supplies the value at path, e.g. ("mqtt", "pass")
+
+    Diagnostic only, so an env var silently overriding the config file can be spotted; never exposes the value.
+    """
+    try:
+        sources = settings_cls.settings_customise_sources(
+            settings_cls,
+            init_settings=InitSettingsSource(settings_cls, init_kwargs={}),
+            env_settings=EnvSettingsSource(settings_cls),
+            dotenv_settings=DotEnvSettingsSource(settings_cls),
+            file_secret_settings=SecretsSettingsSource(settings_cls),
+        )
+    except Exception:
+        return None
+    for source in sources:
+        if _source_value(source, path) is not None:
+            return SOURCE_LABELS.get(type(source), type(source).__name__)
+    return None
+
+
+def _source_value(source: PydanticBaseSettingsSource, path: tuple[str, ...]) -> Any:
+    """Value a single settings source supplies at path, or None if it doesn't, or can't be read"""
+    try:
+        value: Any = source()
+        for key in path:
+            value = value[key]
+    except Exception:
+        return None
+    return value

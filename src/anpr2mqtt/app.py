@@ -23,10 +23,12 @@ from anpr2mqtt.hass import (
     publish_availability,
 )
 from anpr2mqtt.heartbeat import Heartbeat
-from anpr2mqtt.settings import LINK_FRIGATE, CameraSettings, EventSettings, Settings, linked_cameras
+from anpr2mqtt.settings import LINK_FRIGATE, CameraSettings, EventSettings, Settings, linked_cameras, setting_source
 from anpr2mqtt.tracker import Tracker, compute_time_analysis
 
 log = structlog.get_logger()
+# v3.1.1 CONNACK 4/5 and v5 reason codes 134/135; paho also reports v5 refusals as a "Protocol error" disconnect
+CREDENTIAL_FAILURES: tuple[str, ...] = ("Not authorized", "Bad user name or password")
 # run like docker run --restart always -d -v /ftp:/ftp d4d8dea7d1e3
 
 
@@ -38,7 +40,7 @@ def on_connect(
     _props: Properties | None = None,
 ) -> None:
     log.debug("on_connect, MQTT result code " + str(rc))
-    if rc.getName() == "Not authorized":
+    if rc.getName() in CREDENTIAL_FAILURES:
         log.error("Invalid MQTT credentials", result_code=rc)
         return
     if rc != 0:
@@ -113,6 +115,7 @@ def main_loop() -> None:
         client.on_connect = on_connect
         client.on_disconnect = on_disconnect
         client.username_pw_set(username=settings.mqtt.user, password=settings.mqtt.password)
+        log.info("MQTT password taken from %s", setting_source(Settings, "mqtt", "pass") or "unknown source")
         rc: MQTTErrorCode = client.connect(host=settings.mqtt.host, port=int(settings.mqtt.port), keepalive=60)
         log.info("Client connection requested", result_code=rc)
         client.loop_start()

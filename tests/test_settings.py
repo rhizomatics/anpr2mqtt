@@ -1,4 +1,7 @@
+from pathlib import Path
 from typing import Any
+
+import pytest
 
 from anpr2mqtt.settings import (
     CameraSettings,
@@ -91,3 +94,29 @@ def test_linked_frigate_camera_only_cameras_processed() -> None:
     assert linked_cameras(CameraSettings(name="driveway"), frigate) == {}
     camera = CameraSettings(name="drive", linked_cameras={"frigate": "garage", "blueiris": "drive"})
     assert linked_cameras(camera, frigate) == {"frigate": "garage", "blueiris": "drive"}
+
+
+def test_setting_source_identifies_env_override(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, YamlConfigSettingsSource
+
+    from anpr2mqtt.settings import Settings, setting_source
+
+    config = tmp_path / "anpr2mqtt.yaml"
+    config.write_text("mqtt:\n  user: anpr\n  pass: from-yaml\n")
+
+    class YamlEnvSettings(Settings):
+        @classmethod
+        def settings_customise_sources(  # type: ignore[override]
+            cls,
+            settings_cls: type[BaseSettings],
+            env_settings: PydanticBaseSettingsSource,
+            **_kwargs: PydanticBaseSettingsSource,
+        ) -> tuple[PydanticBaseSettingsSource, ...]:
+            return (env_settings, YamlConfigSettingsSource(settings_cls, yaml_file=config))
+
+    monkeypatch.delenv("MQTT__PASS", raising=False)
+    assert setting_source(YamlEnvSettings, "mqtt", "pass") == "config file"
+    monkeypatch.setenv("MQTT__PASS", "from-env")
+    assert setting_source(YamlEnvSettings, "mqtt", "pass") == "environment variable"
+    assert YamlEnvSettings().mqtt.password == "from-env"  # ruff: ignore[hardcoded-password-string]
+    assert setting_source(YamlEnvSettings, "mqtt", "nonexistent") is None
