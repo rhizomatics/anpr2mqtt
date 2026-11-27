@@ -1,0 +1,174 @@
+# Camera Configuration
+
+Any camera that can upload an image for an event, by ftp, to a NAS or otherwise, with a timestamp in its file name, can be used with `anpr2mqtt`. ANPR is its speciality, so the Hikvision ANPR camera below is the main example, followed by [Other Events](#other-events), such as face capture and scene change, from the same or other cameras.
+
+## Hikvision
+
+### Example
+
+This example uses the [DS-2CD4A25FWD-IZS](https://specsheets.dvs.co.uk/DS-2CD4A25FWD-IZS.pdf), one of the very first ANPR enabled Hikvision cameras, on its own, without any NVR.
+
+ANPR configuration, including posting images via ftp, is configured in the *Road Traffic* menu under *Advanced*.
+
+At the bottom of the page is the configuration for actions upon detecting a plate.
+
+The server name, user name and password, and upload directory for this ftp are set once for all ftp actions in the *Network* menu under *Advanced Configuration*.
+
+Some of the results of the recognition algorithm are available either on the picture and/or as part of the image file name. Direction is one that's only available with this model on the image. Its also possible to play with text colour here, although `anpr2mqtt` will optionally invert the colours pre-scan, so its possible to leave it as white text on black background to be clearer for humans to read.
+
+The file name format is configurable, it should have the licence plate included and the timestamp to work with the default `anpr2mqtt` regular expression. There's no need to include camera number if there's only one ANPR camera.
+
+### Image Settings
+
+The Hikvision camera has a special set of image settings bundled as a **Mounting Scenario**
+
+One side-effect of this is that the camera can be practically useless as a general purpose CCTV camera in anything other than very bright conditions if the *Road* Mounting Scenario is chosen.
+
+One way of coping with this is to switch between mount scenarios, so its *Normal* at day time and *Road* at night, or have it on *Road* only when there is heightened security need.
+
+#### Home Assistant Automated Mount Scenario Change
+
+Set up two REST commands, changing `192.168.1.100` for the IP address or host name of your own camera, and adding `hik_user` and `hik_password` values to the `secrets.yaml` file (see [Storing Secrets](https://www.home-assistant.io/docs/configuration/secrets/)).
+
+REST Command Definitions
+
+```text
+driveway_cam_road:
+    url: http://192.168.1.100/ISAPI/Image/channels/1/mountingScenario
+    method: put
+    content_type: text/xml
+    username: !secret hik_user
+    password: !secret hik_password
+    payload: '<MountingScenario xmlns="http://www.hikvision.com/ver20/XMLSchema" version="2.0"><mode>road</mode></MountingScenario>'
+
+driveway_cam_normal:
+    url: http://192.168.1.100/ISAPI/Image/channels/1/mountingScenario
+    method: put
+    content_type: text/xml
+    username: !secret hik_user
+    password: !secret hik_password
+    payload: '<MountingScenario xmlns="http://www.hikvision.com/ver20/XMLSchema" version="2.0"><mode>normal</mode></MountingScenario>'
+```
+
+These commands can now be used in Home Assistant automations as actions, triggered by time of day, state of sun etc.
+
+## Other Events
+
+Hikvision cameras have many other events besides ANPR, such as face capture, scene change, line crossing, region entry or unattended baggage, and can ftp images for any of them. Any of these can be added as an event, so long as the camera puts a timestamp in the file name, without anpr2mqtt having to know about each one.
+
+As with ANPR, the file name format is set on the camera. For example, from camera IP address, channel and timestamp, then the event's own name:
+
+- `10.180.10.30_01_20261127071024588_SCENE_CHANGE_DETECTION.jpg`
+- `10.180.10.40_01_20261125175413139_FACE_DETECTION.jpg`
+
+Every event should have a `target_type`, `plate` for ANPR, and anything else for other events, along with an `image_name_re` matching its file names ( `target_type` defaults to `plate`, for compatibility with older configurations). It can be on the same camera as an ANPR event, and share the same `watch_path`, since each event only picks up files matching its own `image_name_re`.
+
+```yaml
+events:
+- camera: shed
+  event: anpr
+  target_type: plate
+  watch_path: /ftp/Shed
+- camera: shed
+  event: scene_change
+  target_type: scene_change
+  watch_path: /ftp/Shed
+  image_name_re: (?P<ip>[0-9.]+)_(?P<channel>[0-9]+)_(?P<dt>[0-9]{17})_(?P<event>SCENE_CHANGE_DETECTION)\.(?P<ext>jpg|png|gif|jpeg)
+  min_event_gap_seconds: 60
+  ocr_field_ids: []
+```
+
+These events are kept apart from plates:
+
+- **Home Assistant** gets an [event entity](https://www.home-assistant.io/integrations/event/), such as `event.scene_change_shed`, rather than a sensor, on the same device as the camera's ANPR sensor. Its `event_type` is the event's name, here `scene_change`, with the usual [attributes](https://anpr2mqtt.rhizomatics.org.uk/homeassistant/#attributes). There's also an image entity and a camera entity, as for ANPR
+- **Integrations that take an anpr2mqtt device's sensors as plates**, such as [Camera AutoNotify](https://camera-autonotify.rhizomatics.org.uk), don't see them
+- **No plate handling**: no DVLA lookup, plate correction or Frigate licence plates
+- **Defaults**: none of the plate defaults. `event` is the `target_type`, so `event: scene_change` above could be left out, rather than `anpr`. `default_description` comes from the event name, here `Scene change`, rather than `Unknown vehicle`. `icon` is `mdi:cctv` rather than `mdi:car-back`. There's no OCR, rather than the Hikvision vehicle direction, so `ocr_field_ids: []` isn't needed
+
+There's usually no `target` in these file names, so nothing to look up, correct or track, and the event entity records when each was seen. Where a camera sends several images a second or so apart for the same thing, `min_event_gap_seconds` makes them one event, publishing only the first within that many seconds of the last.
+
+### Face Capture
+
+Some cameras send two images per face: a `FACE_SNAP` cropped to the face, and a `FACE_BACKGROUND` of the whole scene, a few milliseconds later, such as `10.180.10.20_01_20261120175018129_FACE_SNAP.jpg`. With `secondary_image_event`, the `FACE_BACKGROUND` is published as a second image entity, such as `image.face_driveway_face_background`, rather than as another event, so there's one event per face, with the `FACE_SNAP` as its image.
+
+```yaml
+- camera: driveway
+  event: face
+  target_type: face
+  default_description: Face
+  icon: mdi:face-recognition
+  watch_path: /ftp/Driveway
+  image_name_re: (?P<ip>[0-9.]+)_(?P<channel>[0-9]+)_(?P<dt>[0-9]{17})_(?P<event>FACE_SNAP|FACE_BACKGROUND)\.(?P<ext>jpg|png|gif|jpeg)
+  secondary_image_event: FACE_BACKGROUND
+  ocr_field_ids: []
+```
+
+Other cameras send only one image per face, `FACE_DETECTION`, often several a second or so apart. Match that event name, leave out `secondary_image_event`, and set `min_event_gap_seconds`, such as `10`.
+
+## Uploads
+
+An event with `target_type: upload` counts every file arriving in, or removed from, its `watch_path`, and the files there now, without looking inside them, so they don't need a timestamp in the file name, or even to be images. Nothing is published for each file, so nothing is notified, only a Home Assistant sensor of when the last file arrived, such as `sensor.upload_shed`, with its counts.
+
+It can be used on its own, as a general purpose monitor of an ftp landing zone, or alongside a directory's other events, to check there's been some activity, such as scene changes or snapshots, even when no plates have arrived.
+
+Uploads aren't tied to a camera, since several cameras may share one landing zone, or one camera upload to several, so `camera` isn't needed. Each upload is told apart by its `id` instead, which can be left out if there's only one.
+
+```yaml
+events:
+- target_type: upload
+  id: shed
+  watch_path: /ftp/Shed
+- target_type: upload
+  id: all
+  description: All ftp uploads
+  watch_path: /ftp
+  watch_tree: true
+```
+
+The sensor's state is the time the last file arrived, with attributes:
+
+```yaml
+event: upload
+id: all
+watch_path: /ftp
+# files there now
+current: 2210
+current_bytes: 1385402880
+# files arrived
+today: 41
+today_bytes: 25690112
+this_week: 230
+this_week_bytes: 144179200
+total: 9120
+total_bytes: 5716836352
+last_received: "2026-11-27T08:02:11.120000+00:00"
+last_file: Shed/10.180.10.30_01_20261127080211120_SCENE_CHANGE_DETECTION.jpg
+# files removed
+removed_today: 0
+removed_today_bytes: 0
+removed_this_week: 1850
+removed_this_week_bytes: 1159725056
+removed_total: 6910
+removed_total_bytes: 4331433472
+last_removed: "2026-11-24T03:00:02.501000+00:00"
+last_removed_file: Shed/10.180.10.30_01_20261117061533114_SCENE_CHANGE_DETECTION.jpg
+```
+
+- **Current**: the files in the `watch_path` now, found by a scan at startup, kept up to date as files arrive and are removed, and scanned again each midnight. Arrivals and removals only count from when `anpr2mqtt` started watching, so with files coming and going, such as a camera or NAS clearing out old images, it's `current` that says what's there
+- **Arrivals**: counted when a file is closed after being written, as an ftp upload is, or renamed to a matching name, such as from an ftp server's temporary upload name. A file moved in whole from elsewhere is in `current`, but not counted as an arrival
+- **Removals**: a file deleted, moved out of the `watch_path`, or renamed to a name that no longer matches. Sizes are as last seen, since the file has gone
+- **Which files**: any file by default, or only those matching `image_name_re`, such as `.*\.jpg`, which needs no `dt` group for an upload. With `watch_tree: true`, files in subdirectories count too, and `last_file` is relative to the `watch_path`
+- **Naming**: the sensor is `sensor.upload_<id>`, such as `sensor.upload_all` above, or `sensor.upload` without an `id`. Each upload needs its own `id`, checked at startup. `id` is only for uploads, other events are told apart by `event` and `camera`
+- **Camera**: optional, and if given, only shown as a `camera` attribute, such as for a camera's own landing zone
+- **No device**: the sensor isn't on any `anpr2mqtt` device, as for the [individual or group sensors](https://anpr2mqtt.rhizomatics.org.uk/homeassistant/#individual-or-group-sensors), so integrations that take an anpr2mqtt device's sensors as plates, such as [Camera AutoNotify](https://camera-autonotify.rhizomatics.org.uk), don't see it
+- **Nothing else**: no image, camera or event entity, OCR, tracking or autoclear
+- **Counts**: as for [image counts](https://anpr2mqtt.rhizomatics.org.uk/homeassistant/#image-counts), kept across restarts and back to 0 at midnight, with sizes in bytes
+
+## Other ANPR Cameras
+
+- See [Which Hikvision ANPR Camera Should I Buy in 2025?](https://www.use-ip.co.uk/forum/threads/which-hikvision-anpr-camera-should-i-buy-in-2025.12271/) FAQ from [use-IP Forum](https://www.use-ip.co.uk/forum/)
+
+## Other Ways to Integrate
+
+- Home Assistant built-in [Hikvision Integration](https://www.home-assistant.io/integrations/hikvision/)
+  - Has support for 'Surveillance Center' notifications but with open [issue #115631](https://github.com/home-assistant/core/issues/115631) for ANPR integration.

@@ -1,0 +1,16 @@
+# Docker Compose
+
+Example Docker Compose configuration to run *ANPR2MQTT* as a container. This also requires a [.env](https://anpr2mqtt.rhizomatics.org.uk/examples/env/index.md), or alternatively adding the environment variables directly into the compose file.
+
+```yaml
+services:
+  anpr2mqtt:
+    container_name: anpr2mqtt
+    image: ghcr.io/rhizomatics/anpr2mqtt:release
+    volumes:
+      - ./config:/config  # Config file lives at /config/anpr2mqtt.yaml inside the container
+      - ./data/:/data     # Tracking data with JSON per plate recording visits, and DVLA cache
+      - ./ftp:/media/cctv/ftp/driveway  # Example ftp landing zone
+    restart: always
+    env_file: ./.env  # Optional environment variables file
+```

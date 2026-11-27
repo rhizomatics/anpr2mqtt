@@ -1,0 +1,367 @@
+# 1.4.2
+
+## ✨ Enhancements
+
+- Upload sensors have a `current` count, and `current_bytes`, of the files in the `watch_path` now, found by a scan at startup and each midnight, and kept up to date as files come and go, since the arrival counts, only from when watching started, could look like an empty directory
+- Files removed from an upload's `watch_path`, deleted, moved out or renamed to a name that no longer matches, are counted, as `removed_today`, `removed_this_week`, `removed_total`, `last_removed` and `last_removed_file`
+- A file renamed to a matching name, such as from an ftp server's temporary upload name, counts as an upload
+- Sizes in bytes alongside every count, such as `today_bytes` and `total_bytes`, for both uploads and events' `images` attribute
+
+# 1.4.1
+
+## ✨ Enhancements
+
+- New `mqtt.client_id` setting, defaulting to `anpr2mqtt` as before, so more than one `anpr2mqtt` can run against the same broker without each one disconnecting the other
+- New `upload` target type, counting every file arriving in its `watch_path`, as a Home Assistant sensor of the last upload with `today`, `this_week`, `total` and `last_file` attributes. Nothing is published for each file, so nothing is notified. Use it as a general purpose ftp landing zone monitor, or alongside a directory's other events, to check there's some activity, such as scene changes, even when no plates arrive. Uploads aren't tied to a camera, which is optional for them, and several are told apart by a new `id` setting, such as `sensor.upload_shed` for `id: shed`. See [Uploads](https://anpr2mqtt.rhizomatics.org.uk/camera/#uploads)
+
+## 💥 Breaking changes
+
+- An event's `images` attribute counts only its own images, as `images.today` rather than `images.event.today`. The `camera` and `all` counts are gone, replaced by `upload` events, which can count a camera's directory, or one shared by all cameras
+
+# 1.4.0
+
+## ✨ Enhancements
+
+- Other camera events, such as face capture, scene change, line crossing or region entry, defined by configuration alone. Any `target_type` other than `plate` is published as a Home Assistant event entity rather than a sensor, so integrations that take anpr2mqtt sensors as plates, such as Camera AutoNotify, don't see them, and has no plate lookups or corrections. See [Other Events](https://anpr2mqtt.rhizomatics.org.uk/camera/#other-events)
+- The `target` group in `image_name_re` is only required for plate events, since most other events have nothing but a timestamp in their image names
+- `default_description` and `icon` default by `target_type`, `Unknown vehicle` and `mdi:car-back` for plates as before, otherwise from the event name and `mdi:cctv`
+- `event` and `ocr_field_ids` default by `target_type` too, `anpr` and the Hikvision vehicle direction for plates as before, otherwise the `target_type` and no OCR, so an event other than plates doesn't get `anpr` in its topics and entity ids
+- New `secondary_image_event` event setting, for a second image of the same capture, such as Hikvision's `FACE_BACKGROUND` alongside its `FACE_SNAP`, published as its own image entity rather than as another event
+- New `min_event_gap_seconds` event setting, for events without a target, so several images of the same face a second or so apart are published as one event
+- Image counts, an `images` attribute on each event's entities, with `today`, `this_week`, `total` and `last_received` for the event, its camera and overall, for health checks such as no images from a camera today. Every image received is counted, whether or not it's published, and counts are kept in the data directory across restarts. See [Image Counts](https://anpr2mqtt.rhizomatics.org.uk/homeassistant/#image-counts)
+- Home Assistant entities no longer configured, such as for a removed event, are removed at startup, along with their retained state. Only this instance's own entities are touched, it's skipped if any event fails to start, and `homeassistant.remove_stale_entities: false` switches it off. See [Removing Entities](https://anpr2mqtt.rhizomatics.org.uk/homeassistant/#removing-entities)
+- MQTT login diagnostics: the source of the MQTT password, such as environment variable or config file, is logged at startup, so an old env var overriding the config file is easier to spot
+
+## 💥 Breaking changes
+
+- An existing event with a `target_type` other than `plate` is now an event entity, and its old sensor is removed from Home Assistant. Automations using that sensor need to use the event entity instead
+
+## 🔒 Security
+
+- Plates from Frigate, which any client that can publish to the MQTT broker could forge, were used unchecked in sighting history file names, so a plate such as `../../x` could read and write JSON files outside the data directory. Plates, Frigate camera names and Frigate event ids are now checked before use, and any sighting history file must be inside the data directory
+
+## 🐛 Bug fixes
+
+- Camera names, and each event's `event`, `camera` and `target_type`, are checked at startup, and must be letters, digits, `_` or `-`, since a space, `/`, `.` or an MQTT wildcard in one broke its topics, Home Assistant discovery or file names
+- MQTT v5 login rejections, such as EMQX's `Bad user name or password`, are now logged as invalid credentials. paho also reports these as a `Protocol error` disconnect, which is the same failure
+- Frigate licence plates are only matched to plate events, where previously the first event configured for a camera was used
+- The milliseconds in an image name's 17 digit timestamp were read as microseconds, so `event_time` and the sighting history were up to a second early, such as `10:30:45.000407` for `10:30:45.407`. Sightings recorded before upgrading keep their old times
+
+## 📚 Documentation
+
+- Docs and examples give every event a `target_type`, including `plate`. It still defaults to `plate`, for older configurations, but an event without it is a plate event, with a plate sensor, even on a camera with no ANPR
+
+## 📝 Other changes
+
+- `anprtools list_dir` works for events without a target, with `--event.target_type`, listing each file's event name
+- `mise.toml` installs Tesseract, via conda-forge, so OCR tests run locally
+
+# 1.3.2
+
+## 🐛 Bug fixes
+
+- Italian and French plate validation patterns corrected to `AA123AA` format, and rules renamed `ITALY_1994` and `FRANCE_2009` to match the year each format was introduced
+
+## 📝 Other changes
+
+- Rebuilt container image to use an astral.sh reproducible Python build
+- Also fixes CVE-2026-5435 and CVE-2026-19499 although neither of these had no exploits in the app.
+- Minor fixes for test readability
+
+## 📚 Documentation
+
+- Updated to reflect new recommendation to use [Camera AutoNotify](https://camera-autonotify.rhizomatics.org.uk) and that this is now recommended for Frigate enrichment rather than anpr2mqtt.
+
+# 1.3.1
+
+## 📝 Other changes
+
+- Correct version number for release
+- `niquests-cache` replaces `requests-cache`, also removes otherwise unnecessary `requests` dependency
+- Existing `requests-cache` files will be ignored, so requests re-cached that would otherwise be within `ttl` first time round
+- Cache file location logged at startup. Cache files are easily distinguished - 64 char hashes for `niquests-cache` vs 16 for `requests-cache`. The two can co-exist until old ones tidied up.
+
+## 🐛 Bug fixes
+
+- Fixed error in handling a DVLA API rejection
+
+# 1.3.0
+
+This version adds support for an upcoming [Camera AutoNotify](https://camera-autonotify.rhizomatics.org.uk/developer/design/rfcs/rfc0003_anpr2mqtt/) release that will support ANPR2MQTT. The changes may also be generally useful where this app used in conjunction with Frigate.
+
+## ✨ Enhancements
+
+- Home Assistant devices now have manufacturer `Rhizomatics` and model `anpr2mqtt`, so integrations building on anpr2mqtt, such as Camera AutoNotify, can recognise them for certain. The device identifier is unchanged, so existing devices are kept
+- A camera's `live_url` is its device's configuration URL in Home Assistant, where it's an `http` or `https` address
+- New `linked_cameras` camera setting, naming the same camera in other integrations, such as Frigate, UniFi Protect, Viseron or Blue Iris, keyed by the Home Assistant domain of each, `frigate`, `unifiprotect`, `viseron` or `blueiris`
+- A Frigate camera named differently from the anpr2mqtt camera its plates should be published as can be linked by `linked_cameras.frigate`. Without it, the Frigate camera of the same name is used, as before
+- Every state has a `linked_cameras` attribute, those set, and the Frigate camera matched by name while the Frigate listener is on, for integrations such as Camera AutoNotify that join sightings to the events of those cameras
+
+# 1.2.2
+
+## ✨ Enhancements
+
+- Docker image now has a built-in `HEALTHCHECK`, using the new `anprtools healthcheck` command. It passes while the main loop is running and connected to MQTT, and needs no broker credentials
+- The old `/app/healthcheck.sh` script is removed. It waited for a heartbeat ANPR2MQTT never published, so it always failed. Remove any `healthcheck:` that calls it from your compose file
+- `mosquitto-clients` and `jq` are no longer installed in the image, reducing CVE exposure
+- OCR is checked at startup against a bundled sample image, logging `Verified OCR` or an error, so a missing or broken Tesseract shows up immediately rather than as every field reading `Unknown`. Turn off with `ocr.verify_on_startup: false`
+
+## 🐛 Bug fixes
+
+- Fix OCR in the Docker image, broken since 1.2.0: the `tesseract` binary was no longer installed, only its English language data, so OCR fields such as `vehicle_direction` always came out as `Unknown`
+
+## 📝 Other changes
+
+- Image rebuild for Debian CVE fixes
+- Base images are pinned by digest, and published images are scanned daily, rebuilding when a fix is available
+
+# 1.2.1
+
+## 🐛 Bug fixes
+
+- Home Assistant target sensors (a target or group given an `entity_id`) now keep the same `unique_id` across restarts. Previously it was rebuilt from a randomised hash each time ANPR2MQTT started, so Home Assistant could add a new entity after each restart, with a `_2`, `_3` suffix, and leave the old one behind as no longer provided
+- After upgrading, delete any leftover target sensors from Home Assistant's entity list, and rename the remaining one back to its original entity ID if it picked up a suffix
+- Republishing discovery when Home Assistant restarts no longer blocks the MQTT connection for the jittered delay, which held up Frigate events and keepalives while it ran
+
+# 1.2.0
+
+## 🚨 Breaking changes
+
+- `tools` CLI renamed to `anprtools`, to avoid clashing with other packages' commands
+
+## ✨ Enhancements
+
+- Home Assistant entities now report availability on MQTT broker, consistent with Updates2MQTT
+- ANPR2MQTT publishes
+  - `online` to `anpr2mqtt/availability` when it connects
+  - `offline` when it shuts down
+  - sets `offline` as its MQTT last will, so the broker publishes it if the service crashes or is killed
+- Every discovery config includes this as its `availability_topic`
+- **Behaviour change**: while ANPR2MQTT is down, its entities in Home Assistant show as *unavailable* rather than keeping their last state. They come back when it reconnects
+- See [Home Assistant Integration](https://anpr2mqtt.rhizomatics.org.uk/homeassistant/#availability)
+- MQTT subscriptions, to Home Assistant status and Frigate events, are now renewed after a reconnect to the broker. Previously a dropped connection silently stopped Frigate events and Home Assistant restart detection until ANPR2MQTT was restarted
+
+## 📝 Other changes
+
+- Shrink docker image by removing build tooling
+- Docker images now security scanned
+- Automated testing now covers Python 3.13, 3.14, 3.15
+
+## 🐛 Bug fixes
+
+- Fix healthcheck by including `jq` in image
+
+# 1.1.5
+
+## 📝 Other changes
+
+- Change pydantic dependency to `pydantic-settings[yaml]` since it now won't automatically import `pyyaml` otherwise
+- Docker image no longer sets `MQTT__HOST`, `MQTT__PORT` and `MQTT__TOPIC_ROOT` env vars, which silently overrode the same settings in the YAML config file
+- Test that the Docker image builds and the app starts inside it
+
+# 1.1.4
+
+## 📝 Other changes
+
+- Security Fixes
+- Pillow upgraded to v13.0.0 to remediate multiple CVEs
+- Build chain certificate update for eMudhra intermediate ca certs issue
+- Container rebuilt with latest `uv` version for eMudhra issue
+
+## 📚 Documentation
+
+- Documentation updated to include new for `tesseract` install when running OCR tools outside of Docker
+
+# 1.1.3
+
+## 📝 Other changes
+
+- Moved docs theme to MaterialX
+- `anpr2mqtt` and `tools` now installed as a `uv` tools inside container
+
+## 📚 Documentation
+
+- Docs publish `llms.txt` / `llms-full.txt` and per-page Markdown links for AI agents
+
+# 1.1.2
+
+## ✨ Enhancements
+
+### Frigate Integration
+
+- Populate `event_image_url` with snapshot for payload compatibility with file system detected images
+
+## 🐛 Bug fixes
+
+### Example Home Assistant Integration
+
+- Fixed use of `vehicle_direction` and `history.last_sighting`
+
+## 📝 Other changes
+
+- Dependency refresh
+- Documentation site build switched from `mkdocs` to `properdocs`
+
+# 1.1.1
+
+## Diagnostics
+
+- When a message is republished because of HA restart or other event, this will be included as the `trigger` in the payload
+- Reduced noisy INFO logging for non-LPR Frigate events
+
+# 1.1.0
+
+## Frigate Integration
+
+- Optionally listen on MQTT for LPR detections in Frigate, and apply the same encrichment (DVLA, known plates) and corrections as for plates found via file system
+
+## Auto-correction
+
+- A recent plate with successful DVLA match will be used as a matching candidate for plates with poor match
+- Dupe messages reduced, and spurious visit counting, by a minimum time gap
+- Auto correct for common alpha/digit swaps by OCRs, with built-in rules for recent UK,French and Italian registrations
+
+# 1.0.0
+
+## Known Targets Configuration
+
+- Restructured from 2 fixed groups ("known" and "dangerous") to a flexible groups structure, so any number of groups can be created, for example "family","postman","delivery","utility"
+- Groups can have an `icon`,`entity_id` and `priority`, targets will inherit these if they don't have their own, or leave empty at group level and populate only on group members
+- Existing config using `known` or `dangerous` will be translated at runtime to new structure
+- `correction` lists of patterns or strings can now be added directly to target
+- API lookup can be configured at target or group level, defaults to off, since vehicles already known
+
+## Fuzzy Matching
+
+- Close matches can be automatically matched to a known plate, with configurable tolerance
+- `auto_match_tolerance` on Event config controls how far apart it can be, for example 1 or 2 different/missing/extra characters
+  - Internally uses `rapidfuzz` with Levenshtein algorithm
+  - Removes many cases for regular expressions, although still possible to provide them, or known bad readings as fixed strings
+
+## Target specific sensors in Home Assistant
+
+- Groups and individual targets can be given an `entity_id` and a sensor will be created in Home Assistant using MQTT discovery
+- State for the sensor will be timestamp of last sighting, and combined past history will be attributes
+- Any number of vehicles can be combined in a single sensor, so for example see last post vehicle detected, even if several come to the property
+- Targets can now be more than a simple string - currently `description` and `entity_id` supported
+
+## Time Analysis
+
+- Previous sightings now have a richer set of analysis, with histogram data by visit hour of day, earliest/latest times
+
+## Home Assistant
+
+- Improved example automation
+- Icon now configurable in the Event config, previously fixed at `mdi:car-back`
+
+## Descriptions
+
+- DVLA API client can now generate a description for unknown vehicles using the colour and vehicle make
+- A `default_description` can be set on the Event config as a backup so there's never a null value passed to Home Assistant
+- This defaults to "Unknown vehicle" however can be changed for other languages, or if being used for face/line-crossing detection
+
+## Internals and Fixes
+
+- Corrected example configurations
+- Refactored internally to a `Sighting` class and a more complete `Target` definition, replacing ad hoc dicts
+
+# 0.10.2
+
+- Improve error handling when started without config file
+- Fix healthcheck script use of MQTT env vars
+
+# 0.10.1
+
+- Update Home Assistant example to display a history summary, use the new `spoken_message` feature of Supernotify, and check `event_image_url` existing
+- Now warns at start up if `image_base_url` has a trailing slash
+- Always send a `history` value, defaulting to empty dict, to simplify HA templates
+- Added pypi publishing
+
+# 0.10.0
+
+- Auto match plates with potential errors to known plates, using Levenshtein algorithm, and controlled via new `auto_match_tolerance` setting
+- Historical analysis now provides a count of times vehicle previously seen by hour of the day, the earliest and latest time of day ever seen, and if the current visit is within that range
+
+# 0.9.2
+
+- Test fixes
+
+# 0.9.1
+
+- Fixes for API Client caching and logging
+- Report % saved on image compression
+- Option to specify a `verify_plate` to check the DVLA API at startup
+
+# 0.9.0
+
+- Replaced the now doubtfully maintained httpx with niquests, and hishel with requests-cache
+- Settings now has configuration for `cache_dir` and to choose `cache_type` between `FILE` or `MEMORY`
+- Add DVLA lookup to the CLI tools
+- `uv run --with anpr2mqtt tools dvla_lookup MAG1C --dvla.api_key <my_api_key>`
+  - (can skip the `--with anpr2mqtt` if running from checked out dir)
+
+# 0.8.0
+
+- Autoclear to optionally reset state after period of time
+- Validate all regular expressions at startup
+
+# 0.7.2
+
+- Python moved to 3.14 for docker image
+
+## Home Assistant Integration
+
+- Remove state republication on HA restart
+
+# 0.7.1
+
+## Home Assistant Integration
+
+- Now subscribes to the HA 'birth' and 'last will' messages to re-publish on HA restart
+- State always published at startup
+- Camera settings can be added, to add `area` and `live_url` to the message
+- Camera Entity can now be added, and option to switch this and/or the Image entity creation
+
+## Directory Scanning
+
+- `watch_tree` can be set to recursively watch all subdirectories below `watch_path`
+
+## MQTT
+
+- MQTT protocol can now be set up to v5 or down to v3, defaults to v3.11
+
+# 0.6.2
+
+## Examples
+
+- Added an example Home Assistant automation to generate notifications using details and priority from MQTT event
+
+# 0.6.1
+
+- Log state topic at startup
+
+# 0.6.0
+
+- Multiple events now supported, e.g. face detection or line crossing
+- OCR field definitions can be reused across events, or different crop definitions for the same value
+- For example, `vehicle_direction` could have different bounding boxes, or even values, on different cameras
+- Suggested area provided for Home Assistant Device if configured
+
+# 0.5.0
+
+- Home Assistant Device creation optional
+- Simplified OCR coordinates
+- Flexible OCR field capture
+
+# 0.4.1
+
+- Improve CLI handling for tools
+- File name parsing now more forgiving of regexp format
+
+# 0.4.0
+
+- CLI handling and env vars switched from click to pydantic-settings
+- Added new anpr2mqtt.yaml config
+- Migrated sightings tracker from appdaemon app
+- Migrated plate classification from appdaemon app
+- Added DVLA api lookup from appdaemon app
