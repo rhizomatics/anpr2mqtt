@@ -187,3 +187,21 @@ def test_non_plate_event_name_and_ocr_default_from_target_type() -> None:
         image_name_re=re.compile(r"(?P<dt>[0-9]{17})_FACE\.jpg"),
     )
     assert (named.event, named.ocr_field_ids) == ("front_face", ["hik_direction"])
+
+
+@pytest.mark.parametrize("name", ["front/door", "front#", "a+b", "front door", "../x", "x.y", "", "x" * 65])
+def test_invalid_names_rejected(name: str) -> None:
+    with pytest.raises(ValidationError, match="letters, digits"):
+        CameraSettings(name=name)
+    with pytest.raises(ValidationError, match="letters, digits"):
+        EventSettings(event=name)
+    with pytest.raises(ValidationError, match="letters, digits"):
+        EventSettings(camera=name)
+    with pytest.raises(ValidationError, match="letters, digits"):
+        EventSettings(target_type=name, image_name_re=re.compile(r"(?P<dt>[0-9]{17})\.jpg"))
+
+
+@pytest.mark.parametrize("name", ["driveway", "Front_Door", "back-gate", "cam2"])
+def test_valid_names_accepted(name: str) -> None:
+    assert CameraSettings(name=name).name == name
+    assert EventSettings(event=name, camera=name).event == name

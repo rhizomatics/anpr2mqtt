@@ -656,3 +656,33 @@ def test_start_records_subscriptions_for_reconnect(handler: FrigateHandler, mock
     handler.start()
     assert "frigate/events" in userdata["subscriptions"]
     assert "frigate/+/snapshot" in userdata["subscriptions"]
+
+
+# --- untrusted input from the broker ---
+
+
+@pytest.mark.parametrize(
+    "override",
+    [
+        {"after": {"recognized_license_plate": "../../../etc/x", "recognized_license_plate_score": 95}},
+        {"after": {"recognized_license_plate": "AB12/CDE", "recognized_license_plate_score": 95}},
+        {"camera": "driveway/../other"},
+        {"camera": "drive#way"},
+        {"event_id": "../../api/config"},
+        {"event_id": "evt?x=1"},
+    ],
+)
+def test_process_event_rejects_forged_names(
+    handler: FrigateHandler, mock_publisher: Mock, mock_tracker: Mock, override: dict[str, Any]
+) -> None:
+    with patch.object(handler, "_get_event_image") as get_image:
+        handler._process_event("frigate/events", _make_payload(**override))
+    get_image.assert_not_called()
+    mock_tracker.record.assert_not_called()
+    mock_publisher.post_state_message.assert_not_called()
+
+
+def test_process_event_accepts_real_frigate_ids(handler: FrigateHandler, mock_publisher: Mock) -> None:
+    with patch.object(handler, "_get_event_image", return_value=None):
+        handler._process_event("frigate/events", _make_payload(event_id="1790171055.400738-28axk4"))
+    mock_publisher.post_state_message.assert_called()

@@ -1,6 +1,8 @@
 import datetime as dt
 from pathlib import Path
 
+import pytest
+
 from anpr2mqtt.settings import Target, TargetGroup, TargetSettings, TrackerSettings
 from anpr2mqtt.tracker import Sighting, Tracker, compute_time_analysis
 
@@ -418,3 +420,26 @@ def test_record_visit_gap_first_sighting_always_new(tmp_path: Path) -> None:
     tracker = Tracker("plate", TrackerSettings(data_dir=tmp_path, min_visit_gap_seconds=300), target_config=TargetSettings())
     result = tracker.record("NEWPLATE", "plate", dt.datetime(2025, 1, 1, tzinfo=dt.UTC))
     assert result.get("is_new_visit", True) is True
+
+
+@pytest.mark.parametrize("target", ["../escape", "a/b", "..", "x" * 40, "AB\x0012"])
+def test_unsafe_target_not_written_outside_data_dir(tmp_path: Path, target: str) -> None:
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    tracker = Tracker(target_type="plate", tracker_config=TrackerSettings(data_dir=data_dir), target_config=None)
+    analysis = tracker.record(target, "plate", None)
+    assert analysis["is_new_visit"] is True
+    assert tracker.history(target, "plate") == []
+    assert sorted(p.name for p in tmp_path.rglob("*") if p.is_file()) == []
+
+
+def test_unsafe_target_type_not_used_as_directory(tmp_path: Path) -> None:
+    tracker = Tracker(target_type="plate", tracker_config=TrackerSettings(data_dir=tmp_path), target_config=None)
+    tracker.record("AB12CDE", "../outside", None)
+    assert not (tmp_path.parent / "outside").exists()
+
+
+def test_plate_with_space_still_tracked(tmp_path: Path) -> None:
+    tracker = Tracker(target_type="plate", tracker_config=TrackerSettings(data_dir=tmp_path), target_config=None)
+    tracker.record("AB12 CDE", "plate", None)
+    assert len(tracker.history("AB12 CDE", "plate")) == 1
