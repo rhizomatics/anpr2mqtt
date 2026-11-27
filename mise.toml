@@ -3,6 +3,8 @@
 minimum_release_age = "7d"
 
 [tools]
+# OCR engine for pytesseract, which the Docker image gets from apt; conda-forge's build includes English language data
+"conda:tesseract" = "latest"
 "pipx:pngquant-cli" = "latest"
 prek = "latest"
 ruff = { version = "latest", minimum_release_age = "2d" }

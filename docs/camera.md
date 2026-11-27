@@ -73,6 +73,49 @@ These commands can now be used in Home Assistant automations as actions, trigger
 
 ![Home Assistant Automation Example](assets/images/ha_mount_scenario_automation.png){width=500}
 
+### Face Capture
+
+Hikvision cameras with face capture can ftp two images per face: a `FACE_SNAP` cropped to the face, and a
+`FACE_BACKGROUND` of the whole scene, a few milliseconds later. As with ANPR, the file name format is set on the camera,
+for example `10.180.10.20_01_20261120175018129_FACE_SNAP.jpg`, from camera IP address, channel and timestamp.
+
+A face is configured as another event on the same camera as its ANPR event, and can share the same `watch_path`, since
+each event only picks up files matching its own `image_name_re`.
+
+```yaml
+events:
+- camera: driveway
+  event: anpr
+  watch_path: /ftp/Driveway
+- camera: driveway
+  event: face
+  target_type: face
+  default_description: Face
+  icon: mdi:face-recognition
+  watch_path: /ftp/Driveway
+  image_name_re: (?P<ip>[0-9.]+)_(?P<channel>[0-9]+)_(?P<dt>[0-9]{17})_(?P<event>FACE_SNAP|FACE_BACKGROUND)\.(?P<ext>jpg|png|gif|jpeg)
+  secondary_image_event: FACE_BACKGROUND
+  ocr_field_ids: []
+```
+
+There's no `target` in a face's file name, so nothing to look up, correct or track. Its sensor, such as
+`sensor.face_driveway`, has the time of the last face as its state, and the usual [attributes](homeassistant.md#attributes),
+with `target` empty. The `FACE_SNAP` fires the event, and is its image entity. With `secondary_image_event`, the
+`FACE_BACKGROUND` is published as a second image entity, such as `image.face_driveway_face_background`, rather than as
+another event, so there's one event per face. Without it, the event would fire for both images.
+
+Other cameras send only one image per face, such as `10.180.10.40_01_20261125175413139_FACE_DETECTION.jpg`. For
+those, match that event name, and leave out `secondary_image_event`. These may send several images of the same face a
+second or so apart. Since there's no target to tell them apart, `min_event_gap_seconds` makes them one event, publishing
+only the first image within that many seconds of the last event:
+
+```yaml
+  image_name_re: (?P<ip>[0-9.]+)_(?P<channel>[0-9]+)_(?P<dt>[0-9]{17})_(?P<event>FACE_DETECTION)\.(?P<ext>jpg|png|gif|jpeg)
+  min_event_gap_seconds: 10
+```
+
+Only plate events receive Frigate's licence plates, so a face event on the same camera doesn't affect those.
+
 ### Other Cameras
 
 - See [Which Hikvision ANPR Camera Should I Buy in 2025?](https://www.use-ip.co.uk/forum/threads/which-hikvision-anpr-camera-should-i-buy-in-2025.12271/) FAQ from [use-IP Forum](https://www.use-ip.co.uk/forum/)

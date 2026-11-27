@@ -46,6 +46,7 @@ class EventHandler(RegexMatchingEventHandler):
         dvla_config: DVLASettings,
         tracker: Tracker,
         mqtt_topic_root: str = "anpr2mqtt",
+        secondary_image_topic: str | None = None,
     ) -> None:
         fqre = f"{event_config.watch_path.resolve() / event_config.image_name_re.pattern}"
         super().__init__(regexes=[fqre], ignore_directories=True, case_sensitive=True)
@@ -61,6 +62,7 @@ class EventHandler(RegexMatchingEventHandler):
         if event_config.image_url_base:
             log.info("Images available from web server with prefix %s", event_config.image_url_base)
         self.image_topic: str = image_topic
+        self.secondary_image_topic: str | None = secondary_image_topic
         self.mqtt_topic_root: str = mqtt_topic_root
         self.api_client: APIClient | None = build_dvla_client(dvla_config, event_config.target_type)
         if self.api_client:
@@ -76,6 +78,7 @@ class EventHandler(RegexMatchingEventHandler):
         self._autoclear_timer = AutoclearTimer()
         self._camera_gate = CameraGatekeeper()
         self._last_good_plate: tuple[str, dt.datetime] | None = None
+        self._last_targetless: dt.datetime | None = None
 
     @property
     def ignore_directories(self) -> bool:
@@ -108,8 +111,14 @@ class EventHandler(RegexMatchingEventHandler):
             )
 
         try:
-            image_info: ImageInfo | None = examine_file(file_path, self.event_config.image_name_re)
-            if image_info is not None and image_info.target is not None:
+            image_info: ImageInfo | None = examine_file(
+                file_path, self.event_config.image_name_re, require_target=self.event_config.has_target
+            )
+            if image_info is not None and self._is_secondary_image(image_info):
+                self._publish_secondary_image(file_path, image_info)
+            elif image_info is not None and not self.event_config.has_target:
+                self._publish_targetless(file_path, image_info, url)
+            elif image_info is not None and image_info.target is not None:
                 target_id: str = image_info.target
                 log.info("Examining image for %s at %s", target_id, file_path.absolute())
 
@@ -182,13 +191,7 @@ class EventHandler(RegexMatchingEventHandler):
                     file_path=file_path,
                     source="filesystem",
                 )
-                if image:
-                    img_format = image_info.ext.upper() if image_info.ext else None
-                    img_format = "JPEG" if img_format == "JPG" else img_format
-                    if img_format:
-                        self.publisher.post_image_message(self.image_topic, image, img_format)
-                    else:
-                        log.warn("Unknown image format for %s", file_path)
+                self._post_image(self.image_topic, image, image_info, file_path)
                 self._schedule_autoclear()
             else:
                 log.warning("No image found for %s", file_path)
@@ -217,6 +220,69 @@ class EventHandler(RegexMatchingEventHandler):
                 file_path=file_path,
             )
 
+    def _is_secondary_image(self, image_info: ImageInfo) -> bool:
+        secondary: str | None = self.event_config.secondary_image_event
+        return secondary is not None and image_info.event == secondary
+
+    def _publish_secondary_image(self, file_path: Path, image_info: ImageInfo) -> None:
+        """Second image of a capture, such as a face's full scene, updates its own image entity without a new event"""
+        if not self.secondary_image_topic:
+            log.debug("No secondary image entity, ignoring %s", file_path)
+            return
+        log.info("Publishing %s image from %s", image_info.event, file_path.absolute())
+        image: Image.Image | None = process_image(
+            file_path.absolute(), image_info, jpeg_opts=self.image_config.jpeg_opts, png_opts=self.image_config.png_opts
+        )
+        self._post_image(self.secondary_image_topic, image, image_info, file_path)
+
+    def _publish_targetless(self, file_path: Path, image_info: ImageInfo, url: str | None) -> None:
+        """Something was seen, such as a face, with nothing in the image name to look up, track or correct"""
+        if not self._targetless_gap_passed(image_info.timestamp):
+            log.info(
+                "Skipping %s within %ss of the last, at %s",
+                image_info.event or self.event_config.event,
+                self.event_config.min_event_gap_seconds,
+                file_path,
+            )
+            return
+        log.info("Examining %s image at %s", image_info.event or self.event_config.event, file_path.absolute())
+        image: Image.Image | None = process_image(
+            file_path.absolute(), image_info, jpeg_opts=self.image_config.jpeg_opts, png_opts=self.image_config.png_opts
+        )
+        ocr_fields: dict[str, str | None] = scan_ocr_fields(image, self.event_config, self.ocr_config)
+        self.publisher.post_state_message(
+            self.state_topic,
+            sighting=None,
+            event_config=self.event_config,
+            camera=self.camera,
+            image_info=image_info,
+            extra_info=ocr_fields,
+            url=url,
+            file_path=file_path,
+            source="filesystem",
+        )
+        self._post_image(self.image_topic, image, image_info, file_path)
+        self._schedule_autoclear()
+
+    def _targetless_gap_passed(self, event_time: dt.datetime) -> bool:
+        """With nothing to tell sightings apart, such as two images of the same face, only time can"""
+        gap: int = self.event_config.min_event_gap_seconds
+        last: dt.datetime | None = self._last_targetless
+        if gap > 0 and last is not None and 0 <= (event_time - last).total_seconds() < gap:
+            return False
+        self._last_targetless = event_time
+        return True
+
+    def _post_image(self, topic: str, image: Image.Image | None, image_info: ImageInfo, file_path: Path) -> None:
+        if not image:
+            return
+        img_format: str | None = image_info.ext.upper() if image_info.ext else None
+        img_format = "JPEG" if img_format == "JPG" else img_format
+        if img_format:
+            self.publisher.post_image_message(topic, image, img_format)
+        else:
+            log.warning("Unknown image format for %s", file_path)
+
     def _schedule_autoclear(self) -> None:
         self._autoclear_timer.schedule(
             self.event_config,
@@ -233,6 +299,8 @@ class EventHandler(RegexMatchingEventHandler):
             )
         if autoclear.image:
             self.publisher.post_image_message(self.image_topic, image=None)
+            if self.secondary_image_topic:
+                self.publisher.post_image_message(self.secondary_image_topic, image=None)
 
 
 def process_image(
@@ -273,7 +341,7 @@ def process_image(
         return None
 
 
-def examine_file(file_path: Path, image_name_re: re.Pattern[str]) -> ImageInfo | None:
+def examine_file(file_path: Path, image_name_re: re.Pattern[str], require_target: bool = True) -> ImageInfo | None:
     try:
         match = re.match(image_name_re, file_path.name)
         if match:
@@ -281,14 +349,16 @@ def examine_file(file_path: Path, image_name_re: re.Pattern[str]) -> ImageInfo |
             size: int = file_path.stat().st_size
             raw_date = match.group("dt")
             year, month, day = map(int, (raw_date[:4], raw_date[4:6], raw_date[6:8]))
-            hours, minutes, seconds, microseconds = map(
+            hours, minutes, seconds, milliseconds = map(
                 int, (raw_date[8:10], raw_date[10:12], raw_date[12:14], raw_date[14:17])
             )
-            timestamp = dt.datetime(year, month, day, hours, minutes, seconds, microseconds, tzinfo=tzlocal.get_localzone())
+            timestamp = dt.datetime(
+                year, month, day, hours, minutes, seconds, milliseconds * 1000, tzinfo=tzlocal.get_localzone()
+            )
             file_ext: str | None = groups.get("ext")
             event: str | None = groups.get("event")
             target: str | None = groups.get("target")
-            if target is None:
+            if target is None and require_target:
                 log.warning("No target found for match: %s", groups)
                 return None
             if file_ext is None:

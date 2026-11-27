@@ -12,6 +12,16 @@ events:
   auto_match_tolerance: 2
   ocr_field_ids:
     - hik_direction
+- camera: driveway
+  event: face
+  description: Face seen at driveway camera
+  target_type: face
+  default_description: Face
+  icon: mdi:face-recognition
+  watch_path: /ftp/Driveway
+  image_name_re: (?P<ip>[0-9.]+)_(?P<channel>[0-9]+)_(?P<dt>[0-9]{17})_(?P<event>FACE_SNAP|FACE_BACKGROUND)\.(?P<ext>jpg|png|gif|jpeg)
+  secondary_image_event: FACE_BACKGROUND
+  ocr_field_ids: []
 - camera: shed
   event: line_crossing
   watch_path: /ftp/shedcam

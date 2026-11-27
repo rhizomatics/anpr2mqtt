@@ -1,3 +1,17 @@
+# 1.4.0
+
+## ✨ Enhancements
+- Face capture, or other events without a plate or other target in the image name. The `target` group in `image_name_re` is now only required for plate events, and an event without one has the time last seen as its sensor state. See [Face Capture](https://anpr2mqtt.rhizomatics.org.uk/camera/#face-capture)
+- New `secondary_image_event` event setting, for a second image of the same capture, such as Hikvision's `FACE_BACKGROUND` alongside its `FACE_SNAP`, published as its own image entity rather than as another event
+- New `min_event_gap_seconds` event setting, for events without a target, so several images of the same face a second or so apart are published as one event
+- MQTT login diagnostics: the source of the MQTT password, such as environment variable or config file, is logged at startup, so an old env var overriding the config file is easier to spot
+## 🐛 Bug fixes
+- MQTT v5 login rejections, such as EMQX's `Bad user name or password`, are now logged as invalid credentials. paho also reports these as a `Protocol error` disconnect, which is the same failure
+- Frigate licence plates are only matched to plate events, where previously the first event configured for a camera was used
+- The milliseconds in an image name's 17 digit timestamp were read as microseconds, so `event_time` and the sighting history were up to a second early, such as `10:30:45.000407` for `10:30:45.407`. Sightings recorded before upgrading keep their old times
+## 📝 Other changes
+- `mise.toml` installs Tesseract, via conda-forge, so OCR tests run locally
+
 # 1.3.2
 
 ## 🐛 Bug fixes

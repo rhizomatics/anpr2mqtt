@@ -21,9 +21,18 @@ from anpr2mqtt.hass import (
     HomeAssistantPublisher,
     availability_topic,
     publish_availability,
+    secondary_image_topic,
 )
 from anpr2mqtt.heartbeat import Heartbeat
-from anpr2mqtt.settings import LINK_FRIGATE, CameraSettings, EventSettings, Settings, linked_cameras, setting_source
+from anpr2mqtt.settings import (
+    LINK_FRIGATE,
+    TARGET_TYPE_PLATE,
+    CameraSettings,
+    EventSettings,
+    Settings,
+    linked_cameras,
+    setting_source,
+)
 from anpr2mqtt.tracker import Tracker, compute_time_analysis
 
 log = structlog.get_logger()
@@ -149,6 +158,11 @@ def main_loop() -> None:
             camera = camera.model_copy(update={"linked_cameras": linked_cameras(camera, settings.frigate)})
             state_topic = f"{settings.mqtt.topic_root}/{event_config.event}/cameras/{camera.name}/state"
             image_topic = f"{settings.mqtt.topic_root}/{event_config.event}/cameras/{camera.name}/image"
+            second_image_topic: str | None = (
+                secondary_image_topic(image_topic, event_config.secondary_image_event)
+                if event_config.secondary_image_event and settings.homeassistant.image_entity
+                else None
+            )
             tracker = Tracker(
                 event_config.target_type,
                 tracker_config=settings.tracker,
@@ -158,7 +172,8 @@ def main_loop() -> None:
             )
             # keyed by the Frigate camera, so a differently named one is published as this camera
             frigate_key = camera.linked_cameras.get(LINK_FRIGATE, camera.name)
-            if frigate_key not in frigate_camera_configs:
+            # only plate events, so a face event on the same camera doesn't take Frigate's licence plates
+            if event_config.target_type == TARGET_TYPE_PLATE and frigate_key not in frigate_camera_configs:
                 frigate_camera_configs[frigate_key] = (event_config, camera, tracker, state_topic, image_topic)
             event_handler = EventHandler(
                 publisher=publisher,
@@ -171,6 +186,7 @@ def main_loop() -> None:
                 dvla_config=settings.dvla,
                 tracker=tracker,
                 mqtt_topic_root=settings.mqtt.topic_root,
+                secondary_image_topic=second_image_topic,
             )
             log.debug("Scheduling watchdog for %s", event_config.watch_path)
             observer.schedule(event_handler, str(event_config.watch_path), recursive=event_config.watch_tree)
@@ -178,6 +194,14 @@ def main_loop() -> None:
             if settings.homeassistant.image_entity:
                 publisher.publish_image_discovery(
                     state_topic=state_topic, image_topic=image_topic, event_config=event_config, camera=camera
+                )
+            if second_image_topic:
+                publisher.publish_image_discovery(
+                    state_topic=state_topic,
+                    image_topic=second_image_topic,
+                    event_config=event_config,
+                    camera=camera,
+                    image_event=event_config.secondary_image_event,
                 )
             if settings.homeassistant.camera_entity:
                 publisher.publish_camera_discovery(

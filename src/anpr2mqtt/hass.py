@@ -33,6 +33,11 @@ def availability_topic(topic_root: str) -> str:
     return f"{topic_root}/availability"
 
 
+def secondary_image_topic(image_topic: str, secondary_image_event: str) -> str:
+    """Image topic for a capture's second image, such as image/face_background alongside a face's image"""
+    return f"{image_topic}/{secondary_image_event.lower()}"
+
+
 def publish_availability(client: mqtt.Client, topic: str, online: bool) -> mqtt.MQTTMessageInfo:
     """Retained plain string payload, as expected by Home Assistant availability_topic"""
     payload: str = AVAILABILITY_ONLINE if online else AVAILABILITY_OFFLINE
@@ -124,6 +129,10 @@ class HomeAssistantPublisher:
             "json_attributes_topic": state_topic,
             "name": name,
         }
+        if not event_config.has_target:
+            # nothing to name, such as a face, so the state is when it was last seen
+            payload["device_class"] = "timestamp"
+            payload["value_template"] = "{{ value_json.event_time | default(None) }}"
         if event_config.icon:
             payload["icon"] = event_config.icon
         if self.device_creation:
@@ -136,9 +145,19 @@ class HomeAssistantPublisher:
         log.info("Published HA MQTT sensor Discovery message to %s", topic)
 
     def publish_image_discovery(
-        self, state_topic: str, image_topic: str, event_config: EventSettings, camera: CameraSettings
+        self,
+        state_topic: str,
+        image_topic: str,
+        event_config: EventSettings,
+        camera: CameraSettings,
+        image_event: str | None = None,
     ) -> None:
+        """Image entity for an event, or with image_event, for a second image of the same capture"""
         name: str = event_config.description or f"{event_config.event} {event_config.camera}"
+        object_id: str = f"{event_config.event}_{event_config.camera}"
+        if image_event:
+            name = f"{name} {image_event.lower().replace('_', ' ')}"
+            object_id = f"{object_id}_{image_event.lower()}"
         payload = {
             "o": {
                 "name": "anpr2mqtt",
@@ -146,8 +165,8 @@ class HomeAssistantPublisher:
                 "url": "https://anpr2mqtt.rhizomatics.org.uk",
             },
             "device_class": None,
-            "unique_id": f"{event_config.event}_{event_config.camera}",
-            "default_entity_id": f"image.{event_config.event}_{event_config.camera}",
+            "unique_id": object_id,
+            "default_entity_id": f"image.{object_id}",
             "image_topic": image_topic,
             "json_attributes_topic": state_topic,
             "icon": event_config.icon,
@@ -156,7 +175,8 @@ class HomeAssistantPublisher:
         if self.device_creation:
             self.add_device_info(payload, camera)
         self.add_availability(payload)
-        topic = f"{self.discovery_topic_prefix}/image/{event_config.camera}/{event_config.event}/config"
+        node: str = f"{event_config.event}_{image_event.lower()}" if image_event else event_config.event
+        topic = f"{self.discovery_topic_prefix}/image/{event_config.camera}/{node}/config"
         msg = json.dumps(payload)
         self.client.publish(topic, payload=msg, qos=0, retain=True)
         self.republish[topic] = payload

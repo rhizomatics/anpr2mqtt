@@ -68,7 +68,19 @@ class EventSettings(BaseModel):
     )
     image_name_re: re.Pattern[str] = Field(
         default=re.compile(r"(?P<dt>[0-9]{17})_(?P<target>[A-Z0-9]+)_(?P<event>VEHICLE_DETECTION)\.(?P<ext>jpg|png|gif|jpeg)"),
-        description="Regular expression to find datetime, file extension and target from image name",
+        description="Regular expression to find datetime, file extension and target from image name. The target group "
+        "is only required for plates, so events without one, such as faces, are published with their capture time as state",
+    )
+    secondary_image_event: str | None = Field(
+        default=None,
+        description="Value of the image name's event group for a second image of the same capture, such as "
+        "FACE_BACKGROUND, published as its own image entity rather than as another event",
+    )
+    min_event_gap_seconds: int = Field(
+        default=0,
+        description="For events without a target, such as faces, minimum seconds after one event before another is "
+        "published, so several images of the same face are one event; 0 to publish every image. Plates use the "
+        "tracker's min_visit_gap_seconds",
     )
     image_url_base: str | None = Field(default=None, description="Base URL to turn a file name into a web link")
     ocr_field_ids: list[str] = Field(
@@ -103,11 +115,23 @@ class EventSettings(BaseModel):
     @field_validator("image_name_re")
     @classmethod
     def validate_image_name_re(cls, v: re.Pattern[str]) -> re.Pattern[str]:
-        required = {"dt", "target"}
-        missing = required - set(v.groupindex)
-        if missing:
-            raise ValueError(f"image_name_re is missing required named groups: {sorted(missing)}")
+        if "dt" not in v.groupindex:
+            raise ValueError("image_name_re is missing required named groups: ['dt']")
         return v
+
+    @model_validator(mode="after")
+    def validate_target_groups(self) -> "EventSettings":
+        groups = set(self.image_name_re.groupindex)
+        if self.target_type == TARGET_TYPE_PLATE and "target" not in groups:
+            raise ValueError("image_name_re is missing required named groups: ['target']")
+        if self.secondary_image_event and "event" not in groups:
+            raise ValueError("secondary_image_event needs an 'event' named group in image_name_re")
+        return self
+
+    @property
+    def has_target(self) -> bool:
+        """Whether image names identify a target, such as a plate, or only that something was seen, such as a face"""
+        return "target" in self.image_name_re.groupindex
 
 
 class HomeAssistantSettings(BaseModel):

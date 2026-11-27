@@ -477,3 +477,41 @@ def test_target_sensor_unique_id_is_stable(publisher: HomeAssistantPublisher, mo
     targets = [Target(id="AB12CDE"), Target(id="XY99ZZZ")]
     publisher.publish_target_sensor_discovery("known_cars", "plate", targets, "t/state", None)
     assert _discovery_payloads(mock_client)[0]["unique_id"] == "plate_known_cars"
+
+
+def test_targetless_sensor_discovery_uses_event_time(
+    publisher: HomeAssistantPublisher, mock_client: Mock, camera: CameraSettings
+) -> None:
+    import re
+
+    face = EventSettings(
+        camera="cam1", event="face", target_type="face", image_name_re=re.compile(r"(?P<dt>[0-9]{17})_FACE_SNAP\.jpg")
+    )
+    publisher.publish_sensor_discovery("anpr2mqtt/face/cam1/state", face, camera)
+    payload = json.loads(mock_client.publish.call_args.kwargs["payload"])
+    assert payload["device_class"] == "timestamp"
+    assert "event_time" in payload["value_template"]
+
+
+def test_plate_sensor_discovery_uses_target(
+    publisher: HomeAssistantPublisher, mock_client: Mock, event_config: EventSettings, camera: CameraSettings
+) -> None:
+    publisher.publish_sensor_discovery("anpr2mqtt/anpr/cam1/state", event_config, camera)
+    payload = json.loads(mock_client.publish.call_args.kwargs["payload"])
+    assert payload["device_class"] is None
+    assert payload["value_template"] == "{{ value_json.target }}"
+
+
+def test_publish_secondary_image_discovery(
+    publisher: HomeAssistantPublisher, mock_client: Mock, event_config: EventSettings, camera: CameraSettings
+) -> None:
+    publisher.publish_image_discovery(
+        "anpr2mqtt/anpr/cam1/state", "anpr2mqtt/anpr/cam1/image/face_background", event_config, camera, "FACE_BACKGROUND"
+    )
+    args, kwargs = mock_client.publish.call_args
+    payload = json.loads(kwargs["payload"])
+    assert args[0] == "homeassistant/image/cam1/anpr_face_background/config"
+    assert payload["unique_id"] == "anpr_cam1_face_background"
+    assert payload["default_entity_id"] == "image.anpr_cam1_face_background"
+    assert payload["image_topic"] == "anpr2mqtt/anpr/cam1/image/face_background"
+    assert payload["name"].endswith("face background")

@@ -1,10 +1,13 @@
+import re
 from pathlib import Path
 from typing import Any
 
 import pytest
+from pydantic import ValidationError
 
 from anpr2mqtt.settings import (
     CameraSettings,
+    EventSettings,
     FrigateSettings,
     Target,
     TargetGroup,
@@ -120,3 +123,25 @@ def test_setting_source_identifies_env_override(monkeypatch: pytest.MonkeyPatch,
     assert setting_source(YamlEnvSettings, "mqtt", "pass") == "environment variable"
     assert YamlEnvSettings().mqtt.password == "from-env"  # ruff: ignore[hardcoded-password-string]
     assert setting_source(YamlEnvSettings, "mqtt", "nonexistent") is None
+
+
+def test_face_event_needs_no_target_group() -> None:
+    event = EventSettings(
+        target_type="face",
+        image_name_re=re.compile(r"(?P<dt>[0-9]{17})_(?P<event>FACE_SNAP|FACE_BACKGROUND)\.jpg"),
+        secondary_image_event="FACE_BACKGROUND",
+    )
+    assert event.has_target is False
+    assert EventSettings().has_target is True
+
+
+def test_plate_event_still_needs_target_group() -> None:
+    with pytest.raises(ValidationError, match="target"):
+        EventSettings(image_name_re=re.compile(r"(?P<dt>[0-9]{17})_FACE_SNAP\.jpg"))
+
+
+def test_secondary_image_event_needs_event_group() -> None:
+    with pytest.raises(ValidationError, match="secondary_image_event"):
+        EventSettings(
+            target_type="face", image_name_re=re.compile(r"(?P<dt>[0-9]{17})_FACE\.jpg"), secondary_image_event="FACE_X"
+        )
