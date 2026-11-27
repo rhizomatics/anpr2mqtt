@@ -109,6 +109,7 @@ def _make_mock_settings(protocol: str = "3.11", events: list[EventSettings] | No
     settings.mqtt.user = "test"
     settings.mqtt.password = "pass"  # ruff: ignore[hardcoded-password-string]
     settings.mqtt.topic_root = "anpr2mqtt"
+    settings.mqtt.client_id = "anpr2mqtt"
     settings.homeassistant = HomeAssistantSettings(status_topic="homeassistant/status")
     settings.frigate = FrigateSettings()
     settings.events = events if events is not None else []
@@ -140,6 +141,29 @@ def test_main_loop_minimal() -> None:
     mock_observer.stop.assert_called_once()
     mock_client.will_set.assert_called_once_with("anpr2mqtt/availability", payload="offline", qos=1, retain=True)
     mock_client.disconnect.assert_called_once()
+
+
+def test_main_loop_mqtt_client_id() -> None:
+    """The configured client id is used, so parallel instances don't knock each other off the broker."""
+    mock_settings = _make_mock_settings()
+    mock_settings.mqtt.client_id = "anpr2mqtt-test"
+    mock_observer = Mock()
+    mock_observer.is_alive.return_value = False
+
+    with (
+        patch("anpr2mqtt.app.Settings", return_value=mock_settings),
+        patch("anpr2mqtt.app.mqtt.Client", return_value=Mock()) as mock_client_class,
+        patch("anpr2mqtt.app.Observer", return_value=mock_observer),
+    ):
+        main_loop()
+
+    assert mock_client_class.call_args.kwargs["client_id"] == "anpr2mqtt-test"
+
+
+def test_mqtt_client_id_default() -> None:
+    from anpr2mqtt.settings import MQTTSettings
+
+    assert MQTTSettings(user="u", password="p").client_id == "anpr2mqtt"  # ruff: ignore[hardcoded-password-func-arg]
 
 
 def test_main_loop_mqtt_protocol_31() -> None:
@@ -231,6 +255,38 @@ def test_main_loop_with_events(tmp_path: Path) -> None:
         main_loop()
 
     mock_observer.schedule.assert_called_once()
+
+
+def test_main_loop_upload_event_only_counted(tmp_path: Path) -> None:
+    """An upload event gets an upload handler and sensor, with no camera, image or event entities."""
+    import json
+
+    from anpr2mqtt.settings import EventSettings, TrackerSettings
+    from anpr2mqtt.upload_handler import UploadHandler
+
+    event_config = EventSettings(id="ftp", target_type="upload", watch_path=tmp_path, watch_tree=True)
+    mock_settings = _make_mock_settings(events=[event_config])
+    mock_settings.tracker = TrackerSettings(data_dir=tmp_path / "data")
+    mock_client = Mock()
+    mock_observer = Mock()
+    mock_observer.is_alive.return_value = False
+
+    with (
+        patch("anpr2mqtt.app.Settings", return_value=mock_settings),
+        patch("anpr2mqtt.app.mqtt.Client", return_value=mock_client),
+        patch("anpr2mqtt.app.Observer", return_value=mock_observer),
+    ):
+        main_loop()
+
+    mock_observer.schedule.assert_called_once()
+    handler, path = mock_observer.schedule.call_args.args
+    assert isinstance(handler, UploadHandler)
+    assert path == str(tmp_path.resolve())
+    assert mock_observer.schedule.call_args.kwargs["recursive"] is True
+    discovery = [c.args[0] for c in mock_client.publish.call_args_list if c.args[0].startswith("homeassistant/")]
+    assert discovery == ["homeassistant/sensor/uploads/upload_ftp/config"]
+    states = [c for c in mock_client.publish.call_args_list if c.args[0] == "anpr2mqtt/uploads/upload_ftp/state"]
+    assert json.loads(states[0].kwargs["payload"])["total"] == 0
 
 
 def test_main_loop_routes_linked_frigate_camera(tmp_path: Path) -> None:

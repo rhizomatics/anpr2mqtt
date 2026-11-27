@@ -567,8 +567,8 @@ def test_state_carries_image_counts_and_refreshes(mock_client: Mock, camera: Cam
     publisher.record_image(scene, camera)
     publisher.post_state_message("state/topic", None, scene, camera, event_topic="ev/topic")
     first = json.loads(mock_client.publish.call_args.kwargs["payload"])
-    assert first["images"]["event"]["today"] == 1
-    assert first["images"]["all"]["total"] == 1
+    assert first["images"]["today"] == 1
+    assert first["images"]["total"] == 1
 
     mock_client.reset_mock()
     publisher.record_image(scene, camera)
@@ -577,8 +577,68 @@ def test_state_carries_image_counts_and_refreshes(mock_client: Mock, camera: Cam
     args, kwargs = mock_client.publish.call_args
     refreshed = json.loads(kwargs["payload"])
     assert args[0] == "state/topic", "refreshes the state, never fires the event"
-    assert refreshed["images"]["event"]["total"] == 2
+    assert refreshed["images"]["total"] == 2
     assert {k: v for k, v in refreshed.items() if k != "images"} == {k: v for k, v in first.items() if k != "images"}
+
+
+def test_event_counts_only_its_own_images(mock_client: Mock, camera: CameraSettings) -> None:
+    from anpr2mqtt.image_stats import ImageStats
+
+    publisher = HomeAssistantPublisher(mock_client, HomeAssistantSettings(), image_stats=ImageStats())
+    scene = _scene_event()
+    publisher.record_image(EventSettings(camera="cam1", target_type="face"), camera)
+    publisher.record_image(scene, camera)
+    publisher.post_state_message("state/topic", None, scene, camera)
+    assert json.loads(mock_client.publish.call_args.kwargs["payload"])["images"]["total"] == 1
+
+
+def _upload_event() -> EventSettings:
+    return EventSettings(id="shed", target_type="upload", watch_path=Path("/ftp/shed"))
+
+
+def test_publish_upload_discovery(mock_client: Mock) -> None:
+    publisher = HomeAssistantPublisher(mock_client, HomeAssistantSettings(), availability_topic="anpr2mqtt/availability")
+    publisher.publish_upload_discovery("anpr2mqtt/uploads/upload_shed/state", _upload_event())
+    args, kwargs = mock_client.publish.call_args
+    payload = json.loads(kwargs["payload"])
+    assert args[0] == "homeassistant/sensor/uploads/upload_shed/config"
+    assert payload["unique_id"] == "uploads_upload_shed"
+    assert payload["default_entity_id"] == "sensor.upload_shed", "named by id, no camera"
+    assert payload["name"] == "Upload shed"
+    assert payload["device_class"] == "timestamp"
+    assert payload["value_template"] == "{{ value_json.last_received }}"
+    assert payload["icon"] == "mdi:folder-upload"
+    assert "dev" not in payload, "not on the device, so not taken as a plate sensor"
+    assert payload["availability_topic"] == "anpr2mqtt/availability"
+    assert args[0] in publisher.republish
+
+
+def test_upload_state_and_midnight_refresh(mock_client: Mock) -> None:
+    from anpr2mqtt.image_stats import ImageStats
+
+    publisher = HomeAssistantPublisher(mock_client, HomeAssistantSettings(), image_stats=ImageStats())
+    upload = _upload_event()
+    publisher.post_upload_state("upload/state", upload)
+    empty = json.loads(mock_client.publish.call_args.kwargs["payload"])
+    assert empty["total"] == 0
+    assert empty["last_received"] is None
+    assert empty["last_file"] is None
+    assert empty["watch_path"] == "/ftp/shed"
+    assert "camera" not in empty
+    assert empty["id"] == "shed"
+
+    publisher.record_upload(upload, "sub/x.jpg")
+    mock_client.reset_mock()
+    publisher.refresh_image_stats()
+    mock_client.publish.assert_called_once()
+    args, kwargs = mock_client.publish.call_args
+    refreshed = json.loads(kwargs["payload"])
+    assert args[0] == "upload/state"
+    assert kwargs["retain"] is True
+    assert refreshed["total"] == 1
+    assert refreshed["today"] == 1
+    assert refreshed["last_file"] == "sub/x.jpg"
+    assert refreshed["last_received"] is not None
 
 
 def test_refresh_without_stats_does_nothing(publisher: HomeAssistantPublisher, mock_client: Mock) -> None:

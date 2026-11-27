@@ -11,6 +11,7 @@ from paho.mqtt.reasoncodes import ReasonCode
 from pydantic import ValidationError
 from pydantic_settings import CliApp
 from watchdog.observers import Observer
+from watchdog.observers.api import BaseObserver
 
 import anpr2mqtt
 from anpr2mqtt.event_handler import EventHandler, verify_ocr
@@ -27,6 +28,7 @@ from anpr2mqtt.hass import (
 from anpr2mqtt.heartbeat import Heartbeat
 from anpr2mqtt.image_stats import ImageStats, local_now
 from anpr2mqtt.settings import (
+    DEFAULT_CAMERA,
     LINK_FRIGATE,
     TARGET_TYPE_PLATE,
     CameraSettings,
@@ -36,6 +38,7 @@ from anpr2mqtt.settings import (
     setting_source,
 )
 from anpr2mqtt.tracker import Tracker, compute_time_analysis
+from anpr2mqtt.upload_handler import UploadHandler
 
 log = structlog.get_logger()
 # v3.1.1 CONNACK 4/5 and v5 reason codes 134/135; paho also reports v5 refusals as a "Protocol error" disconnect
@@ -117,7 +120,7 @@ def main_loop() -> None:
         client = mqtt.Client(
             callback_api_version=CallbackAPIVersion.VERSION2,
             clean_session=True if protocol != MQTTProtocolVersion.MQTTv5 else None,
-            client_id="anpr2mqtt",
+            client_id=settings.mqtt.client_id,
             protocol=protocol,
             userdata={"availability_topic": avail_topic, SUBSCRIPTIONS: []},
         )
@@ -157,11 +160,15 @@ def main_loop() -> None:
     for event_config in settings.events:
         camera: CameraSettings | None = None
         try:
+            if event_config.is_upload:
+                start_upload(publisher, observer, settings.mqtt.topic_root, event_config)
+                continue
+            camera_name: str = event_config.camera or DEFAULT_CAMERA
             for camera_config in settings.cameras:
-                if camera_config.name == event_config.camera:
+                if camera_config.name == camera_name:
                     camera = camera_config
             if camera is None:
-                camera = CameraSettings(name=event_config.camera)
+                camera = CameraSettings(name=camera_name)
             # resolved once, so Home Assistant is told the same Frigate camera that events are routed by
             camera = camera.model_copy(update={"linked_cameras": linked_cameras(camera, settings.frigate)})
             state_topic = f"{settings.mqtt.topic_root}/{event_config.event}/cameras/{camera.name}/state"
@@ -323,6 +330,22 @@ def main_loop() -> None:
         observer.join()
         log.info("loop observer ended")
         shutdown_mqtt(client, avail_topic)
+
+
+def start_upload(
+    publisher: HomeAssistantPublisher,
+    observer: BaseObserver,
+    topic_root: str,
+    event_config: EventSettings,
+) -> None:
+    """Only counted, as a sensor of the last upload, with no camera, image or event entities, tracking or OCR"""
+    state_topic: str = f"{topic_root}/uploads/{event_config.upload_name}/state"
+    upload_handler = UploadHandler(publisher=publisher, state_topic=state_topic, event_config=event_config)
+    log.debug("Scheduling upload watchdog for %s", upload_handler.watch_root)
+    observer.schedule(upload_handler, str(upload_handler.watch_root), recursive=event_config.watch_tree)
+    publisher.publish_upload_discovery(state_topic=state_topic, event_config=event_config)
+    publisher.post_upload_state(state_topic, event_config)
+    log.info("Counting uploads to %s as %s, at %s", event_config.watch_path, event_config.upload_name, state_topic)
 
 
 def shutdown_mqtt(client: mqtt.Client, avail_topic: str) -> None:

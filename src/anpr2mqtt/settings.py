@@ -19,6 +19,10 @@ from pydantic_settings import (
 )
 
 TARGET_TYPE_PLATE: Final[str] = "plate"
+# not a camera event, but any file landing in the watch path, counted to check that uploads are still arriving
+TARGET_TYPE_UPLOAD: Final[str] = "upload"
+UPLOAD_NAME_RE: Final[str] = r".+"
+DEFAULT_CAMERA: Final[str] = "driveway"
 
 # Names used in MQTT topics, Home Assistant discovery and entity ids, and file paths: no topic separators or wildcards,
 # path separators, dots, spaces or anything else Home Assistant discovery would reject
@@ -50,6 +54,10 @@ class MQTTSettings(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     topic_root: str = "anpr2mqtt"
+    client_id: str = Field(
+        default="anpr2mqtt",
+        description="MQTT client ID, which must be different for each anpr2mqtt instance on the same broker",
+    )
     host: str = Field(default="localhost", description="MQTT broker IP address or hostname")
     port: int = Field(default=1883, description="MQTT broker port number")
     user: str = Field(description="MQTT account user name")
@@ -85,17 +93,28 @@ class AutoClearSettings(BaseModel):
 
 
 class EventSettings(BaseModel):
-    camera: str = Field(default="driveway", description="Camera name")
+    camera: str | None = Field(
+        default=None,
+        description="Camera name, 'driveway' if not given. Optional for uploads, which aren't tied to a camera, since "
+        "several cameras may share a landing zone, and only shown as an attribute if given",
+    )
     event: str = Field(
         default="anpr",
         description="Identifier of the event, used in MQTT topics and entity ids, 'anpr' for plates, otherwise the target_type",
+    )
+    id: str | None = Field(
+        default=None,
+        description="For uploads only, tells several landing zones apart, such as 'shed' for sensor.upload_shed. Not "
+        "needed for a single upload",
     )
     description: str | None = Field(default=None, description="Free text description of event")
     target_type: str = Field(
         default="plate",
         description="Type of target for this event, 'plate' if ANPR, best always given. Any other type, such as 'face' or "
         "'scene_change', is published as a Home Assistant event entity rather than a sensor, and has no plate lookups or "
-        "corrections. Defaults to 'plate', so configurations from before other events were supported still work",
+        "corrections. 'upload' counts every file arriving in the watch path, as a sensor of the last upload, without "
+        "publishing any events, told apart by id rather than camera. Defaults to 'plate', so configurations "
+        "from before other events were supported still work",
     )
     region: str | None = Field(default="UK", description="Region for applying correction, normalization rules")
     default_description: str | None = Field(
@@ -104,7 +123,8 @@ class EventSettings(BaseModel):
     )
     icon: str | None = Field(
         default=None,
-        description="Default icon to provide for Home Assistant entities, mdi:car-back for plates, otherwise mdi:cctv",
+        description="Default icon to provide for Home Assistant entities, mdi:car-back for plates, mdi:folder-upload for "
+        "uploads, otherwise mdi:cctv",
     )
     watch_path: Path = Field(default=Path(), description="File system directory to watch")
     watch_tree: bool = Field(
@@ -113,7 +133,8 @@ class EventSettings(BaseModel):
     image_name_re: re.Pattern[str] = Field(
         default=re.compile(r"(?P<dt>[0-9]{17})_(?P<target>[A-Z0-9]+)_(?P<event>VEHICLE_DETECTION)\.(?P<ext>jpg|png|gif|jpeg)"),
         description="Regular expression to find datetime, file extension and target from image name. The target group "
-        "is only required for plates, so events without one, such as faces, are published with their capture time as state",
+        "is only required for plates, so events without one, such as faces, are published with their capture time as state. "
+        "For uploads, any file name by default, with no datetime needed",
     )
     secondary_image_event: str | None = Field(
         default=None,
@@ -145,10 +166,10 @@ class EventSettings(BaseModel):
         description="Max Levenshtein distance from last known-good plate to trigger correction; 0 to disable",
     )
 
-    @field_validator("event", "camera", "target_type")
+    @field_validator("event", "camera", "target_type", "id")
     @classmethod
-    def validate_names(cls, v: str, info: ValidationInfo) -> str:
-        return check_name(v, str(info.field_name))
+    def validate_names(cls, v: str | None, info: ValidationInfo) -> str | None:
+        return None if v is None else check_name(v, str(info.field_name))
 
     @field_validator("image_url_base")
     @classmethod
@@ -162,45 +183,57 @@ class EventSettings(BaseModel):
             )
         return v
 
-    @field_validator("image_name_re")
-    @classmethod
-    def validate_image_name_re(cls, v: re.Pattern[str]) -> re.Pattern[str]:
-        if "dt" not in v.groupindex:
-            raise ValueError("image_name_re is missing required named groups: ['dt']")
-        return v
-
     @model_validator(mode="before")
     @classmethod
     def non_plate_defaults(cls, data: Any) -> Any:
         """Other events don't get the plate defaults, an 'anpr' event name and the vehicle direction OCR"""
         if isinstance(data, dict):
             target_type: Any = data.get("target_type", TARGET_TYPE_PLATE)
+            if target_type != TARGET_TYPE_UPLOAD and data.get("camera") is None:
+                data = {**data, "camera": DEFAULT_CAMERA}
             if target_type != TARGET_TYPE_PLATE:
                 data = {**data}
                 data.setdefault("event", target_type)
                 data.setdefault("ocr_field_ids", [])
+                if target_type == TARGET_TYPE_UPLOAD:
+                    data.setdefault("image_name_re", UPLOAD_NAME_RE)
         return data
 
     @model_validator(mode="after")
     def validate_target_groups(self) -> "EventSettings":
         groups = set(self.image_name_re.groupindex)
+        # uploads aren't read for their capture time, so can be any file
+        if "dt" not in groups and not self.is_upload:
+            raise ValueError("image_name_re is missing required named groups: ['dt']")
         if self.target_type == TARGET_TYPE_PLATE and "target" not in groups:
             raise ValueError(
                 "image_name_re is missing required named groups: ['target']. "
                 "For events other than plates, set target_type, such as target_type: scene_change"
             )
+        if self.id is not None and not self.is_upload:
+            raise ValueError("id is only for uploads, other events are told apart by their event and camera")
         if self.secondary_image_event and "event" not in groups:
             raise ValueError("secondary_image_event needs an 'event' named group in image_name_re")
         if self.default_description is None:
             self.default_description = "Unknown vehicle" if self.is_plate else self.event.replace("_", " ").capitalize()
         if self.icon is None:
-            self.icon = "mdi:car-back" if self.is_plate else "mdi:cctv"
+            self.icon = "mdi:car-back" if self.is_plate else "mdi:folder-upload" if self.is_upload else "mdi:cctv"
         return self
 
     @property
     def is_plate(self) -> bool:
         """Plate events are Home Assistant sensors, any other kind of event is an event entity"""
         return self.target_type == TARGET_TYPE_PLATE
+
+    @property
+    def is_upload(self) -> bool:
+        """Uploads are counted, as a sensor of the last one, but never published as events"""
+        return self.target_type == TARGET_TYPE_UPLOAD
+
+    @property
+    def upload_name(self) -> str:
+        """Name of an upload's entity, topics and counts, by event and id, as uploads aren't tied to a camera"""
+        return f"{self.event}_{self.id}" if self.id else self.event
 
     @property
     def has_target(self) -> bool:
@@ -473,6 +506,15 @@ class Settings(BaseSettings):
                     elif isinstance(member, dict) and "target_type" not in member:
                         member["target_type"] = target_type
         return data
+
+    @model_validator(mode="after")
+    def unique_upload_events(self) -> "Settings":
+        """Reject uploads sharing a name, since without a camera, they'd share an entity and counts"""
+        names: list[str] = [event.upload_name for event in self.events if event.is_upload]
+        duplicates: list[str] = sorted({name for name in names if names.count(name) > 1})
+        if duplicates:
+            raise ValueError(f"each upload needs its own id, such as 'id: shed', but more than one is named {duplicates}")
+        return self
 
     @classmethod
     def settings_customise_sources(

@@ -167,6 +167,78 @@ def test_defaults_follow_target_type() -> None:
     assert (custom.default_description, custom.icon) == ("Face", "mdi:face-recognition")
 
 
+def test_upload_event_defaults() -> None:
+    upload = EventSettings(target_type="upload")
+    assert upload.is_upload
+    assert not upload.is_plate
+    assert not upload.has_target
+    assert upload.event == "upload"
+    assert upload.ocr_field_ids == []
+    assert upload.icon == "mdi:folder-upload"
+    assert upload.image_name_re.pattern == ".+", "any file, no datetime needed"
+    assert upload.default_description == "Upload"
+
+
+def test_upload_event_can_narrow_files_without_datetime() -> None:
+    upload = EventSettings.model_validate({"target_type": "upload", "image_name_re": r".*\.jpg"})
+    assert upload.image_name_re.pattern == r".*\.jpg"
+
+
+def _settings(events: list[dict[str, Any]]) -> Any:
+    from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
+
+    from anpr2mqtt.settings import Settings
+
+    class InitOnlySettings(Settings):
+        model_config = SettingsConfigDict(yaml_file=None)
+
+        @classmethod
+        def settings_customise_sources(  # type: ignore[override]
+            cls, _settings_cls: type[BaseSettings], init_settings: PydanticBaseSettingsSource, **_kwargs: Any
+        ) -> tuple[PydanticBaseSettingsSource, ...]:
+            return (init_settings,)
+
+    return InitOnlySettings(mqtt={"user": "u", "pass": "p"}, events=events)
+
+
+def test_uploads_told_apart_by_id() -> None:
+    uploads: list[dict[str, Any]] = [
+        {"target_type": "upload", "watch_path": "/ftp/a"},
+        {"target_type": "upload", "watch_path": "/ftp/b"},
+    ]
+    with pytest.raises(ValidationError, match=r"own id.*\['upload'\]"):
+        _settings(uploads)
+    uploads[1]["id"] = "b"
+    assert [e.upload_name for e in _settings(uploads).events] == ["upload", "upload_b"]
+    uploads[0]["id"] = "b"
+    with pytest.raises(ValidationError, match=r"\['upload_b'\]"):
+        _settings(uploads)
+
+
+def test_id_only_for_uploads() -> None:
+    with pytest.raises(ValidationError, match="id is only for uploads"):
+        EventSettings(target_type="face", id="x")
+    with pytest.raises(ValidationError, match="id"):
+        EventSettings(target_type="upload", id="not ok")
+
+
+def test_upload_name_may_repeat_another_kind_of_event() -> None:
+    events = [{"camera": "a", "target_type": "face", "event": "upload"}, {"target_type": "upload", "watch_path": "/ftp"}]
+    assert len(_settings(events).events) == 2
+
+
+def test_camera_optional_only_for_uploads() -> None:
+    assert EventSettings(target_type="upload").camera is None
+    assert EventSettings(target_type="upload", camera="shed").camera == "shed"
+    assert EventSettings(target_type="face").camera == "driveway"
+    assert EventSettings().camera == "driveway"
+
+
+def test_other_events_still_need_datetime() -> None:
+    with pytest.raises(ValidationError, match="'dt'"):
+        EventSettings.model_validate({"target_type": "face", "image_name_re": r".*\.jpg"})
+
+
 def test_missing_target_suggests_target_type() -> None:
     with pytest.raises(ValidationError, match="set target_type"):
         EventSettings(image_name_re=re.compile(r"(?P<dt>[0-9]{17})_SCENE_CHANGE_DETECTION\.jpg"))

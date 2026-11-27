@@ -839,6 +839,7 @@ def test_every_image_counted_even_when_not_published(tracker: Tracker, tmp_path:
         handler.on_closed(_closed(_face_file(tmp_path, name)))
 
     states = _face_states(handler)
-    assert [s["images"]["event"]["total"] for s in states] == [1, 2, 3]
+    assert [s["images"]["total"] for s in states] == [1, 2, 3]
     assert all(s["event_time"] == states[0]["event_time"] for s in states), "later images only refresh the counts"
-    assert states[-1]["images"]["camera"]["today"] == 3
+    assert states[-1]["images"]["today"] == 3
+    assert set(states[-1]["images"]) == {"today", "this_week", "total", "last_received"}, "no camera or overall counts"
