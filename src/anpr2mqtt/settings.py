@@ -53,7 +53,10 @@ class AutoClearSettings(BaseModel):
 
 class EventSettings(BaseModel):
     camera: str = Field(default="driveway", description="Camera name")
-    event: str = Field(default="anpr", description="Identifier of the event, used in MQTT topic description")
+    event: str = Field(
+        default="anpr",
+        description="Identifier of the event, used in MQTT topics and entity ids, 'anpr' for plates, otherwise the target_type",
+    )
     description: str | None = Field(default=None, description="Free text description of event")
     target_type: str = Field(
         default="plate",
@@ -92,7 +95,8 @@ class EventSettings(BaseModel):
     )
     image_url_base: str | None = Field(default=None, description="Base URL to turn a file name into a web link")
     ocr_field_ids: list[str] = Field(
-        default_factory=lambda: ["hik_direction"], description="OCR field definitions to find in image"
+        default_factory=lambda: ["hik_direction"],
+        description="OCR field definitions to find in image, the Hikvision vehicle direction for plates, otherwise none",
     )
     autoclear: AutoClearSettings = AutoClearSettings()
     auto_match_tolerance: int = Field(
@@ -126,6 +130,18 @@ class EventSettings(BaseModel):
         if "dt" not in v.groupindex:
             raise ValueError("image_name_re is missing required named groups: ['dt']")
         return v
+
+    @model_validator(mode="before")
+    @classmethod
+    def non_plate_defaults(cls, data: Any) -> Any:
+        """Other events don't get the plate defaults, an 'anpr' event name and the vehicle direction OCR"""
+        if isinstance(data, dict):
+            target_type: Any = data.get("target_type", TARGET_TYPE_PLATE)
+            if target_type != TARGET_TYPE_PLATE:
+                data = {**data}
+                data.setdefault("event", target_type)
+                data.setdefault("ocr_field_ids", [])
+        return data
 
     @model_validator(mode="after")
     def validate_target_groups(self) -> "EventSettings":

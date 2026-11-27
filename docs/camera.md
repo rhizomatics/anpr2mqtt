@@ -121,8 +121,10 @@ These events are kept apart from plates:
 - **Integrations that take an anpr2mqtt device's sensors as plates**, such as
   [Camera AutoNotify](https://camera-autonotify.rhizomatics.org.uk), don't see them
 - **No plate handling**: no DVLA lookup, plate correction or Frigate licence plates
-- **Defaults**: `default_description` comes from the event name, here `Scene change`, and `icon` is `mdi:cctv`, rather
-  than the plate defaults `Unknown vehicle` and `mdi:car-back`
+- **Defaults**: none of the plate defaults. `event` is the `target_type`, so `event: scene_change` above could be left
+  out, rather than `anpr`. `default_description` comes from the event name, here `Scene change`, rather than `Unknown
+  vehicle`. `icon` is `mdi:cctv` rather than `mdi:car-back`. There's no OCR, rather than the Hikvision vehicle
+  direction, so `ocr_field_ids: []` isn't needed
 
 There's usually no `target` in these file names, so nothing to look up, correct or track, and the event entity
 records when each was seen. Where a camera sends several images a second or so apart for the same thing,
