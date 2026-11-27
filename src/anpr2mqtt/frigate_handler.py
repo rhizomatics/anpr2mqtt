@@ -13,12 +13,15 @@ from anpr2mqtt.const import ImageInfo
 from anpr2mqtt.handler_common import AutoclearTimer, CameraGatekeeper, build_dvla_client, correct_against_good_read, subscribe
 from anpr2mqtt.hass import HomeAssistantPublisher
 from anpr2mqtt.settings import (
+    FRIGATE_EVENT_ID_RE,
     TARGET_TYPE_PLATE,
     CameraSettings,
     DVLASettings,
     EventSettings,
     FrigateSettings,
     ImageSettings,
+    is_valid_name,
+    is_valid_target_id,
 )
 from anpr2mqtt.tracker import Sighting, Tracker
 
@@ -125,6 +128,10 @@ class FrigateHandler:
             event_type = cast("str", event_data.get("type", "") or "")
         event_id: str = cast("str", event_data.get("id", "") or "")
         camera: str = cast("str", event_data.get("camera", "") or "")
+        # from any MQTT client that can publish to the broker, so checked before use in topics, URLs and file names
+        if not is_valid_name(camera) or not FRIGATE_EVENT_ID_RE.fullmatch(event_id):
+            log.warning("Ignoring Frigate message with invalid camera %r or event id %r", camera[:80], event_id[:80])
+            return
 
         # Only process 'end' for frigate/events — they carry the most complete plate data
         if topic == "frigate/events" and event_type == "end":
@@ -169,6 +176,9 @@ class FrigateHandler:
             description = payload.get("name") or "Unknown"
         if not plate:
             log.debug("Frigate event %s has no recognized plate, %s", event_id, description)
+            return
+        if not isinstance(plate, str) or not is_valid_target_id(plate):
+            log.warning("Ignoring Frigate event %s with invalid plate %r", event_id, str(plate)[:80])
             return
 
         if score is None:

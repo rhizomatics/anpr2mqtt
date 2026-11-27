@@ -4,7 +4,7 @@ from enum import StrEnum, auto
 from pathlib import Path
 from typing import Any, Final, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator
 from pydantic_settings import (
     BaseSettings,
     CliSettingsSource,
@@ -20,6 +20,31 @@ from pydantic_settings import (
 
 TARGET_TYPE_PLATE: Final[str] = "plate"
 
+# Names used in MQTT topics, Home Assistant discovery and entity ids, and file paths: no topic separators or wildcards,
+# path separators, dots, spaces or anything else Home Assistant discovery would reject
+NAME_RE: Final[re.Pattern[str]] = re.compile(r"[A-Za-z0-9_-]{1,64}")
+# Targets, such as plates, also name sighting history files, and may come from untrusted MQTT messages, such as Frigate's
+TARGET_ID_RE: Final[re.Pattern[str]] = re.compile(r"[A-Za-z0-9][A-Za-z0-9 _-]{0,31}")
+# Frigate event ids, such as 1790171055.400738-28axk4, used in Frigate API URLs
+FRIGATE_EVENT_ID_RE: Final[re.Pattern[str]] = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}")
+
+
+def is_valid_name(value: str | None) -> bool:
+    return value is not None and NAME_RE.fullmatch(value) is not None
+
+
+def check_name(value: str, what: str) -> str:
+    if not is_valid_name(value):
+        raise ValueError(
+            f"{what} {value!r} must be 1 to 64 letters, digits, '_' or '-', such as 'front_door', since it's used in "
+            "MQTT topics and Home Assistant entity ids. Use description for display text"
+        )
+    return value
+
+
+def is_valid_target_id(value: str | None) -> bool:
+    return value is not None and TARGET_ID_RE.fullmatch(value) is not None
+
 
 class MQTTSettings(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
@@ -33,7 +58,10 @@ class MQTTSettings(BaseModel):
 
 
 class CameraSettings(BaseModel):
-    name: str = Field(default="driveway", description="Camera Identifier, used to build MQTT topic names")
+    name: str = Field(
+        default="driveway",
+        description="Camera Identifier, used to build MQTT topic names, letters, digits, '_' or '-' only",
+    )
     area: str | None = Field(default=None, description="Home Assistant area ID")
     live_url: str | None = Field(default=None, description="URL to watch camera feed live")
     linked_cameras: dict[str, str] = Field(
@@ -42,6 +70,11 @@ class CameraSettings(BaseModel):
         "unifiprotect, viseron or blueiris, for integrations that join sightings to their events. The frigate camera "
         "is also the one whose licence plate events are published as this camera, only needed where its name differs",
     )
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        return check_name(v, "camera name")
 
 
 class AutoClearSettings(BaseModel):
@@ -111,6 +144,11 @@ class EventSettings(BaseModel):
         default=2,
         description="Max Levenshtein distance from last known-good plate to trigger correction; 0 to disable",
     )
+
+    @field_validator("event", "camera", "target_type")
+    @classmethod
+    def validate_names(cls, v: str, info: ValidationInfo) -> str:
+        return check_name(v, str(info.field_name))
 
     @field_validator("image_url_base")
     @classmethod

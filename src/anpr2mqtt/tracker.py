@@ -2,6 +2,7 @@ import datetime as dt
 import json
 import re
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, cast
 
 import structlog
@@ -12,6 +13,8 @@ from anpr2mqtt.settings import (
     Target,
     TargetSettings,
     TrackerSettings,
+    is_valid_name,
+    is_valid_target_id,
 )
 
 log = structlog.get_logger()
@@ -69,11 +72,24 @@ class Tracker:
                         self.entities.setdefault(entity_id, [])
                         self.entities[entity_id].append(target)
 
+    def _target_file(self, target_id: str, target_type: str) -> Path | None:
+        """Sighting history file, or None for a target or type that can't safely name one, such as from a forged message"""
+        if not is_valid_target_id(target_id) or not is_valid_name(target_type):
+            log.warning("Not tracking sightings of %r, not a valid %s", target_id, target_type)
+            return None
+        data_dir: Path = self.tracker_config.data_dir.resolve()
+        target_file: Path = (data_dir / target_type / f"{target_id}.json").resolve()
+        if not target_file.is_relative_to(data_dir):
+            log.warning("Not tracking sightings of %r, outside %s", target_id, data_dir)
+            return None
+        target_file.parent.mkdir(exist_ok=True)
+        return target_file
+
     def history(self, target_id: str, target_type: str) -> list[str]:
         target_id = target_id or "UNKNOWN"
-        target_type_path = self.tracker_config.data_dir / target_type
-        target_type_path.mkdir(exist_ok=True)
-        target_file = target_type_path / f"{target_id}.json"
+        target_file: Path | None = self._target_file(target_id, target_type)
+        if target_file is None:
+            return []
 
         try:
             if target_file.exists():
@@ -86,9 +102,9 @@ class Tracker:
 
     def record(self, target: str, target_type: str, event_dt: dt.datetime | None) -> dict[str, Any]:
         target = target or "UNKNOWN"
-        target_type_path = self.tracker_config.data_dir / target_type
-        target_type_path.mkdir(exist_ok=True)
-        target_file = target_type_path / f"{target}.json"
+        target_file: Path | None = self._target_file(target, target_type)
+        if target_file is None:
+            return {**compute_time_analysis([], event_dt), "is_new_visit": True}
         sightings = self.history(target, target_type)
         time_analysis: dict[str, Any] = {}
         try:
