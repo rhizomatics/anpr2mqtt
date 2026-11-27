@@ -45,7 +45,8 @@ While it specialises in vehicle plate detection, it can watch for any camera eve
     - Minimum gap between events, for noisy or repeating events
 * **[Home Assistant Integration](homeassistant.md)**
     - Publishes plates to MQTT for Home Assistant as a [MQTT Sensor Entity](https://www.home-assistant.io/integrations/sensor.mqtt/), and other events as a [MQTT Event Entity](https://www.home-assistant.io/integrations/event.mqtt/)
-    - [Image counts](homeassistant.md#image-counts) per event, camera and overall, for today, this week and in total, for health checks such as a camera that's stopped sending images
+    - [Image counts](homeassistant.md#image-counts) per event, for today, this week and in total, for health checks such as a camera that's stopped sending images
+    - [Upload monitoring](camera.md#uploads) of an ftp landing zone, counting every file that arrives, as a sensor that doesn't notify
     - Auto-discovery configuration for Home Assistant
     - Creates [MQTT Image Entity](https://www.home-assistant.io/integrations/image.mqtt/) on Home Assistant for image snapshot, so no web access to ftp needed
     - Optionally also creates an [MQTT Camera Entity](https://www.home-assistant.io/integrations/camera.mqtt/)

@@ -149,6 +149,56 @@ another event, so there's one event per face, with the `FACE_SNAP` as its image.
 Other cameras send only one image per face, `FACE_DETECTION`, often several a second or so apart. Match that event
 name, leave out `secondary_image_event`, and set `min_event_gap_seconds`, such as `10`.
 
+## Uploads
+
+An event with `target_type: upload` counts every file arriving in its `watch_path`, without looking inside it, so it
+doesn't need a timestamp in the file name, or even to be an image. Nothing is published for each file, so nothing is
+notified, only a Home Assistant sensor of when the last file arrived, such as `sensor.upload_shed`, with its counts.
+
+It can be used on its own, as a general purpose monitor of an ftp landing zone, or alongside a directory's other
+events, to check there's been some activity, such as scene changes or snapshots, even when no plates have arrived.
+
+Uploads aren't tied to a camera, since several cameras may share one landing zone, or one camera upload to several,
+so `camera` isn't needed. Each upload is told apart by its `id` instead, which can be left out if there's only one.
+
+```yaml
+events:
+- target_type: upload
+  id: shed
+  watch_path: /ftp/Shed
+- target_type: upload
+  id: all
+  description: All ftp uploads
+  watch_path: /ftp
+  watch_tree: true
+```
+
+The sensor's state is the time the last file arrived, with attributes:
+
+```yaml
+today: 41
+this_week: 230
+total: 9120
+last_received: "2026-11-27T08:02:11.120000+00:00"
+last_file: Shed/10.180.10.30_01_20261127080211120_SCENE_CHANGE_DETECTION.jpg
+event: upload
+id: all
+watch_path: /ftp
+```
+
+- **Which files**: any file by default, or only those matching `image_name_re`, such as `.*\.jpg`, which needs no
+  `dt` group for an upload. With `watch_tree: true`, files in subdirectories count too, and `last_file` is relative to
+  the `watch_path`
+- **Naming**: the sensor is `sensor.upload_<id>`, such as `sensor.upload_all` above, or `sensor.upload` without an
+  `id`. Each upload needs its own `id`, checked at startup. `id` is only for uploads, other events are told apart by
+  `event` and `camera`
+- **Camera**: optional, and if given, only shown as a `camera` attribute, such as for a camera's own landing zone
+- **No device**: the sensor isn't on any `anpr2mqtt` device, as for the
+  [individual or group sensors](homeassistant.md#individual-or-group-sensors), so integrations that take an anpr2mqtt
+  device's sensors as plates, such as [Camera AutoNotify](https://camera-autonotify.rhizomatics.org.uk), don't see it
+- **Nothing else**: no image, camera or event entity, OCR, tracking or autoclear
+- **Counts**: as for [image counts](homeassistant.md#image-counts), kept across restarts and back to 0 at midnight
+
 ## Other ANPR Cameras
 
 - See [Which Hikvision ANPR Camera Should I Buy in 2025?](https://www.use-ip.co.uk/forum/threads/which-hikvision-anpr-camera-should-i-buy-in-2025.12271/) FAQ from [use-IP Forum](https://www.use-ip.co.uk/forum/)

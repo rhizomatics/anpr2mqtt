@@ -1,3 +1,11 @@
+# 1.4.1
+
+## ✨ Enhancements
+- New `mqtt.client_id` setting, defaulting to `anpr2mqtt` as before, so more than one `anpr2mqtt` can run against the same broker without each one disconnecting the other
+- New `upload` target type, counting every file arriving in its `watch_path`, as a Home Assistant sensor of the last upload with `today`, `this_week`, `total` and `last_file` attributes. Nothing is published for each file, so nothing is notified. Use it as a general purpose ftp landing zone monitor, or alongside a directory's other events, to check there's some activity, such as scene changes, even when no plates arrive. Uploads aren't tied to a camera, which is optional for them, and several are told apart by a new `id` setting, such as `sensor.upload_shed` for `id: shed`. See [Uploads](https://anpr2mqtt.rhizomatics.org.uk/camera/#uploads)
+## 💥 Breaking changes
+- An event's `images` attribute counts only its own images, as `images.today` rather than `images.event.today`. The `camera` and `all` counts are gone, replaced by `upload` events, which can count a camera's directory, or one shared by all cameras
+
 # 1.4.0
 
 ## ✨ Enhancements

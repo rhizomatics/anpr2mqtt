@@ -99,6 +99,8 @@ There are 4 separate types of MQTT topic used for HomeAssisstant integration:
 - *Config* to support auto discovery. 
     - A topic is created per camera, with a name like `homeassistant/sensor/driveway/anpr/config`. 
     - For events other than plates, an `event` entity instead, such as `homeassistant/event/driveway/face/config`, see [Other Events](camera.md#other-events)
+    - For uploads, a sensor of the last upload, such as `homeassistant/sensor/uploads/upload_shed/config`, with its
+      state at `anpr2mqtt/uploads/upload_shed/state`, see [Uploads](camera.md#uploads)
     - Optionally a `image` and `camera` topic can be created
     - The `homeassistant` topic prefix can also be configured.
 - *State* to report the last plate seen and attributes, by event name and camera, the event name being `anpr` for
@@ -108,6 +110,9 @@ There are 4 separate types of MQTT topic used for HomeAssisstant integration:
     - For events other than plates, `anpr2mqtt/<event>/cameras/<camera>/event`, such as
       `anpr2mqtt/face/cameras/front/event`, fires the event entity, not retained
     - The `anpr2mqtt` topic root can also be configured, with `mqtt.topic_root`
+    - When running more than one `anpr2mqtt` on the same broker, give each its own `mqtt.client_id` as well as its own
+      `mqtt.topic_root`, since the broker disconnects a client when another connects with the same client ID. It defaults
+      to `anpr2mqtt`
 - *Availability* to show whether ANPR2MQTT itself is running
     - One topic per ANPR2MQTT instance, `anpr2mqtt/availability`, holding `online` or `offline`
     - See [Availability](#availability) below
@@ -126,26 +131,15 @@ no availability topic, aren't recognised, and need removing by hand.
 
 ## Image Counts
 
-Each event's entities have an `images` attribute counting the images received, for the event itself, for all events of
-its camera, and for all cameras, to check that cameras are still sending images:
+Each event's entities have an `images` attribute counting the images received for that event, to check that cameras
+are still sending them:
 
 ```yaml
 images:
-  event:
-    today: 3
-    this_week: 17
-    total: 412
-    last_received: "2026-11-27T07:10:34.596000+00:00"
-  camera:
-    today: 5
-    this_week: 26
-    total: 1033
-    last_received: "2026-11-27T07:10:34.596000+00:00"
-  all:
-    today: 41
-    this_week: 230
-    total: 9120
-    last_received: "2026-11-27T08:02:11.120000+00:00"
+  today: 3
+  this_week: 17
+  total: 412
+  last_received: "2026-11-27T07:10:34.596000+00:00"
 ```
 
 Every image matching the event's `image_name_re` is counted, whether or not it's published: duplicates, ignored plates,
@@ -155,14 +149,18 @@ Days and weeks are in local time, weeks starting on Monday, and the counts are r
 back to 0 even for a camera that sends nothing. Counts are kept in `image_stats.json` in the tracker's `data_dir`, so
 they carry on across restarts. Images from Frigate aren't counted, only those from the file system.
 
-For example, a template binary sensor for a camera that's sent nothing today:
+For counts across all of a camera's events, or everything arriving in an ftp directory, add an
+[upload event](camera.md#uploads) watching that directory. Where one directory takes all cameras' uploads, that's an
+overall count too.
+
+For example, a template binary sensor for a camera that's sent no faces today:
 
 ```yaml
 template:
   - binary_sensor:
       - name: Barn camera quiet
         device_class: problem
-        state: "{{ (state_attr('event.face_barn', 'images') or {}).get('camera', {}).get('today', 0) == 0 }}"
+        state: "{{ (state_attr('event.face_barn', 'images') or {}).get('today', 0) == 0 }}"
 ```
 
 ## Availability

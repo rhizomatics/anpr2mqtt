@@ -34,6 +34,11 @@ events:
     post_event: 360
     state: True
     image: False
+- target_type: upload
+  id: all
+  description: All ftp uploads
+  watch_path: /ftp
+  watch_tree: true
 
 cameras:
 - name: driveway
@@ -47,6 +52,7 @@ mqtt:
   user: anpr2mqtt
   password: topsecret901
   topic_root: anpr2mqtt
+  client_id: anpr2mqtt
 homeassistant:
   discovery_topic_root: homeassistant
   device_creation: true
