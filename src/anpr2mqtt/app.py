@@ -157,11 +157,12 @@ def main_loop() -> None:
     frigate_camera_configs: dict[str, CameraConfig] = {}
 
     events_failed: int = 0
+    upload_handlers: list[UploadHandler] = []
     for event_config in settings.events:
         camera: CameraSettings | None = None
         try:
             if event_config.is_upload:
-                start_upload(publisher, observer, settings.mqtt.topic_root, event_config)
+                upload_handlers.append(start_upload(publisher, observer, settings.mqtt.topic_root, event_config))
                 continue
             camera_name: str = event_config.camera or DEFAULT_CAMERA
             for camera_config in settings.cameras:
@@ -321,6 +322,8 @@ def main_loop() -> None:
                 # so today's and this week's image counts go back to 0, even for a camera with no images since
                 today = local_now().date()
                 publisher.refresh_image_stats()
+                # off the main loop, so a large landing zone's scan doesn't hold up the heartbeat
+                threading.Thread(target=rescan_uploads, args=(upload_handlers,), name="upload-rescan", daemon=True).start()
             observer.join(1)
     except Exception as e:
         log.error("Failed in run observer loop: %s", e, exc_info=1)
@@ -337,15 +340,28 @@ def start_upload(
     observer: BaseObserver,
     topic_root: str,
     event_config: EventSettings,
-) -> None:
+) -> UploadHandler:
     """Only counted, as a sensor of the last upload, with no camera, image or event entities, tracking or OCR"""
     state_topic: str = f"{topic_root}/uploads/{event_config.upload_name}/state"
     upload_handler = UploadHandler(publisher=publisher, state_topic=state_topic, event_config=event_config)
     log.debug("Scheduling upload watchdog for %s", upload_handler.watch_root)
     observer.schedule(upload_handler, str(upload_handler.watch_root), recursive=event_config.watch_tree)
     publisher.publish_upload_discovery(state_topic=state_topic, event_config=event_config)
-    publisher.post_upload_state(state_topic, event_config)
+    # before the observer starts, so no file events are lost to the scan replacing what they found
+    upload_handler.scan()
+    upload_handler.publish_state()
     log.info("Counting uploads to %s as %s, at %s", event_config.watch_path, event_config.upload_name, state_topic)
+    return upload_handler
+
+
+def rescan_uploads(upload_handlers: list[UploadHandler]) -> None:
+    """Correct the current files for anything file events missed, and today's counts going back to 0"""
+    for upload_handler in upload_handlers:
+        try:
+            upload_handler.scan()
+            upload_handler.publish_state()
+        except Exception as e:
+            log.error("Failed to rescan uploads at %s: %s", upload_handler.watch_root, e, exc_info=1)
 
 
 def shutdown_mqtt(client: mqtt.Client, avail_topic: str) -> None:

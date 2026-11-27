@@ -98,7 +98,11 @@ class EventHandler(RegexMatchingEventHandler):
             return
         log.info("New complete file detected: %s", event.src_path)
         # counted whether or not it's published, since it still shows the camera is sending images
-        self.publisher.record_image(self.event_config, self.camera)
+        try:
+            size: int = Path(str(event.src_path)).stat().st_size
+        except OSError:
+            size = 0
+        self.publisher.record_image(self.event_config, self.camera, size)
         posts: int = self.publisher.state_posts(self.state_topic)
         try:
             self._on_image(event)

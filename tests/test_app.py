@@ -264,7 +264,10 @@ def test_main_loop_upload_event_only_counted(tmp_path: Path) -> None:
     from anpr2mqtt.settings import EventSettings, TrackerSettings
     from anpr2mqtt.upload_handler import UploadHandler
 
-    event_config = EventSettings(id="ftp", target_type="upload", watch_path=tmp_path, watch_tree=True)
+    (tmp_path / "in" / "sub").mkdir(parents=True)
+    (tmp_path / "in" / "a.jpg").write_bytes(b"x")
+    (tmp_path / "in" / "sub" / "b.jpg").write_bytes(b"x")
+    event_config = EventSettings(id="ftp", target_type="upload", watch_path=tmp_path / "in", watch_tree=True)
     mock_settings = _make_mock_settings(events=[event_config])
     mock_settings.tracker = TrackerSettings(data_dir=tmp_path / "data")
     mock_client = Mock()
@@ -281,12 +284,13 @@ def test_main_loop_upload_event_only_counted(tmp_path: Path) -> None:
     mock_observer.schedule.assert_called_once()
     handler, path = mock_observer.schedule.call_args.args
     assert isinstance(handler, UploadHandler)
-    assert path == str(tmp_path.resolve())
+    assert path == str((tmp_path / "in").resolve())
     assert mock_observer.schedule.call_args.kwargs["recursive"] is True
     discovery = [c.args[0] for c in mock_client.publish.call_args_list if c.args[0].startswith("homeassistant/")]
     assert discovery == ["homeassistant/sensor/uploads/upload_ftp/config"]
     states = [c for c in mock_client.publish.call_args_list if c.args[0] == "anpr2mqtt/uploads/upload_ftp/state"]
-    assert json.loads(states[0].kwargs["payload"])["total"] == 0
+    first = json.loads(states[0].kwargs["payload"])
+    assert (first["total"], first["current"]) == (0, 2), "files already there found by the startup scan"
 
 
 def test_main_loop_routes_linked_frigate_camera(tmp_path: Path) -> None:

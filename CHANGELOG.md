@@ -1,3 +1,11 @@
+# 1.4.2
+
+## ✨ Enhancements
+- Upload sensors have a `current` count, and `current_bytes`, of the files in the `watch_path` now, found by a scan at startup and each midnight, and kept up to date as files come and go, since the arrival counts, only from when watching started, could look like an empty directory
+- Files removed from an upload's `watch_path`, deleted, moved out or renamed to a name that no longer matches, are counted, as `removed_today`, `removed_this_week`, `removed_total`, `last_removed` and `last_removed_file`
+- A file renamed to a matching name, such as from an ftp server's temporary upload name, counts as an upload
+- Sizes in bytes alongside every count, such as `today_bytes` and `total_bytes`, for both uploads and events' `images` attribute
+
 # 1.4.1
 
 ## ✨ Enhancements

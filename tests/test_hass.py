@@ -613,32 +613,49 @@ def test_publish_upload_discovery(mock_client: Mock) -> None:
     assert args[0] in publisher.republish
 
 
-def test_upload_state_and_midnight_refresh(mock_client: Mock) -> None:
+def test_upload_state(mock_client: Mock) -> None:
     from anpr2mqtt.image_stats import ImageStats
 
     publisher = HomeAssistantPublisher(mock_client, HomeAssistantSettings(), image_stats=ImageStats())
     upload = _upload_event()
     publisher.post_upload_state("upload/state", upload)
     empty = json.loads(mock_client.publish.call_args.kwargs["payload"])
+    assert empty["current"] == 0
     assert empty["total"] == 0
+    assert empty["removed_total"] == 0
     assert empty["last_received"] is None
     assert empty["last_file"] is None
+    assert empty["last_removed"] is None
     assert empty["watch_path"] == "/ftp/shed"
     assert "camera" not in empty
     assert empty["id"] == "shed"
 
-    publisher.record_upload(upload, "sub/x.jpg")
-    mock_client.reset_mock()
-    publisher.refresh_image_stats()
-    mock_client.publish.assert_called_once()
+    publisher.record_upload(upload, "sub/x.jpg", 100)
+    publisher.record_upload(upload, "y.jpg", 50)
+    publisher.record_removal(upload, "old.jpg", 30)
+    publisher.post_upload_state("upload/state", upload, current_files=1200, current_bytes=9000)
     args, kwargs = mock_client.publish.call_args
-    refreshed = json.loads(kwargs["payload"])
+    state = json.loads(kwargs["payload"])
     assert args[0] == "upload/state"
     assert kwargs["retain"] is True
-    assert refreshed["total"] == 1
-    assert refreshed["today"] == 1
-    assert refreshed["last_file"] == "sub/x.jpg"
-    assert refreshed["last_received"] is not None
+    assert (state["current"], state["current_bytes"]) == (1200, 9000)
+    assert (state["today"], state["today_bytes"], state["this_week_bytes"]) == (2, 150, 150)
+    assert (state["total"], state["total_bytes"]) == (2, 150)
+    assert state["last_file"] == "y.jpg"
+    assert state["last_received"] is not None
+    assert (state["removed_today"], state["removed_total"], state["removed_total_bytes"]) == (1, 1, 30)
+    assert state["last_removed_file"] == "old.jpg"
+    assert state["last_removed"] is not None
+
+
+def test_refresh_image_stats_leaves_uploads_to_their_rescan(mock_client: Mock) -> None:
+    from anpr2mqtt.image_stats import ImageStats
+
+    publisher = HomeAssistantPublisher(mock_client, HomeAssistantSettings(), image_stats=ImageStats())
+    publisher.post_upload_state("upload/state", _upload_event())
+    mock_client.reset_mock()
+    publisher.refresh_image_stats()
+    mock_client.publish.assert_not_called()
 
 
 def test_upload_camera_published_as_attribute_only(mock_client: Mock) -> None:
