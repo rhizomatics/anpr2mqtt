@@ -101,13 +101,28 @@ There are 4 separate types of MQTT topic used for HomeAssisstant integration:
     - For events other than plates, an `event` entity instead, such as `homeassistant/event/driveway/face/config`, see [Other Events](camera.md#other-events)
     - Optionally a `image` and `camera` topic can be created
     - The `homeassistant` topic prefix can also be configured.
-- *State* to report the last plate seen and attributes
-    - `anpr2mqtt/camera_name/state`
-    - `anpr2mqtt/camera_name/image`
-    - For events other than plates, `anpr2mqtt/event/cameras/camera_name/event` fires the event entity, not retained
+- *State* to report the last plate seen and attributes, by event name and camera, the event name being `anpr` for
+  plates unless configured otherwise, or the `target_type` for other events, such as `face`
+    - `anpr2mqtt/<event>/cameras/<camera>/state`, such as `anpr2mqtt/anpr/cameras/driveway/state`
+    - `anpr2mqtt/<event>/cameras/<camera>/image`
+    - For events other than plates, `anpr2mqtt/<event>/cameras/<camera>/event`, such as
+      `anpr2mqtt/face/cameras/front/event`, fires the event entity, not retained
+    - The `anpr2mqtt` topic root can also be configured, with `mqtt.topic_root`
 - *Availability* to show whether ANPR2MQTT itself is running
     - One topic per ANPR2MQTT instance, `anpr2mqtt/availability`, holding `online` or `offline`
     - See [Availability](#availability) below
+
+## Removing Entities
+
+At startup, `anpr2mqtt` removes any Home Assistant entities it created before but no longer has, such as for an event
+removed from the configuration, a camera renamed, or the image entity switched off. It looks at the retained discovery
+messages for its own availability topic only, so other `anpr2mqtt` instances on the same broker, with their own
+`mqtt.topic_root`, and everything else's discovery are left alone. The removed entities' retained state and image topics
+are cleared too, unless a current entity still uses them.
+
+It's skipped if any event fails to start, so a configuration error can't remove entities that are still wanted, and
+can be switched off with `homeassistant.remove_stale_entities: false`. Entities from versions before 1.2.0, which had
+no availability topic, aren't recognised, and need removing by hand.
 
 ## Image Counts
 

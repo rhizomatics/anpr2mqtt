@@ -8,10 +8,14 @@
 - New `secondary_image_event` event setting, for a second image of the same capture, such as Hikvision's `FACE_BACKGROUND` alongside its `FACE_SNAP`, published as its own image entity rather than as another event
 - New `min_event_gap_seconds` event setting, for events without a target, so several images of the same face a second or so apart are published as one event
 - Image counts, an `images` attribute on each event's entities, with `today`, `this_week`, `total` and `last_received` for the event, its camera and overall, for health checks such as no images from a camera today. Every image received is counted, whether or not it's published, and counts are kept in the data directory across restarts. See [Image Counts](https://anpr2mqtt.rhizomatics.org.uk/homeassistant/#image-counts)
+- Home Assistant entities no longer configured, such as for a removed event, are removed at startup, along with their retained state. Only this instance's own entities are touched, it's skipped if any event fails to start, and `homeassistant.remove_stale_entities: false` switches it off. See [Removing Entities](https://anpr2mqtt.rhizomatics.org.uk/homeassistant/#removing-entities)
 - MQTT login diagnostics: the source of the MQTT password, such as environment variable or config file, is logged at startup, so an old env var overriding the config file is easier to spot
 ## 💥 Breaking changes
 - An existing event with a `target_type` other than `plate` is now an event entity, and its old sensor is removed from Home Assistant. Automations using that sensor need to use the event entity instead
+## 🔒 Security
+- Plates from Frigate, which any client that can publish to the MQTT broker could forge, were used unchecked in sighting history file names, so a plate such as `../../x` could read and write JSON files outside the data directory. Plates, Frigate camera names and Frigate event ids are now checked before use, and any sighting history file must be inside the data directory
 ## 🐛 Bug fixes
+- Camera names, and each event's `event`, `camera` and `target_type`, are checked at startup, and must be letters, digits, `_` or `-`, since a space, `/`, `.` or an MQTT wildcard in one broke its topics, Home Assistant discovery or file names
 - MQTT v5 login rejections, such as EMQX's `Bad user name or password`, are now logged as invalid credentials. paho also reports these as a `Protocol error` disconnect, which is the same failure
 - Frigate licence plates are only matched to plate events, where previously the first event configured for a camera was used
 - The milliseconds in an image name's 17 digit timestamp were read as microseconds, so `event_time` and the sighting history were up to a second early, such as `10:30:45.000407` for `10:30:45.407`. Sightings recorded before upgrading keep their old times

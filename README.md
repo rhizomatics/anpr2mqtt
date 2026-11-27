@@ -78,6 +78,11 @@ Build and run with Docker or Podman, example [docker-compose.yaml](examples/dock
 
 ANPR2MQTT uses [pydantic-settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/), which means configuration can happen in a variety of ways, and these can be combined - yaml configuration file, environment variables, Docker Secrets, built-in defaults, and `.env` file or command line arguments.
 
+Camera names, and each event's `event`, `camera` and `target_type`, are used in MQTT topics, Home Assistant entity ids
+and file names, so they must be 1 to 64 letters, digits, `_` or `-`, such as `front_door`. Anything else, such as a
+space, `/`, `.`, `+` or `#`, stops `anpr2mqtt` starting, with a message saying which one. Use `description` for text to
+show in Home Assistant.
+
 ### CLI Arguments
 
 Every configuration setting can be passed as a command line argument, using dot notation for nested settings.
