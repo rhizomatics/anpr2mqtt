@@ -21,9 +21,19 @@ from anpr2mqtt.hass import (
     HomeAssistantPublisher,
     availability_topic,
     publish_availability,
+    secondary_image_topic,
 )
 from anpr2mqtt.heartbeat import Heartbeat
-from anpr2mqtt.settings import LINK_FRIGATE, CameraSettings, EventSettings, Settings, linked_cameras, setting_source
+from anpr2mqtt.image_stats import ImageStats, local_now
+from anpr2mqtt.settings import (
+    LINK_FRIGATE,
+    TARGET_TYPE_PLATE,
+    CameraSettings,
+    EventSettings,
+    Settings,
+    linked_cameras,
+    setting_source,
+)
 from anpr2mqtt.tracker import Tracker, compute_time_analysis
 
 log = structlog.get_logger()
@@ -121,7 +131,12 @@ def main_loop() -> None:
         client.loop_start()
         log.info(f"Connected to MQTT at {settings.mqtt.host}:{settings.mqtt.port} as {settings.mqtt.user}")
         log.info(f"Publishing at {settings.mqtt.topic_root}")
-        publisher = HomeAssistantPublisher(client, settings.homeassistant, availability_topic=avail_topic)
+        publisher = HomeAssistantPublisher(
+            client,
+            settings.homeassistant,
+            availability_topic=avail_topic,
+            image_stats=ImageStats(settings.tracker.data_dir / "image_stats.json"),
+        )
 
     except Exception as e:
         log.error("Failed to connect to MQTT: %s", e, exc_info=1)
@@ -149,6 +164,17 @@ def main_loop() -> None:
             camera = camera.model_copy(update={"linked_cameras": linked_cameras(camera, settings.frigate)})
             state_topic = f"{settings.mqtt.topic_root}/{event_config.event}/cameras/{camera.name}/state"
             image_topic = f"{settings.mqtt.topic_root}/{event_config.event}/cameras/{camera.name}/image"
+            # plates are sensors, anything else is an event entity, fired by its own topic
+            event_topic: str | None = (
+                None
+                if event_config.is_plate
+                else f"{settings.mqtt.topic_root}/{event_config.event}/cameras/{camera.name}/event"
+            )
+            second_image_topic: str | None = (
+                secondary_image_topic(image_topic, event_config.secondary_image_event)
+                if event_config.secondary_image_event and settings.homeassistant.image_entity
+                else None
+            )
             tracker = Tracker(
                 event_config.target_type,
                 tracker_config=settings.tracker,
@@ -158,7 +184,8 @@ def main_loop() -> None:
             )
             # keyed by the Frigate camera, so a differently named one is published as this camera
             frigate_key = camera.linked_cameras.get(LINK_FRIGATE, camera.name)
-            if frigate_key not in frigate_camera_configs:
+            # only plate events, so a face event on the same camera doesn't take Frigate's licence plates
+            if event_config.target_type == TARGET_TYPE_PLATE and frigate_key not in frigate_camera_configs:
                 frigate_camera_configs[frigate_key] = (event_config, camera, tracker, state_topic, image_topic)
             event_handler = EventHandler(
                 publisher=publisher,
@@ -171,13 +198,29 @@ def main_loop() -> None:
                 dvla_config=settings.dvla,
                 tracker=tracker,
                 mqtt_topic_root=settings.mqtt.topic_root,
+                secondary_image_topic=second_image_topic,
+                event_topic=event_topic,
             )
             log.debug("Scheduling watchdog for %s", event_config.watch_path)
             observer.schedule(event_handler, str(event_config.watch_path), recursive=event_config.watch_tree)
-            publisher.publish_sensor_discovery(state_topic=state_topic, event_config=event_config, camera=camera)
+            if event_topic:
+                publisher.publish_event_discovery(
+                    event_topic=event_topic, state_topic=state_topic, event_config=event_config, camera=camera
+                )
+                publisher.remove_sensor_discovery(event_config)
+            else:
+                publisher.publish_sensor_discovery(state_topic=state_topic, event_config=event_config, camera=camera)
             if settings.homeassistant.image_entity:
                 publisher.publish_image_discovery(
                     state_topic=state_topic, image_topic=image_topic, event_config=event_config, camera=camera
+                )
+            if second_image_topic:
+                publisher.publish_image_discovery(
+                    state_topic=state_topic,
+                    image_topic=second_image_topic,
+                    event_config=event_config,
+                    camera=camera,
+                    image_event=event_config.secondary_image_event,
                 )
             if settings.homeassistant.camera_entity:
                 publisher.publish_camera_discovery(
@@ -254,10 +297,15 @@ def main_loop() -> None:
     heartbeat = Heartbeat()
     try:
         log.info("Starting observer loop")
+        today = local_now().date()
         while observer.is_alive():
             # only while connected, so the healthcheck also fails if the broker connection is lost
             if client.is_connected():
                 heartbeat.beat()
+            if local_now().date() != today:
+                # so today's and this week's image counts go back to 0, even for a camera with no images since
+                today = local_now().date()
+                publisher.refresh_image_stats()
             observer.join(1)
     except Exception as e:
         log.error("Failed in run observer loop: %s", e, exc_info=1)

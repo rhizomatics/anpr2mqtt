@@ -3,5 +3,5 @@ events:
   - watch_path: /ftp/hikcam2
 mqtt:
   user: anpr2mqtt
-  password: secret987
+  password: my_secret_password
   # assumes mqtt broker on localhost

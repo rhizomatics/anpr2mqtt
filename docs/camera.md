@@ -7,9 +7,15 @@ tags:
 - ftp
 - alpr
 - lpr
-description: Suggestions for integrating Hikvision ANPR camera functionality into Home Assistant
+- face capture
+- scene change
+description: Suggestions for integrating Hikvision ANPR cameras, and other camera events such as face capture, into Home Assistant
 ---
-# ANPR Camera Configuration
+# Camera Configuration
+
+Any camera that can upload an image for an event, by ftp, to a NAS or otherwise, with a timestamp in its file name, can
+be used with `anpr2mqtt`. ANPR is its speciality, so the Hikvision ANPR camera below is the main example, followed by
+[Other Events](#other-events), such as face capture and scene change, from the same or other cameras.
 
 ## Hikvision
 
@@ -73,11 +79,79 @@ These commands can now be used in Home Assistant automations as actions, trigger
 
 ![Home Assistant Automation Example](assets/images/ha_mount_scenario_automation.png){width=500}
 
-### Other Cameras
+## Other Events
+
+Hikvision cameras have many other events besides ANPR, such as face capture, scene change, line crossing, region entry
+or unattended baggage, and can ftp images for any of them. Any of these can be added as an event, so long as the camera
+puts a timestamp in the file name, without anpr2mqtt having to know about each one.
+
+As with ANPR, the file name format is set on the camera. For example, from camera IP address, channel and timestamp,
+then the event's own name:
+
+- `10.180.10.30_01_20261127071024588_SCENE_CHANGE_DETECTION.jpg`
+- `10.180.10.40_01_20261125175413139_FACE_DETECTION.jpg`
+
+An event that isn't a plate needs its own `target_type`, which can be anything other than `plate`, and an
+`image_name_re` matching its file names. It can be on the same camera as an ANPR event, and share the same
+`watch_path`, since each event only picks up files matching its own `image_name_re`.
+
+```yaml
+events:
+- camera: shed
+  event: anpr
+  watch_path: /ftp/Shed
+- camera: shed
+  event: scene_change
+  target_type: scene_change
+  watch_path: /ftp/Shed
+  image_name_re: (?P<ip>[0-9.]+)_(?P<channel>[0-9]+)_(?P<dt>[0-9]{17})_(?P<event>SCENE_CHANGE_DETECTION)\.(?P<ext>jpg|png|gif|jpeg)
+  min_event_gap_seconds: 60
+  ocr_field_ids: []
+```
+
+These events are kept apart from plates:
+
+- **Home Assistant** gets an [event entity](https://www.home-assistant.io/integrations/event/), such as
+  `event.scene_change_shed`, rather than a sensor, on the same device as the camera's ANPR sensor. Its `event_type` is
+  the event's name, here `scene_change`, with the usual [attributes](homeassistant.md#attributes). There's also an
+  image entity and a camera entity, as for ANPR
+- **Integrations that take an anpr2mqtt device's sensors as plates**, such as
+  [Camera AutoNotify](https://camera-autonotify.rhizomatics.org.uk), don't see them
+- **No plate handling**: no DVLA lookup, plate correction or Frigate licence plates
+- **Defaults**: `default_description` comes from the event name, here `Scene change`, and `icon` is `mdi:cctv`, rather
+  than the plate defaults `Unknown vehicle` and `mdi:car-back`
+
+There's usually no `target` in these file names, so nothing to look up, correct or track, and the event entity
+records when each was seen. Where a camera sends several images a second or so apart for the same thing,
+`min_event_gap_seconds` makes them one event, publishing only the first within that many seconds of the last.
+
+### Face Capture
+
+Some cameras send two images per face: a `FACE_SNAP` cropped to the face, and a `FACE_BACKGROUND` of the whole scene,
+a few milliseconds later, such as `10.180.10.20_01_20261120175018129_FACE_SNAP.jpg`. With `secondary_image_event`, the
+`FACE_BACKGROUND` is published as a second image entity, such as `image.face_driveway_face_background`, rather than as
+another event, so there's one event per face, with the `FACE_SNAP` as its image.
+
+```yaml
+- camera: driveway
+  event: face
+  target_type: face
+  default_description: Face
+  icon: mdi:face-recognition
+  watch_path: /ftp/Driveway
+  image_name_re: (?P<ip>[0-9.]+)_(?P<channel>[0-9]+)_(?P<dt>[0-9]{17})_(?P<event>FACE_SNAP|FACE_BACKGROUND)\.(?P<ext>jpg|png|gif|jpeg)
+  secondary_image_event: FACE_BACKGROUND
+  ocr_field_ids: []
+```
+
+Other cameras send only one image per face, `FACE_DETECTION`, often several a second or so apart. Match that event
+name, leave out `secondary_image_event`, and set `min_event_gap_seconds`, such as `10`.
+
+## Other ANPR Cameras
 
 - See [Which Hikvision ANPR Camera Should I Buy in 2025?](https://www.use-ip.co.uk/forum/threads/which-hikvision-anpr-camera-should-i-buy-in-2025.12271/) FAQ from [use-IP Forum](https://www.use-ip.co.uk/forum/)
 
-### Other Ways to Integrate
+## Other Ways to Integrate
 
 - Home Assistant built-in [Hikvision Integration](https://www.home-assistant.io/integrations/hikvision/) 
     - Has support for

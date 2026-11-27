@@ -46,4 +46,4 @@ def test_ocr_list_dir_default(shell: Subprocess) -> None:
 def test_ocr_list_dir_override(shell: Subprocess) -> None:
     ret = shell.run("uv", "run", "anprtools", "list_dir", "--event.watch_path", "fixtures")
     assert ret.returncode == 0
-    assert "B4DM3N: timestamp=2025-06-02 10:30:45.000407+00:00,ext=jpg" in ret.stdout
+    assert "B4DM3N: timestamp=2025-06-02 10:30:45.407000+00:00,ext=jpg" in ret.stdout

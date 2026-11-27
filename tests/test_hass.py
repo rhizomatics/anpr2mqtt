@@ -477,3 +477,119 @@ def test_target_sensor_unique_id_is_stable(publisher: HomeAssistantPublisher, mo
     targets = [Target(id="AB12CDE"), Target(id="XY99ZZZ")]
     publisher.publish_target_sensor_discovery("known_cars", "plate", targets, "t/state", None)
     assert _discovery_payloads(mock_client)[0]["unique_id"] == "plate_known_cars"
+
+
+def _scene_event() -> EventSettings:
+    import re
+
+    return EventSettings(
+        camera="cam1",
+        event="scene_change",
+        target_type="scene_change",
+        image_name_re=re.compile(r"(?P<dt>[0-9]{17})_(?P<event>SCENE_CHANGE_DETECTION)\.jpg"),
+    )
+
+
+def test_publish_event_discovery(publisher: HomeAssistantPublisher, mock_client: Mock, camera: CameraSettings) -> None:
+    publisher.publish_event_discovery(
+        "anpr2mqtt/scene_change/cameras/cam1/event", "anpr2mqtt/scene_change/cameras/cam1/state", _scene_event(), camera
+    )
+    args, kwargs = mock_client.publish.call_args
+    payload = json.loads(kwargs["payload"])
+    assert args[0] == "homeassistant/event/cam1/scene_change/config"
+    assert payload["default_entity_id"] == "event.scene_change_cam1"
+    assert payload["state_topic"] == "anpr2mqtt/scene_change/cameras/cam1/event"
+    assert payload["event_types"] == ["scene_change"]
+    assert payload["json_attributes_topic"] == "anpr2mqtt/scene_change/cameras/cam1/state"
+    assert "images" in payload["json_attributes_template"]
+    assert "event_time" not in payload["json_attributes_template"]
+    assert payload["icon"] == "mdi:cctv"
+    assert payload["dev"]["model"] == DEVICE_MODEL
+    assert kwargs["retain"] is True
+
+
+def test_remove_sensor_discovery(publisher: HomeAssistantPublisher, mock_client: Mock) -> None:
+    publisher.remove_sensor_discovery(_scene_event())
+    mock_client.publish.assert_called_once_with("homeassistant/sensor/cam1/scene_change/config", payload="", qos=0, retain=True)
+
+
+def test_state_with_event_topic_fires_event(
+    publisher: HomeAssistantPublisher, mock_client: Mock, camera: CameraSettings
+) -> None:
+    info = ImageInfo(None, "SCENE_CHANGE_DETECTION", dt.datetime(2026, 11, 27, 7, 10, 24, 588000, tzinfo=dt.UTC), "jpg", 10)
+    publisher.post_state_message(
+        "anpr2mqtt/scene_change/cameras/cam1/state", None, _scene_event(), camera, image_info=info, event_topic="ev/topic"
+    )
+    calls = {c.args[0]: c.kwargs for c in mock_client.publish.call_args_list}
+    assert calls["anpr2mqtt/scene_change/cameras/cam1/state"]["retain"] is True
+    assert calls["ev/topic"]["retain"] is False
+    event = json.loads(calls["ev/topic"]["payload"])
+    assert event["event_type"] == "scene_change"
+    assert event["image_event"] == "SCENE_CHANGE_DETECTION"
+    assert event["description"] == "Scene change"
+
+
+def test_cleared_state_fires_no_event(publisher: HomeAssistantPublisher, mock_client: Mock, camera: CameraSettings) -> None:
+    publisher.post_state_message("state/topic", None, _scene_event(), camera, event_topic="ev/topic")
+    assert [c.args[0] for c in mock_client.publish.call_args_list] == ["state/topic"]
+
+
+def test_plate_sensor_discovery_uses_target(
+    publisher: HomeAssistantPublisher, mock_client: Mock, event_config: EventSettings, camera: CameraSettings
+) -> None:
+    publisher.publish_sensor_discovery("anpr2mqtt/anpr/cam1/state", event_config, camera)
+    payload = json.loads(mock_client.publish.call_args.kwargs["payload"])
+    assert payload["device_class"] is None
+    assert payload["value_template"] == "{{ value_json.target }}"
+
+
+def test_publish_secondary_image_discovery(
+    publisher: HomeAssistantPublisher, mock_client: Mock, event_config: EventSettings, camera: CameraSettings
+) -> None:
+    publisher.publish_image_discovery(
+        "anpr2mqtt/anpr/cam1/state", "anpr2mqtt/anpr/cam1/image/face_background", event_config, camera, "FACE_BACKGROUND"
+    )
+    args, kwargs = mock_client.publish.call_args
+    payload = json.loads(kwargs["payload"])
+    assert args[0] == "homeassistant/image/cam1/anpr_face_background/config"
+    assert payload["unique_id"] == "anpr_cam1_face_background"
+    assert payload["default_entity_id"] == "image.anpr_cam1_face_background"
+    assert payload["image_topic"] == "anpr2mqtt/anpr/cam1/image/face_background"
+    assert payload["name"].endswith("face background")
+
+
+def test_state_carries_image_counts_and_refreshes(mock_client: Mock, camera: CameraSettings, tmp_path: Path) -> None:
+    from anpr2mqtt.image_stats import ImageStats
+
+    stats = ImageStats(tmp_path / "image_stats.json")
+    publisher = HomeAssistantPublisher(mock_client, HomeAssistantSettings(), image_stats=stats)
+    scene = _scene_event()
+    publisher.record_image(scene, camera)
+    publisher.post_state_message("state/topic", None, scene, camera, event_topic="ev/topic")
+    first = json.loads(mock_client.publish.call_args.kwargs["payload"])
+    assert first["images"]["event"]["today"] == 1
+    assert first["images"]["all"]["total"] == 1
+
+    mock_client.reset_mock()
+    publisher.record_image(scene, camera)
+    publisher.refresh_image_stats("state/topic")
+    mock_client.publish.assert_called_once()
+    args, kwargs = mock_client.publish.call_args
+    refreshed = json.loads(kwargs["payload"])
+    assert args[0] == "state/topic", "refreshes the state, never fires the event"
+    assert refreshed["images"]["event"]["total"] == 2
+    assert {k: v for k, v in refreshed.items() if k != "images"} == {k: v for k, v in first.items() if k != "images"}
+
+
+def test_refresh_without_stats_does_nothing(publisher: HomeAssistantPublisher, mock_client: Mock) -> None:
+    publisher.refresh_image_stats()
+    mock_client.publish.assert_not_called()
+
+
+def test_camera_entity_id_suffix_only_for_plates(
+    publisher: HomeAssistantPublisher, mock_client: Mock, event_config: EventSettings, camera: CameraSettings
+) -> None:
+    publisher.publish_camera_discovery("s", "i", event_config, camera)
+    assert json.loads(mock_client.publish.call_args.kwargs["payload"])["default_entity_id"] == "camera.anpr_cam1_anpr"
+    publisher.publish_camera_discovery("s", "i", _scene_event(), camera)
+    assert json.loads(mock_client.publish.call_args.kwargs["payload"])["default_entity_id"] == "camera.scene_change_cam1"

@@ -2,6 +2,7 @@ import datetime as dt
 import json
 import re
 from pathlib import Path
+from typing import Any
 from unittest.mock import ANY, Mock, patch
 
 from PIL import Image
@@ -9,12 +10,15 @@ from pytest_mock import MockerFixture
 
 from anpr2mqtt.const import ImageInfo
 from anpr2mqtt.event_handler import EventHandler, examine_file, process_image, scan_ocr_fields
+from anpr2mqtt.hass import HomeAssistantPublisher
 from anpr2mqtt.settings import (
     AutoClearSettings,
+    CameraSettings,
     DimensionSettings,
     DVLASettings,
     EventSettings,
     HomeAssistantSettings,
+    ImageSettings,
     OCRFieldSettings,
     OCRSettings,
     Target,
@@ -59,7 +63,7 @@ def test_eventhandler_handles_reg_plate_event(event_handler: EventHandler, track
     assert sightings_db_path.exists()
     with sightings_db_path.open("r") as f:
         sightings = json.load(f)
-        assert sightings == ["2025-06-02T10:30:45.000407+00:00"]
+        assert sightings == ["2025-06-02T10:30:45.407000+00:00"]
 
 
 def test_eventhandler_copes_with_malformed_reg_plate_event(event_handler: EventHandler) -> None:
@@ -674,3 +678,167 @@ def test_scan_ocr_fields_image_size_exception() -> None:
     type(broken).size = property(lambda _self: (_ for _ in ()).throw(RuntimeError("no size")))
     result = scan_ocr_fields(broken, event_config, ocr_config)
     assert "IMAGE_ERROR" in result
+
+
+# --- targetless events, such as faces ---
+
+FACE_RE = re.compile(
+    r"(?P<ip>[0-9.]+)_(?P<channel>[0-9]+)_(?P<dt>[0-9]{17})_(?P<event>FACE_SNAP|FACE_BACKGROUND)\.(?P<ext>jpg|jpeg)"
+)
+
+
+def _face_handler(tracker: Tracker, secondary_image_topic: str | None = "test/images/face_background") -> EventHandler:
+    return EventHandler(
+        HomeAssistantPublisher(Mock(), HomeAssistantSettings(status_topic="status_test_topic")),
+        state_topic="test/face",
+        image_topic="test/images",
+        dvla_config=DVLASettings(),
+        camera=CameraSettings(name="front"),
+        image_config=ImageSettings(),
+        tracker=tracker,
+        ocr_config=OCRSettings(),
+        event_config=EventSettings(
+            camera="front",
+            event="face",
+            target_type="face",
+            default_description="Face",
+            image_name_re=FACE_RE,
+            secondary_image_event="FACE_BACKGROUND",
+            watch_path=Path("/fixtures"),
+            ocr_field_ids=[],
+        ),
+        secondary_image_topic=secondary_image_topic,
+        event_topic="test/face/event",
+    )
+
+
+def _closed(path: Path) -> Mock:
+    event = Mock()
+    event.src_path = str(path)
+    event.event_type = "closed"
+    event.is_directory = False
+    return event
+
+
+def _face_file(tmp_path: Path, name: str) -> Path:
+    path = tmp_path / name
+    Image.new("RGB", (40, 40), color="grey").save(path, "jpeg")
+    return path
+
+
+def test_face_snap_publishes_event_and_image(tracker: Tracker, tmp_path: Path) -> None:
+    handler = _face_handler(tracker)
+    handler.on_closed(_closed(_face_file(tmp_path, "10.180.10.20_01_20261120175018129_FACE_SNAP.jpg")))
+
+    publish: Mock = handler.publisher.client.publish  # type: ignore[assignment]
+    state_call = next(c for c in publish.call_args_list if c.args[0] == "test/face")
+    payload = json.loads(state_call.kwargs["payload"])
+    assert payload["target"] is None
+    assert payload["target_type"] == "face"
+    assert payload["description"] == "Face"
+    assert payload["image_event"] == "FACE_SNAP"
+    assert payload["event_time"].startswith("2026-11-20T17:50:18.129")
+    publish.assert_any_call("test/images", payload=ANY, qos=0, retain=True)
+    assert not any(c.args[0] == "test/images/face_background" for c in publish.call_args_list)
+    assert not list(tracker.tracker_config.data_dir.rglob("*.json")), "faces aren't tracked as sightings"
+
+
+def test_face_background_only_updates_its_image(tracker: Tracker, tmp_path: Path) -> None:
+    handler = _face_handler(tracker)
+    handler.on_closed(_closed(_face_file(tmp_path, "10.180.10.20_01_20261120175018160_FACE_BACKGROUND.jpg")))
+
+    publish: Mock = handler.publisher.client.publish  # type: ignore[assignment]
+    publish.assert_called_once_with("test/images/face_background", payload=ANY, qos=0, retain=True)
+
+
+def test_face_background_ignored_without_secondary_topic(tracker: Tracker, tmp_path: Path) -> None:
+    handler = _face_handler(tracker, secondary_image_topic=None)
+    handler.on_closed(_closed(_face_file(tmp_path, "10.180.10.20_01_20261120175018160_FACE_BACKGROUND.jpg")))
+
+    handler.publisher.client.publish.assert_not_called()  # type: ignore[attr-defined]
+
+
+def test_face_autoclear_clears_both_images(tracker: Tracker) -> None:
+    handler = _face_handler(tracker)
+    handler.event_config.autoclear.image = True
+    handler._do_autoclear()
+
+    publish: Mock = handler.publisher.client.publish  # type: ignore[assignment]
+    publish.assert_any_call("test/images", payload=None, qos=0, retain=True)
+    publish.assert_any_call("test/images/face_background", payload=None, qos=0, retain=True)
+
+
+def test_examine_file_without_target_when_not_required(tmp_path: Path) -> None:
+    f = tmp_path / "10.180.10.20_01_20261120175018129_FACE_SNAP.jpg"
+    f.write_bytes(b"fake")
+    result = examine_file(f, FACE_RE, require_target=False)
+    assert result is not None
+    assert result.target is None
+    assert result.event == "FACE_SNAP"
+    assert result.ext == "jpg"
+
+
+def _face_states(handler: EventHandler) -> list[dict[str, Any]]:
+    publish: Mock = handler.publisher.client.publish  # type: ignore[assignment]
+    return [json.loads(c.kwargs["payload"]) for c in publish.call_args_list if c.args[0] == "test/face"]
+
+
+def test_face_within_gap_is_one_event(tracker: Tracker, tmp_path: Path) -> None:
+    handler = _face_handler(tracker, secondary_image_topic=None)
+    handler.event_config.min_event_gap_seconds = 10
+    for name in (
+        "10.180.10.40_01_20261125175413139_FACE_SNAP.jpg",
+        "10.180.10.40_01_20261125175414335_FACE_SNAP.jpg",
+        "10.180.10.40_01_20261125175430000_FACE_SNAP.jpg",
+    ):
+        handler.on_closed(_closed(_face_file(tmp_path, name)))
+
+    times = [dt.datetime.fromisoformat(state["event_time"]).time() for state in _face_states(handler)]
+    assert times == [dt.time(17, 54, 13, 139000), dt.time(17, 54, 30)]
+
+
+def test_face_without_gap_is_every_image(tracker: Tracker, tmp_path: Path) -> None:
+    handler = _face_handler(tracker, secondary_image_topic=None)
+    for name in ("10.180.10.40_01_20261125175413139_FACE_SNAP.jpg", "10.180.10.40_01_20261125175414335_FACE_SNAP.jpg"):
+        handler.on_closed(_closed(_face_file(tmp_path, name)))
+
+    assert len(_face_states(handler)) == 2
+
+
+def test_examine_file_reads_milliseconds(tmp_path: Path) -> None:
+    f = tmp_path / "10.180.10.40_01_20261125175413139_FACE_SNAP.jpg"
+    f.write_bytes(b"fake")
+    result = examine_file(f, FACE_RE, require_target=False)
+    assert result is not None
+    assert result.timestamp.microsecond == 139000
+
+
+def test_face_fires_event_entity(tracker: Tracker, tmp_path: Path) -> None:
+    handler = _face_handler(tracker)
+    handler.on_closed(_closed(_face_file(tmp_path, "10.180.10.20_01_20261120175018129_FACE_SNAP.jpg")))
+    handler.on_closed(_closed(_face_file(tmp_path, "10.180.10.20_01_20261120175018160_FACE_BACKGROUND.jpg")))
+
+    publish: Mock = handler.publisher.client.publish  # type: ignore[assignment]
+    events = [c for c in publish.call_args_list if c.args[0] == "test/face/event"]
+    assert len(events) == 1, "only the snap fires the event, not the background"
+    assert json.loads(events[0].kwargs["payload"])["event_type"] == "face"
+    assert events[0].kwargs["retain"] is False
+
+
+def test_every_image_counted_even_when_not_published(tracker: Tracker, tmp_path: Path) -> None:
+    from anpr2mqtt.image_stats import ImageStats
+
+    handler = _face_handler(tracker)
+    handler.publisher.image_stats = ImageStats(tmp_path / "image_stats.json")
+    handler.event_config.min_event_gap_seconds = 10
+    for name in (
+        "10.180.10.20_01_20261120175018129_FACE_SNAP.jpg",
+        "10.180.10.20_01_20261120175018160_FACE_BACKGROUND.jpg",
+        "10.180.10.20_01_20261120175019000_FACE_SNAP.jpg",
+    ):
+        handler.on_closed(_closed(_face_file(tmp_path, name)))
+
+    states = _face_states(handler)
+    assert [s["images"]["event"]["total"] for s in states] == [1, 2, 3]
+    assert all(s["event_time"] == states[0]["event_time"] for s in states), "later images only refresh the counts"
+    assert states[-1]["images"]["camera"]["today"] == 3

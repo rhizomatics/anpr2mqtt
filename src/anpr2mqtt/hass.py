@@ -13,6 +13,7 @@ from paho.mqtt.reasoncodes import ReasonCode
 from PIL import Image
 
 import anpr2mqtt
+from anpr2mqtt.image_stats import ImageStats
 from anpr2mqtt.settings import CameraSettings, EventSettings, HomeAssistantSettings, Target
 from anpr2mqtt.tracker import Sighting
 
@@ -33,6 +34,11 @@ def availability_topic(topic_root: str) -> str:
     return f"{topic_root}/availability"
 
 
+def secondary_image_topic(image_topic: str, secondary_image_event: str) -> str:
+    """Image topic for a capture's second image, such as image/face_background alongside a face's image"""
+    return f"{image_topic}/{secondary_image_event.lower()}"
+
+
 def publish_availability(client: mqtt.Client, topic: str, online: bool) -> mqtt.MQTTMessageInfo:
     """Retained plain string payload, as expected by Home Assistant availability_topic"""
     payload: str = AVAILABILITY_ONLINE if online else AVAILABILITY_OFFLINE
@@ -41,8 +47,18 @@ def publish_availability(client: mqtt.Client, topic: str, online: bool) -> mqtt.
 
 
 class HomeAssistantPublisher:
-    def __init__(self, client: mqtt.Client, cfg: HomeAssistantSettings, availability_topic: str | None = None) -> None:
+    def __init__(
+        self,
+        client: mqtt.Client,
+        cfg: HomeAssistantSettings,
+        availability_topic: str | None = None,
+        image_stats: ImageStats | None = None,
+    ) -> None:
         self.client: mqtt.Client = client
+        self.image_stats: ImageStats | None = image_stats
+        # last state published to each topic, so image counts can be refreshed without a new sighting
+        self._last_state: dict[str, tuple[dict[str, Any], EventSettings, CameraSettings]] = {}
+        self._state_posts: dict[str, int] = {}
         self.availability_topic: str | None = availability_topic
         self.hass_status_topic: str = cfg.status_topic
         self.discovery_topic_prefix: str = cfg.discovery_topic_root
@@ -135,10 +151,60 @@ class HomeAssistantPublisher:
         self.republish[topic] = payload
         log.info("Published HA MQTT sensor Discovery message to %s", topic)
 
-    def publish_image_discovery(
-        self, state_topic: str, image_topic: str, event_config: EventSettings, camera: CameraSettings
+    def publish_event_discovery(
+        self, event_topic: str, state_topic: str, event_config: EventSettings, camera: CameraSettings
     ) -> None:
+        """Event entity for anything other than plates, such as faces or scene changes
+
+        Kept out of the sensor domain, so integrations that take an anpr2mqtt device's sensors for plates, such as
+        Camera AutoNotify, aren't given other events they can't handle.
+        """
+        name: str = event_config.description or f"{event_config.event} {camera.name}"
+        payload: dict[str, Any] = {
+            "o": {
+                "name": "anpr2mqtt",
+                "sw": anpr2mqtt.version,  # pyright: ignore[reportAttributeAccessIssue]
+                "url": "https://anpr2mqtt.rhizomatics.org.uk",
+            },
+            "default_entity_id": f"event.{event_config.event}_{event_config.camera}",
+            "unique_id": f"{event_config.event}_{event_config.camera}",
+            "state_topic": event_topic,
+            # the event's own details come with each event; only the image counts, refreshed between events, from state
+            "json_attributes_topic": state_topic,
+            "json_attributes_template": "{{ {'images': value_json.images | default(None)} | tojson }}",
+            "event_types": [event_config.event],
+            "name": name,
+        }
+        if event_config.icon:
+            payload["icon"] = event_config.icon
+        if self.device_creation:
+            self.add_device_info(payload, camera)
+        self.add_availability(payload)
+        topic: str = f"{self.discovery_topic_prefix}/event/{event_config.camera}/{event_config.event}/config"
+        self.client.publish(topic, payload=json.dumps(payload), qos=0, retain=True)
+        self.republish[topic] = payload
+        log.info("Published HA MQTT event Discovery message to %s", topic)
+
+    def remove_sensor_discovery(self, event_config: EventSettings) -> None:
+        """Remove a sensor an earlier version made for an event that's now an event entity"""
+        topic: str = f"{self.discovery_topic_prefix}/sensor/{event_config.camera}/{event_config.event}/config"
+        self.client.publish(topic, payload="", qos=0, retain=True)
+        log.debug("Removed any HA MQTT sensor Discovery message at %s", topic)
+
+    def publish_image_discovery(
+        self,
+        state_topic: str,
+        image_topic: str,
+        event_config: EventSettings,
+        camera: CameraSettings,
+        image_event: str | None = None,
+    ) -> None:
+        """Image entity for an event, or with image_event, for a second image of the same capture"""
         name: str = event_config.description or f"{event_config.event} {event_config.camera}"
+        object_id: str = f"{event_config.event}_{event_config.camera}"
+        if image_event:
+            name = f"{name} {image_event.lower().replace('_', ' ')}"
+            object_id = f"{object_id}_{image_event.lower()}"
         payload = {
             "o": {
                 "name": "anpr2mqtt",
@@ -146,8 +212,8 @@ class HomeAssistantPublisher:
                 "url": "https://anpr2mqtt.rhizomatics.org.uk",
             },
             "device_class": None,
-            "unique_id": f"{event_config.event}_{event_config.camera}",
-            "default_entity_id": f"image.{event_config.event}_{event_config.camera}",
+            "unique_id": object_id,
+            "default_entity_id": f"image.{object_id}",
             "image_topic": image_topic,
             "json_attributes_topic": state_topic,
             "icon": event_config.icon,
@@ -156,7 +222,8 @@ class HomeAssistantPublisher:
         if self.device_creation:
             self.add_device_info(payload, camera)
         self.add_availability(payload)
-        topic = f"{self.discovery_topic_prefix}/image/{event_config.camera}/{event_config.event}/config"
+        node: str = f"{event_config.event}_{image_event.lower()}" if image_event else event_config.event
+        topic = f"{self.discovery_topic_prefix}/image/{event_config.camera}/{node}/config"
         msg = json.dumps(payload)
         self.client.publish(topic, payload=msg, qos=0, retain=True)
         self.republish[topic] = payload
@@ -173,7 +240,8 @@ class HomeAssistantPublisher:
                 "url": "https://anpr2mqtt.rhizomatics.org.uk",
             },
             "unique_id": f"{event_config.event}_{camera.name}",
-            "default_entity_id": f"camera.{event_config.event}_{camera.name}_anpr",
+            # plates keep their _anpr suffix, so existing entity ids don't change
+            "default_entity_id": f"camera.{event_config.event}_{camera.name}" + ("_anpr" if event_config.is_plate else ""),
             "topic": image_topic,
             "json_attributes_topic": state_topic,
             "icon": event_config.icon,
@@ -262,8 +330,9 @@ class HomeAssistantPublisher:
         source: str | None = None,
         frigate_event_id: str | None = None,
         frigate_ui_url: str | None = None,
+        event_topic: str | None = None,
     ) -> None:
-
+        """State, retained for attributes, and with event_topic, an event entity's event, for each sighting"""
         payload: dict[str, Any] = sighting.as_dict() if sighting else {"target": None, "target_type": event_config.target_type}
         if payload.get("description") is None:
             payload["description"] = event_config.default_description
@@ -304,11 +373,45 @@ class HomeAssistantPublisher:
                         "image_size": image_info.size,
                     }
                 )
-            msg: str = json.dumps(payload)
-            self.client.publish(topic, payload=msg, qos=0, retain=True)
-            log.debug("Published HA MQTT State message to %s: %s", topic, payload)
+            self._last_state[topic] = (payload, event_config, camera)
+            self._state_posts[topic] = self._state_posts.get(topic, 0) + 1
+            self._publish_state(topic, payload, event_config, camera)
+            if event_topic and image_info and not error:
+                # not retained, or Home Assistant would fire the event again on restart
+                event_msg: str = json.dumps({"event_type": event_config.event, **payload})
+                self.client.publish(event_topic, payload=event_msg, qos=0, retain=False)
+                log.debug("Published HA MQTT Event message to %s", event_topic)
         except Exception as e:
             log.error("Failed to publish event %s: %s", payload, e, exc_info=1)
+
+    def _publish_state(self, topic: str, payload: dict[str, Any], event_config: EventSettings, camera: CameraSettings) -> None:
+        if self.image_stats:
+            payload["images"] = self.image_stats.attributes(event_config.event, camera.name)
+        msg: str = json.dumps(payload)
+        self.client.publish(topic, payload=msg, qos=0, retain=True)
+        log.debug("Published HA MQTT State message to %s: %s", topic, payload)
+
+    def record_image(self, event_config: EventSettings, camera: CameraSettings) -> None:
+        if self.image_stats:
+            self.image_stats.record(event_config.event, camera.name)
+
+    def state_posts(self, topic: str) -> int:
+        """How many states have been published to a topic, to tell if handling an image published one"""
+        return self._state_posts.get(topic, 0)
+
+    def refresh_image_stats(self, topic: str | None = None) -> None:
+        """Republish the last state, of one topic or all, with the latest image counts and nothing else changed
+
+        Neither the state nor event_time change, so it isn't taken as a new sighting, and no event entity fires.
+        """
+        if not self.image_stats:
+            return
+        for state_topic, (payload, event_config, camera) in list(self._last_state.items()):
+            if topic is None or state_topic == topic:
+                try:
+                    self._publish_state(state_topic, payload, event_config, camera)
+                except Exception as e:
+                    log.error("Failed to refresh image counts at %s: %s", state_topic, e)
 
     def post_image_message(self, topic: str, image: Image.Image | None, img_format: str = "JPEG") -> None:
         try:

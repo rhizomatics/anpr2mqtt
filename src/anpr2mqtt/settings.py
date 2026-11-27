@@ -55,12 +55,19 @@ class EventSettings(BaseModel):
     camera: str = Field(default="driveway", description="Camera name")
     event: str = Field(default="anpr", description="Identifier of the event, used in MQTT topic description")
     description: str | None = Field(default=None, description="Free text description of event")
-    target_type: str = Field(default="plate", description="Type of target for this event, 'plate' if ANPR")
+    target_type: str = Field(
+        default="plate",
+        description="Type of target for this event, 'plate' if ANPR. Any other type, such as 'face' or 'scene_change', "
+        "is published as a Home Assistant event entity rather than a sensor, and has no plate lookups or corrections",
+    )
     region: str | None = Field(default="UK", description="Region for applying correction, normalization rules")
-    default_description: str = Field(default="Unknown vehicle", description="Default description if no known match found")
+    default_description: str | None = Field(
+        default=None,
+        description="Default description if no known match found, 'Unknown vehicle' for plates, otherwise from the event name",
+    )
     icon: str | None = Field(
-        default="mdi:car-back",
-        description="Default icon to provide for Home Assistant sensors",
+        default=None,
+        description="Default icon to provide for Home Assistant entities, mdi:car-back for plates, otherwise mdi:cctv",
     )
     watch_path: Path = Field(default=Path(), description="File system directory to watch")
     watch_tree: bool = Field(
@@ -68,7 +75,19 @@ class EventSettings(BaseModel):
     )
     image_name_re: re.Pattern[str] = Field(
         default=re.compile(r"(?P<dt>[0-9]{17})_(?P<target>[A-Z0-9]+)_(?P<event>VEHICLE_DETECTION)\.(?P<ext>jpg|png|gif|jpeg)"),
-        description="Regular expression to find datetime, file extension and target from image name",
+        description="Regular expression to find datetime, file extension and target from image name. The target group "
+        "is only required for plates, so events without one, such as faces, are published with their capture time as state",
+    )
+    secondary_image_event: str | None = Field(
+        default=None,
+        description="Value of the image name's event group for a second image of the same capture, such as "
+        "FACE_BACKGROUND, published as its own image entity rather than as another event",
+    )
+    min_event_gap_seconds: int = Field(
+        default=0,
+        description="For events without a target, such as faces, minimum seconds after one event before another is "
+        "published, so several images of the same face are one event; 0 to publish every image. Plates use the "
+        "tracker's min_visit_gap_seconds",
     )
     image_url_base: str | None = Field(default=None, description="Base URL to turn a file name into a web link")
     ocr_field_ids: list[str] = Field(
@@ -103,11 +122,35 @@ class EventSettings(BaseModel):
     @field_validator("image_name_re")
     @classmethod
     def validate_image_name_re(cls, v: re.Pattern[str]) -> re.Pattern[str]:
-        required = {"dt", "target"}
-        missing = required - set(v.groupindex)
-        if missing:
-            raise ValueError(f"image_name_re is missing required named groups: {sorted(missing)}")
+        if "dt" not in v.groupindex:
+            raise ValueError("image_name_re is missing required named groups: ['dt']")
         return v
+
+    @model_validator(mode="after")
+    def validate_target_groups(self) -> "EventSettings":
+        groups = set(self.image_name_re.groupindex)
+        if self.target_type == TARGET_TYPE_PLATE and "target" not in groups:
+            raise ValueError(
+                "image_name_re is missing required named groups: ['target']. "
+                "For events other than plates, set target_type, such as target_type: scene_change"
+            )
+        if self.secondary_image_event and "event" not in groups:
+            raise ValueError("secondary_image_event needs an 'event' named group in image_name_re")
+        if self.default_description is None:
+            self.default_description = "Unknown vehicle" if self.is_plate else self.event.replace("_", " ").capitalize()
+        if self.icon is None:
+            self.icon = "mdi:car-back" if self.is_plate else "mdi:cctv"
+        return self
+
+    @property
+    def is_plate(self) -> bool:
+        """Plate events are Home Assistant sensors, any other kind of event is an event entity"""
+        return self.target_type == TARGET_TYPE_PLATE
+
+    @property
+    def has_target(self) -> bool:
+        """Whether image names identify a target, such as a plate, or only that something was seen, such as a face"""
+        return "target" in self.image_name_re.groupindex
 
 
 class HomeAssistantSettings(BaseModel):

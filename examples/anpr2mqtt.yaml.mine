@@ -9,7 +9,7 @@ events:
 mqtt:
   host: 10.111.10.111
   user: anpr2mqtt
-  password: secret987
+  password: my_secret_password
 targets:
   plate:
     known:
