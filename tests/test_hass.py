@@ -641,6 +641,20 @@ def test_upload_state_and_midnight_refresh(mock_client: Mock) -> None:
     assert refreshed["last_received"] is not None
 
 
+def test_upload_camera_published_as_attribute_only(mock_client: Mock) -> None:
+    publisher = HomeAssistantPublisher(mock_client, HomeAssistantSettings())
+    upload = EventSettings(id="shed", camera="shed_cam", target_type="upload", watch_path=Path("/ftp/shed"))
+    publisher.post_upload_state("upload/state", upload)
+    assert json.loads(mock_client.publish.call_args.kwargs["payload"])["camera"] == "shed_cam"
+
+    publisher.publish_upload_discovery("upload/state", upload)
+    args, kwargs = mock_client.publish.call_args
+    discovery = json.loads(kwargs["payload"])
+    assert args[0] == "homeassistant/sensor/uploads/upload_shed/config", "camera not in the topic"
+    assert discovery["default_entity_id"] == "sensor.upload_shed", "camera not in the entity id"
+    assert "dev" not in discovery, "camera doesn't put it on a device"
+
+
 def test_refresh_without_stats_does_nothing(publisher: HomeAssistantPublisher, mock_client: Mock) -> None:
     publisher.refresh_image_stats()
     mock_client.publish.assert_not_called()
