@@ -1,5 +1,6 @@
 import logging
 import sys
+import threading
 from typing import Any
 
 import paho.mqtt.client as mqtt
@@ -152,6 +153,7 @@ def main_loop() -> None:
     # Used by FrigateHandler to share the same pipeline as filesystem events.
     frigate_camera_configs: dict[str, CameraConfig] = {}
 
+    events_failed: int = 0
     for event_config in settings.events:
         camera: CameraSettings | None = None
         try:
@@ -255,6 +257,7 @@ def main_loop() -> None:
             publisher.post_state_message(state_topic, sighting=None, event_config=event_config, camera=camera)
             log.info("Publishing %s %s state to %s", event_config.event, camera.name, state_topic)
         except Exception as e:
+            events_failed += 1
             log.error(
                 "Failed to schedule event %s %s watchdog: %s",
                 event_config.event,
@@ -264,6 +267,11 @@ def main_loop() -> None:
 
     publisher.start()
     observer.start()
+    if events_failed:
+        log.warning("Not removing stale Home Assistant entities, since %s events failed to start", events_failed)
+    else:
+        # off the main thread, since it waits for the broker to send back retained discovery
+        threading.Thread(target=publisher.sweep_stale_discovery, name="hass-sweep", daemon=True).start()
 
     if settings.frigate.enabled:
         event_settings: EventSettings | None = None

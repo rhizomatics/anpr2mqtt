@@ -593,3 +593,67 @@ def test_camera_entity_id_suffix_only_for_plates(
     assert json.loads(mock_client.publish.call_args.kwargs["payload"])["default_entity_id"] == "camera.anpr_cam1_anpr"
     publisher.publish_camera_discovery("s", "i", _scene_event(), camera)
     assert json.loads(mock_client.publish.call_args.kwargs["payload"])["default_entity_id"] == "camera.scene_change_cam1"
+
+
+def _retained(topic: str, payload: Any) -> Mock:
+    msg = Mock()
+    msg.topic = topic
+    msg.retain = True
+    msg.payload = json.dumps(payload).encode() if payload is not None else b""
+    return msg
+
+
+def _sweep(publisher: HomeAssistantPublisher, mock_client: Mock, retained: list[Mock]) -> list[str]:
+    """Run a sweep, with the broker sending back these retained messages when subscribed"""
+    callbacks: dict[str, Any] = {}
+    mock_client.message_callback_add.side_effect = lambda pattern, cb: callbacks.__setitem__(pattern, cb)
+    mock_client.subscribe.side_effect = lambda pattern: [callbacks[pattern](mock_client, None, m) for m in retained]
+    return publisher.sweep_stale_discovery(wait=0)
+
+
+def test_sweep_removes_only_own_stale_discovery(mock_client: Mock, camera: CameraSettings) -> None:
+    publisher = HomeAssistantPublisher(mock_client, HomeAssistantSettings(), availability_topic="anpr2mqtt/availability")
+    publisher.publish_event_discovery("anpr2mqtt/face/cameras/front/event", "anpr2mqtt/face/cameras/front/state",
+                                      _scene_event(), camera)  # fmt: skip
+    current = next(iter(publisher.republish))
+    mine = {"availability_topic": "anpr2mqtt/availability", "unique_id": "anpr_front",
+            "state_topic": "anpr2mqtt/anpr/cameras/front/state"}  # fmt: skip
+    mock_client.reset_mock()
+
+    removed = _sweep(publisher, mock_client, [
+        _retained(current, publisher.republish[current]),
+        _retained("homeassistant/sensor/front/anpr/config", mine),
+        _retained("homeassistant/sensor/other/anpr/config", {**mine, "availability_topic": "other/availability"}),
+        _retained("homeassistant/sensor/zigbee/config", {"state_topic": "zigbee2mqtt/x"}),
+        _retained("homeassistant/sensor/cleared/config", None),
+    ])  # fmt: skip
+
+    assert removed == ["homeassistant/sensor/front/anpr/config"]
+    published = {c.args[0]: c.kwargs for c in mock_client.publish.call_args_list}
+    assert set(published) == {"homeassistant/sensor/front/anpr/config", "anpr2mqtt/anpr/cameras/front/state"}
+    assert all(kw["payload"] == "" and kw["retain"] for kw in published.values())
+    mock_client.unsubscribe.assert_called_once_with("homeassistant/#")
+    mock_client.message_callback_remove.assert_called_once_with("homeassistant/#")
+
+
+def test_sweep_keeps_state_topics_still_in_use(mock_client: Mock, camera: CameraSettings) -> None:
+    publisher = HomeAssistantPublisher(mock_client, HomeAssistantSettings(), availability_topic="anpr2mqtt/availability")
+    publisher.publish_sensor_discovery("anpr2mqtt/anpr/cameras/cam1/state", EventSettings(camera="cam1"), camera)
+    mock_client.reset_mock()
+    old_image = {"availability_topic": "anpr2mqtt/availability", "image_topic": "anpr2mqtt/anpr/cameras/cam1/image",
+                 "json_attributes_topic": "anpr2mqtt/anpr/cameras/cam1/state"}  # fmt: skip
+
+    _sweep(publisher, mock_client, [_retained("homeassistant/image/cam1/anpr/config", old_image)])
+
+    cleared = [c.args[0] for c in mock_client.publish.call_args_list]
+    assert "anpr2mqtt/anpr/cameras/cam1/image" in cleared
+    assert "anpr2mqtt/anpr/cameras/cam1/state" not in cleared, "the plate sensor still reads it"
+
+
+def test_sweep_disabled_or_without_availability(mock_client: Mock) -> None:
+    off = HomeAssistantPublisher(
+        mock_client, HomeAssistantSettings(remove_stale_entities=False), availability_topic="anpr2mqtt/availability"
+    )
+    assert off.sweep_stale_discovery(wait=0) == []
+    assert HomeAssistantPublisher(mock_client, HomeAssistantSettings()).sweep_stale_discovery(wait=0) == []
+    mock_client.subscribe.assert_not_called()

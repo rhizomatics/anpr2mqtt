@@ -22,6 +22,10 @@ from .handler_common import subscribe
 
 log = structlog.get_logger()
 
+STALE_SWEEP_SECONDS: float = 5  # long enough for the broker to send back every retained discovery message
+# discovery payload keys naming the topics an entity reads, cleared along with a stale entity
+ENTITY_TOPIC_KEYS: tuple[str, ...] = ("state_topic", "json_attributes_topic", "image_topic", "topic")
+
 AVAILABILITY_ONLINE = "online"  # Home Assistant default payload_available
 AVAILABILITY_OFFLINE = "offline"  # Home Assistant default payload_not_available
 OFFLINE_PUBLISH_TIMEOUT = 2.0
@@ -63,6 +67,7 @@ class HomeAssistantPublisher:
         self.hass_status_topic: str = cfg.status_topic
         self.discovery_topic_prefix: str = cfg.discovery_topic_root
         self.device_creation: bool = cfg.device_creation
+        self.remove_stale_entities: bool = cfg.remove_stale_entities
         self.republish: dict[str, dict[str, Any]] = {}
         self.hass_online: bool | None = None
 
@@ -115,6 +120,54 @@ class HomeAssistantPublisher:
                 log.warn("Unknown Home Assistant status payload: %s", msg.payload)
         else:
             log.debug("Unknown message on %s", msg.topic)
+
+    def sweep_stale_discovery(self, wait: float = STALE_SWEEP_SECONDS) -> list[str]:
+        """Remove entities this instance published discovery for before, but not this time, such as removed events
+
+        Only discovery naming this instance's availability topic is touched, so other anpr2mqtt instances on the same
+        broker, and anything else's discovery, are left alone. Retained state topics of removed entities are cleared
+        too, unless a current entity still reads them. Returns the discovery topics removed.
+        """
+        if not self.remove_stale_entities or not self.availability_topic:
+            return []
+        pattern: str = f"{self.discovery_topic_prefix}/#"
+        found: dict[str, dict[str, Any]] = {}
+        lock = threading.Lock()
+
+        def on_discovery(_client: mqtt.Client, _userdata: Any, msg: mqtt.MQTTMessage) -> None:
+            if not msg.retain or not msg.payload:
+                return
+            try:
+                payload: Any = json.loads(msg.payload)
+            except ValueError:
+                return
+            if isinstance(payload, dict) and payload.get("availability_topic") == self.availability_topic:
+                with lock:
+                    found[msg.topic] = payload
+
+        self.client.message_callback_add(pattern, on_discovery)
+        try:
+            self.client.subscribe(pattern)
+            time.sleep(wait)
+            self.client.unsubscribe(pattern)
+        finally:
+            self.client.message_callback_remove(pattern)
+
+        with lock:
+            stale: dict[str, dict[str, Any]] = {t: p for t, p in found.items() if t not in self.republish}
+        in_use: set[str] = {str(p[k]) for p in self.republish.values() for k in ENTITY_TOPIC_KEYS if p.get(k)}
+        topic_root: str = self.availability_topic.rsplit("/", 1)[0] + "/"
+        for topic, payload in stale.items():
+            log.info("Removing stale Home Assistant entity %s, no longer configured", payload.get("unique_id", topic))
+            self.client.publish(topic, payload="", qos=0, retain=True)
+            for key in ENTITY_TOPIC_KEYS:
+                entity_topic: Any = payload.get(key)
+                if isinstance(entity_topic, str) and entity_topic.startswith(topic_root) and entity_topic not in in_use:
+                    self.client.publish(entity_topic, payload="", qos=0, retain=True)
+                    in_use.add(entity_topic)  # cleared once, even if several stale entities read it
+        if not stale:
+            log.debug("No stale Home Assistant entities found")
+        return list(stale)
 
     def republish_discovery(self, source_event: str) -> None:
         for topic, payload in self.republish.items():
