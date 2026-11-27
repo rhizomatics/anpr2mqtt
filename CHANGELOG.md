@@ -1,10 +1,15 @@
 # 1.4.0
 
 ## ✨ Enhancements
-- Face capture, or other events without a plate or other target in the image name. The `target` group in `image_name_re` is now only required for plate events, and an event without one has the time last seen as its sensor state. See [Face Capture](https://anpr2mqtt.rhizomatics.org.uk/camera/#face-capture)
+- Other camera events, such as face capture, scene change, line crossing or region entry, defined by configuration alone. Any `target_type` other than `plate` is published as a Home Assistant event entity rather than a sensor, so integrations that take anpr2mqtt sensors as plates, such as Camera AutoNotify, don't see them, and has no plate lookups or corrections. See [Other Events](https://anpr2mqtt.rhizomatics.org.uk/camera/#other-events)
+- The `target` group in `image_name_re` is only required for plate events, since most other events have nothing but a timestamp in their image names
+- `default_description` and `icon` default by `target_type`, `Unknown vehicle` and `mdi:car-back` for plates as before, otherwise from the event name and `mdi:cctv`
 - New `secondary_image_event` event setting, for a second image of the same capture, such as Hikvision's `FACE_BACKGROUND` alongside its `FACE_SNAP`, published as its own image entity rather than as another event
 - New `min_event_gap_seconds` event setting, for events without a target, so several images of the same face a second or so apart are published as one event
+- Image counts, an `images` attribute on each event's entities, with `today`, `this_week`, `total` and `last_received` for the event, its camera and overall, for health checks such as no images from a camera today. Every image received is counted, whether or not it's published, and counts are kept in the data directory across restarts. See [Image Counts](https://anpr2mqtt.rhizomatics.org.uk/homeassistant/#image-counts)
 - MQTT login diagnostics: the source of the MQTT password, such as environment variable or config file, is logged at startup, so an old env var overriding the config file is easier to spot
+## 💥 Breaking changes
+- An existing event with a `target_type` other than `plate` is now an event entity, and its old sensor is removed from Home Assistant. Automations using that sensor need to use the event entity instead
 ## 🐛 Bug fixes
 - MQTT v5 login rejections, such as EMQX's `Bad user name or password`, are now logged as invalid credentials. paho also reports these as a `Protocol error` disconnect, which is the same failure
 - Frigate licence plates are only matched to plate events, where previously the first event configured for a camera was used

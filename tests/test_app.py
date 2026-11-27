@@ -536,3 +536,38 @@ def test_main_loop_verifies_ocr_only_when_used(
         main_loop()
 
     assert verify.called is called
+
+
+def test_main_loop_publishes_plates_as_sensors_and_others_as_events(tmp_path: Path) -> None:
+    plate = EventSettings(camera="cam1", event="anpr", watch_path=tmp_path, ocr_field_ids=[])
+    scene = EventSettings(
+        camera="cam1",
+        event="scene_change",
+        target_type="scene_change",
+        watch_path=tmp_path,
+        image_name_re=re.compile(r"(?P<dt>[0-9]{17})_(?P<event>SCENE_CHANGE_DETECTION)\.(?P<ext>jpg)"),
+        ocr_field_ids=[],
+    )
+    settings = _make_mock_settings(events=[scene, plate])
+    settings.cameras = [CameraSettings(name="cam1")]
+    settings.ocr = OCRSettings(verify_on_startup=False)
+    settings.image = ImageSettings()
+    settings.dvla = DVLASettings()
+    settings.tracker = TrackerSettings(data_dir=tmp_path)
+    client = Mock()
+    observer = Mock()
+    observer.is_alive.return_value = False
+
+    with (
+        patch("anpr2mqtt.app.Settings", return_value=settings),
+        patch("anpr2mqtt.app.mqtt.Client", return_value=client),
+        patch("anpr2mqtt.app.Observer", return_value=observer),
+    ):
+        main_loop()
+
+    topics = [c.args[0] for c in client.publish.call_args_list]
+    assert "homeassistant/sensor/cam1/anpr/config" in topics
+    assert "homeassistant/event/cam1/scene_change/config" in topics
+    assert "homeassistant/event/cam1/anpr/config" not in topics
+    removed = [c for c in client.publish.call_args_list if c.args[0] == "homeassistant/sensor/cam1/scene_change/config"]
+    assert [c.kwargs["payload"] for c in removed] == [""], "an old sensor for the scene event is removed, not made"

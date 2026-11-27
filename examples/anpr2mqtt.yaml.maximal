@@ -24,6 +24,7 @@ events:
   ocr_field_ids: []
 - camera: shed
   event: line_crossing
+  target_type: line_crossing
   watch_path: /ftp/shedcam
   description: Entry to back garden gate
   image_name_re: (?P<dt>[0-9]{17})_(?P<target>[A-Z0-9]+)_(?P<event>LINE_CROSSING)\.(?P<ext>jpg|png|gif|jpeg)

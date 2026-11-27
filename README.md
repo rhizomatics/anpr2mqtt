@@ -16,7 +16,7 @@
 
 # ANPR MQTT Bridge
 
-A simple way to integrate CCTV cameras with built-in **ANPR** (**Automatic Number Plate Recognition**, aka **ALPR** or **Automatic License Plate Recognition**) to MQTT for Home Assistant integration, or any other MQTT consumer. Running under Docker is preferred but not necessary.
+A simple way to integrate any CCTV camera that can upload files via FTP, NAS etc into Home Assistant or other MQTT consumers. Specializes in **ANPR** (**Automatic Number Plate Recognition**, aka **ALPR** or **Automatic License Plate Recognition**) with support for face events, and configurable for other event types. Running under Docker is preferred but not necessary.
 
 All that is needed is for the camera to be configured to upload images on plate recognition, by ftp, NAS or whatever else. ANPR2MQTT monitors the directory where the images lands and publishes plate information to MQTT. Its simple, requires no proprietary vendor APIs ( or differing ONVIF implementations ), and Home Assistant gets a copy of the actual annotated detection image to use on dashboards or to attach to notifications.
 

@@ -145,3 +145,28 @@ def test_secondary_image_event_needs_event_group() -> None:
         EventSettings(
             target_type="face", image_name_re=re.compile(r"(?P<dt>[0-9]{17})_FACE\.jpg"), secondary_image_event="FACE_X"
         )
+
+
+def test_defaults_follow_target_type() -> None:
+    plate = EventSettings()
+    assert plate.is_plate is True
+    assert plate.default_description == "Unknown vehicle"
+    assert plate.icon == "mdi:car-back"
+    scene = EventSettings(
+        event="scene_change", target_type="scene_change", image_name_re=re.compile(r"(?P<dt>[0-9]{17})_SCENE\.jpg")
+    )
+    assert scene.is_plate is False
+    assert scene.default_description == "Scene change"
+    assert scene.icon == "mdi:cctv"
+    custom = EventSettings(
+        target_type="face",
+        default_description="Face",
+        icon="mdi:face-recognition",
+        image_name_re=re.compile(r"(?P<dt>[0-9]{17})_FACE\.jpg"),
+    )
+    assert (custom.default_description, custom.icon) == ("Face", "mdi:face-recognition")
+
+
+def test_missing_target_suggests_target_type() -> None:
+    with pytest.raises(ValidationError, match="set target_type"):
+        EventSettings(image_name_re=re.compile(r"(?P<dt>[0-9]{17})_SCENE_CHANGE_DETECTION\.jpg"))

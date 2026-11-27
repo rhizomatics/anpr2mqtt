@@ -47,6 +47,7 @@ class EventHandler(RegexMatchingEventHandler):
         tracker: Tracker,
         mqtt_topic_root: str = "anpr2mqtt",
         secondary_image_topic: str | None = None,
+        event_topic: str | None = None,
     ) -> None:
         fqre = f"{event_config.watch_path.resolve() / event_config.image_name_re.pattern}"
         super().__init__(regexes=[fqre], ignore_directories=True, case_sensitive=True)
@@ -63,6 +64,7 @@ class EventHandler(RegexMatchingEventHandler):
             log.info("Images available from web server with prefix %s", event_config.image_url_base)
         self.image_topic: str = image_topic
         self.secondary_image_topic: str | None = secondary_image_topic
+        self.event_topic: str | None = event_topic
         self.mqtt_topic_root: str = mqtt_topic_root
         self.api_client: APIClient | None = build_dvla_client(dvla_config, event_config.target_type)
         if self.api_client:
@@ -95,6 +97,16 @@ class EventHandler(RegexMatchingEventHandler):
             log.debug("on_closed: skipping irrelevant event: %s", event)
             return
         log.info("New complete file detected: %s", event.src_path)
+        # counted whether or not it's published, since it still shows the camera is sending images
+        self.publisher.record_image(self.event_config, self.camera)
+        posts: int = self.publisher.state_posts(self.state_topic)
+        try:
+            self._on_image(event)
+        finally:
+            if self.publisher.state_posts(self.state_topic) == posts:
+                self.publisher.refresh_image_stats(self.state_topic)
+
+    def _on_image(self, event: FileClosedEvent) -> None:
 
         file_path = Path(str(event.src_path))
         if file_path.stat().st_size == 0:
@@ -190,6 +202,7 @@ class EventHandler(RegexMatchingEventHandler):
                     reg_info=reg_info,
                     file_path=file_path,
                     source="filesystem",
+                    event_topic=self.event_topic,
                 )
                 self._post_image(self.image_topic, image, image_info, file_path)
                 self._schedule_autoclear()
@@ -260,6 +273,7 @@ class EventHandler(RegexMatchingEventHandler):
             url=url,
             file_path=file_path,
             source="filesystem",
+            event_topic=self.event_topic,
         )
         self._post_image(self.image_topic, image, image_info, file_path)
         self._schedule_autoclear()

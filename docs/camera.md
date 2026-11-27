@@ -73,20 +73,60 @@ These commands can now be used in Home Assistant automations as actions, trigger
 
 ![Home Assistant Automation Example](assets/images/ha_mount_scenario_automation.png){width=500}
 
-### Face Capture
+### Other Events
 
-Hikvision cameras with face capture can ftp two images per face: a `FACE_SNAP` cropped to the face, and a
-`FACE_BACKGROUND` of the whole scene, a few milliseconds later. As with ANPR, the file name format is set on the camera,
-for example `10.180.10.20_01_20261120175018129_FACE_SNAP.jpg`, from camera IP address, channel and timestamp.
+Hikvision cameras have many other events besides ANPR, such as face capture, scene change, line crossing, region entry
+or unattended baggage, and can ftp images for any of them. Any of these can be added as an event, so long as the camera
+puts a timestamp in the file name, without anpr2mqtt having to know about each one.
 
-A face is configured as another event on the same camera as its ANPR event, and can share the same `watch_path`, since
-each event only picks up files matching its own `image_name_re`.
+As with ANPR, the file name format is set on the camera. For example, from camera IP address, channel and timestamp,
+then the event's own name:
+
+- `10.180.10.30_01_20261127071024588_SCENE_CHANGE_DETECTION.jpg`
+- `10.180.10.40_01_20261125175413139_FACE_DETECTION.jpg`
+
+An event that isn't a plate needs its own `target_type`, which can be anything other than `plate`, and an
+`image_name_re` matching its file names. It can be on the same camera as an ANPR event, and share the same
+`watch_path`, since each event only picks up files matching its own `image_name_re`.
 
 ```yaml
 events:
-- camera: driveway
+- camera: shed
   event: anpr
-  watch_path: /ftp/Driveway
+  watch_path: /ftp/Shed
+- camera: shed
+  event: scene_change
+  target_type: scene_change
+  watch_path: /ftp/Shed
+  image_name_re: (?P<ip>[0-9.]+)_(?P<channel>[0-9]+)_(?P<dt>[0-9]{17})_(?P<event>SCENE_CHANGE_DETECTION)\.(?P<ext>jpg|png|gif|jpeg)
+  min_event_gap_seconds: 60
+  ocr_field_ids: []
+```
+
+These events are kept apart from plates:
+
+- **Home Assistant** gets an [event entity](https://www.home-assistant.io/integrations/event/), such as
+  `event.scene_change_shed`, rather than a sensor, on the same device as the camera's ANPR sensor. Its `event_type` is
+  the event's name, here `scene_change`, with the usual [attributes](homeassistant.md#attributes). There's also an
+  image entity and a camera entity, as for ANPR
+- **Integrations that take an anpr2mqtt device's sensors as plates**, such as
+  [Camera AutoNotify](https://camera-autonotify.rhizomatics.org.uk), don't see them
+- **No plate handling**: no DVLA lookup, plate correction or Frigate licence plates
+- **Defaults**: `default_description` comes from the event name, here `Scene change`, and `icon` is `mdi:cctv`, rather
+  than the plate defaults `Unknown vehicle` and `mdi:car-back`
+
+There's usually no `target` in these file names, so nothing to look up, correct or track, and the event entity
+records when each was seen. Where a camera sends several images a second or so apart for the same thing,
+`min_event_gap_seconds` makes them one event, publishing only the first within that many seconds of the last.
+
+#### Face Capture
+
+Some cameras send two images per face: a `FACE_SNAP` cropped to the face, and a `FACE_BACKGROUND` of the whole scene,
+a few milliseconds later, such as `10.180.10.20_01_20261120175018129_FACE_SNAP.jpg`. With `secondary_image_event`, the
+`FACE_BACKGROUND` is published as a second image entity, such as `image.face_driveway_face_background`, rather than as
+another event, so there's one event per face, with the `FACE_SNAP` as its image.
+
+```yaml
 - camera: driveway
   event: face
   target_type: face
@@ -98,23 +138,8 @@ events:
   ocr_field_ids: []
 ```
 
-There's no `target` in a face's file name, so nothing to look up, correct or track. Its sensor, such as
-`sensor.face_driveway`, has the time of the last face as its state, and the usual [attributes](homeassistant.md#attributes),
-with `target` empty. The `FACE_SNAP` fires the event, and is its image entity. With `secondary_image_event`, the
-`FACE_BACKGROUND` is published as a second image entity, such as `image.face_driveway_face_background`, rather than as
-another event, so there's one event per face. Without it, the event would fire for both images.
-
-Other cameras send only one image per face, such as `10.180.10.40_01_20261125175413139_FACE_DETECTION.jpg`. For
-those, match that event name, and leave out `secondary_image_event`. These may send several images of the same face a
-second or so apart. Since there's no target to tell them apart, `min_event_gap_seconds` makes them one event, publishing
-only the first image within that many seconds of the last event:
-
-```yaml
-  image_name_re: (?P<ip>[0-9.]+)_(?P<channel>[0-9]+)_(?P<dt>[0-9]{17})_(?P<event>FACE_DETECTION)\.(?P<ext>jpg|png|gif|jpeg)
-  min_event_gap_seconds: 10
-```
-
-Only plate events receive Frigate's licence plates, so a face event on the same camera doesn't affect those.
+Other cameras send only one image per face, `FACE_DETECTION`, often several a second or so apart. Match that event
+name, leave out `secondary_image_event`, and set `min_event_gap_seconds`, such as `10`.
 
 ### Other Cameras
 

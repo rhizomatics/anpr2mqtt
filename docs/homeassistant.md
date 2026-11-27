@@ -12,7 +12,8 @@ Use [Camera AutoNotify](https://camera-autonotify.rhizomatics.org.uk) to automat
 
 ## Attributes
 
-Both the `sensor` and `image` attributes have the same extensive set of attributes.
+Both the `sensor` and `image` attributes have the same extensive set of attributes. For events other than plates,
+the event entity has them too, with `event_type` as the event's name.
 
 The target value will also appear in a field named after `target_type`, for example, `plate` for
 easier to read Home Assistant automations.
@@ -95,14 +96,57 @@ There are 4 separate types of MQTT topic used for HomeAssisstant integration:
 
 - *Config* to support auto discovery. 
     - A topic is created per camera, with a name like `homeassistant/sensor/driveway/anpr/config`. 
+    - For events other than plates, an `event` entity instead, such as `homeassistant/event/driveway/face/config`, see [Other Events](camera.md#other-events)
     - Optionally a `image` and `camera` topic can be created
     - The `homeassistant` topic prefix can also be configured.
 - *State* to report the last plate seen and attributes
     - `anpr2mqtt/camera_name/state`
     - `anpr2mqtt/camera_name/image`
+    - For events other than plates, `anpr2mqtt/event/cameras/camera_name/event` fires the event entity, not retained
 - *Availability* to show whether ANPR2MQTT itself is running
     - One topic per ANPR2MQTT instance, `anpr2mqtt/availability`, holding `online` or `offline`
     - See [Availability](#availability) below
+
+## Image Counts
+
+Each event's entities have an `images` attribute counting the images received, for the event itself, for all events of
+its camera, and for all cameras, to check that cameras are still sending images:
+
+```yaml
+images:
+  event:
+    today: 3
+    this_week: 17
+    total: 412
+    last_received: "2026-11-27T07:10:34.596000+00:00"
+  camera:
+    today: 5
+    this_week: 26
+    total: 1033
+    last_received: "2026-11-27T07:10:34.596000+00:00"
+  all:
+    today: 41
+    this_week: 230
+    total: 9120
+    last_received: "2026-11-27T08:02:11.120000+00:00"
+```
+
+Every image matching the event's `image_name_re` is counted, whether or not it's published: duplicates, ignored plates,
+a face's background image, or images within `min_event_gap_seconds`. When an image isn't published, the last state is
+republished with the new counts, with the state and `event_time` unchanged, so it isn't taken as a new sighting.
+Days and weeks are in local time, weeks starting on Monday, and the counts are republished at midnight, so `today` goes
+back to 0 even for a camera that sends nothing. Counts are kept in `image_stats.json` in the tracker's `data_dir`, so
+they carry on across restarts. Images from Frigate aren't counted, only those from the file system.
+
+For example, a template binary sensor for a camera that's sent nothing today:
+
+```yaml
+template:
+  - binary_sensor:
+      - name: Barn camera quiet
+        device_class: problem
+        state: "{{ (state_attr('event.face_barn', 'images') or {}).get('camera', {}).get('today', 0) == 0 }}"
+```
 
 ## Availability
 

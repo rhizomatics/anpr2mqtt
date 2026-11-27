@@ -708,6 +708,7 @@ def _face_handler(tracker: Tracker, secondary_image_topic: str | None = "test/im
             ocr_field_ids=[],
         ),
         secondary_image_topic=secondary_image_topic,
+        event_topic="test/face/event",
     )
 
 
@@ -810,3 +811,34 @@ def test_examine_file_reads_milliseconds(tmp_path: Path) -> None:
     result = examine_file(f, FACE_RE, require_target=False)
     assert result is not None
     assert result.timestamp.microsecond == 139000
+
+
+def test_face_fires_event_entity(tracker: Tracker, tmp_path: Path) -> None:
+    handler = _face_handler(tracker)
+    handler.on_closed(_closed(_face_file(tmp_path, "10.180.10.20_01_20261120175018129_FACE_SNAP.jpg")))
+    handler.on_closed(_closed(_face_file(tmp_path, "10.180.10.20_01_20261120175018160_FACE_BACKGROUND.jpg")))
+
+    publish: Mock = handler.publisher.client.publish  # type: ignore[assignment]
+    events = [c for c in publish.call_args_list if c.args[0] == "test/face/event"]
+    assert len(events) == 1, "only the snap fires the event, not the background"
+    assert json.loads(events[0].kwargs["payload"])["event_type"] == "face"
+    assert events[0].kwargs["retain"] is False
+
+
+def test_every_image_counted_even_when_not_published(tracker: Tracker, tmp_path: Path) -> None:
+    from anpr2mqtt.image_stats import ImageStats
+
+    handler = _face_handler(tracker)
+    handler.publisher.image_stats = ImageStats(tmp_path / "image_stats.json")
+    handler.event_config.min_event_gap_seconds = 10
+    for name in (
+        "10.180.10.20_01_20261120175018129_FACE_SNAP.jpg",
+        "10.180.10.20_01_20261120175018160_FACE_BACKGROUND.jpg",
+        "10.180.10.20_01_20261120175019000_FACE_SNAP.jpg",
+    ):
+        handler.on_closed(_closed(_face_file(tmp_path, name)))
+
+    states = _face_states(handler)
+    assert [s["images"]["event"]["total"] for s in states] == [1, 2, 3]
+    assert all(s["event_time"] == states[0]["event_time"] for s in states), "later images only refresh the counts"
+    assert states[-1]["images"]["camera"]["today"] == 3

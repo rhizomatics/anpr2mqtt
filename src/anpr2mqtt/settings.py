@@ -55,12 +55,19 @@ class EventSettings(BaseModel):
     camera: str = Field(default="driveway", description="Camera name")
     event: str = Field(default="anpr", description="Identifier of the event, used in MQTT topic description")
     description: str | None = Field(default=None, description="Free text description of event")
-    target_type: str = Field(default="plate", description="Type of target for this event, 'plate' if ANPR")
+    target_type: str = Field(
+        default="plate",
+        description="Type of target for this event, 'plate' if ANPR. Any other type, such as 'face' or 'scene_change', "
+        "is published as a Home Assistant event entity rather than a sensor, and has no plate lookups or corrections",
+    )
     region: str | None = Field(default="UK", description="Region for applying correction, normalization rules")
-    default_description: str = Field(default="Unknown vehicle", description="Default description if no known match found")
+    default_description: str | None = Field(
+        default=None,
+        description="Default description if no known match found, 'Unknown vehicle' for plates, otherwise from the event name",
+    )
     icon: str | None = Field(
-        default="mdi:car-back",
-        description="Default icon to provide for Home Assistant sensors",
+        default=None,
+        description="Default icon to provide for Home Assistant entities, mdi:car-back for plates, otherwise mdi:cctv",
     )
     watch_path: Path = Field(default=Path(), description="File system directory to watch")
     watch_tree: bool = Field(
@@ -123,10 +130,22 @@ class EventSettings(BaseModel):
     def validate_target_groups(self) -> "EventSettings":
         groups = set(self.image_name_re.groupindex)
         if self.target_type == TARGET_TYPE_PLATE and "target" not in groups:
-            raise ValueError("image_name_re is missing required named groups: ['target']")
+            raise ValueError(
+                "image_name_re is missing required named groups: ['target']. "
+                "For events other than plates, set target_type, such as target_type: scene_change"
+            )
         if self.secondary_image_event and "event" not in groups:
             raise ValueError("secondary_image_event needs an 'event' named group in image_name_re")
+        if self.default_description is None:
+            self.default_description = "Unknown vehicle" if self.is_plate else self.event.replace("_", " ").capitalize()
+        if self.icon is None:
+            self.icon = "mdi:car-back" if self.is_plate else "mdi:cctv"
         return self
+
+    @property
+    def is_plate(self) -> bool:
+        """Plate events are Home Assistant sensors, any other kind of event is an event entity"""
+        return self.target_type == TARGET_TYPE_PLATE
 
     @property
     def has_target(self) -> bool:
