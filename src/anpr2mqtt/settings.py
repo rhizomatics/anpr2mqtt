@@ -180,6 +180,11 @@ class HomeAssistantSettings(BaseModel):
     )
     image_entity: bool = Field(default=True, description="Create an Image entity via MQTT discovery")
     camera_entity: bool = Field(default=True, description="Create a Camera entity via MQTT discovery")
+    remove_stale_entities: bool = Field(
+        default=True,
+        description="At startup, remove Home Assistant entities this instance created before but no longer has, such as "
+        "for events removed from the configuration",
+    )
 
 
 class CacheType(StrEnum):

@@ -571,3 +571,27 @@ def test_main_loop_publishes_plates_as_sensors_and_others_as_events(tmp_path: Pa
     assert "homeassistant/event/cam1/anpr/config" not in topics
     removed = [c for c in client.publish.call_args_list if c.args[0] == "homeassistant/sensor/cam1/scene_change/config"]
     assert [c.kwargs["payload"] for c in removed] == [""], "an old sensor for the scene event is removed, not made"
+
+
+@pytest.mark.parametrize("event_fails", [False, True])
+def test_main_loop_sweeps_stale_entities_only_if_all_events_started(tmp_path: Path, event_fails: bool) -> None:
+    settings = _make_mock_settings(events=[EventSettings(camera="cam1", target_type="plate", watch_path=tmp_path)])
+    settings.cameras = [CameraSettings(name="cam1")]
+    settings.ocr = OCRSettings(verify_on_startup=False)
+    settings.image = ImageSettings()
+    settings.dvla = DVLASettings()
+    settings.tracker = TrackerSettings(data_dir=tmp_path)
+    observer = Mock()
+    observer.is_alive.return_value = False
+
+    with (
+        patch("anpr2mqtt.app.Settings", return_value=settings),
+        patch("anpr2mqtt.app.mqtt.Client", return_value=Mock()),
+        patch("anpr2mqtt.app.Observer", return_value=observer),
+        patch("anpr2mqtt.app.EventHandler", side_effect=RuntimeError("boom") if event_fails else None),
+        patch("anpr2mqtt.app.threading.Thread") as thread,
+    ):
+        main_loop()
+
+    sweeps = [c for c in thread.call_args_list if c.kwargs.get("name") == "hass-sweep"]
+    assert len(sweeps) == (0 if event_fails else 1)
