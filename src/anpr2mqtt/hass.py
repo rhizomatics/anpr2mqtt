@@ -63,8 +63,6 @@ class HomeAssistantPublisher:
         # last state published to each topic, so image counts can be refreshed without a new sighting
         self._last_state: dict[str, tuple[dict[str, Any], EventSettings, CameraSettings]] = {}
         self._state_posts: dict[str, int] = {}
-        # upload sensors, whose whole state is their counts, so refreshed at midnight along with the events'
-        self._uploads: dict[str, EventSettings] = {}
         self.availability_topic: str | None = availability_topic
         self.hass_status_topic: str = cfg.status_topic
         self.discovery_topic_prefix: str = cfg.discovery_topic_root
@@ -269,19 +267,34 @@ class HomeAssistantPublisher:
         self.republish[topic] = payload
         log.info("Published HA MQTT upload sensor Discovery message to %s", topic)
 
-    def post_upload_state(self, topic: str, event_config: EventSettings) -> None:
-        """Retained, with the latest counts, after each upload, at startup, and at midnight"""
-        self._uploads[topic] = event_config
-        key: str = ImageStats.upload_key(event_config.upload_name)
-        counts: Counts = self.image_stats.counts(key) if self.image_stats else Counts()
+    def post_upload_state(
+        self, topic: str, event_config: EventSettings, current_files: int = 0, current_bytes: int = 0
+    ) -> None:
+        """Publish the files now in the watch path and the latest counts, retained, after each change, and at midnight
+
+        Received and removed counts are since counting started, so with files coming and going, the current files
+        say what's actually there now.
+        """
+        received: Counts = Counts()
+        removed: Counts = Counts()
+        if self.image_stats:
+            received = self.image_stats.counts(ImageStats.upload_key(event_config.upload_name))
+            removed = self.image_stats.counts(ImageStats.removed_key(event_config.upload_name))
+        now = local_now()
         payload: dict[str, Any] = {
             "event": event_config.event,
             "id": event_config.id,
             "watch_path": str(event_config.watch_path),
             # only for reference, as the camera this is the landing zone for
             **({"camera": event_config.camera} if event_config.camera else {}),
-            **counts.as_attributes(local_now()),
-            "last_file": counts.last_file,
+            "current": current_files,
+            "current_bytes": current_bytes,
+            **received.as_attributes(now),
+            "last_received": received.last_received,
+            "last_file": received.last_file,
+            **removed.as_attributes(now, prefix="removed_"),
+            "last_removed": removed.last_received,
+            "last_removed_file": removed.last_file,
         }
         try:
             self.client.publish(topic, payload=json.dumps(payload), qos=0, retain=True)
@@ -495,13 +508,17 @@ class HomeAssistantPublisher:
         self.client.publish(topic, payload=msg, qos=0, retain=True)
         log.debug("Published HA MQTT State message to %s: %s", topic, payload)
 
-    def record_image(self, event_config: EventSettings, camera: CameraSettings) -> None:
+    def record_image(self, event_config: EventSettings, camera: CameraSettings, size: int = 0) -> None:
         if self.image_stats:
-            self.image_stats.record(ImageStats.event_key(event_config.event, camera.name))
+            self.image_stats.record(ImageStats.event_key(event_config.event, camera.name), size=size)
 
-    def record_upload(self, event_config: EventSettings, file_name: str) -> None:
+    def record_upload(self, event_config: EventSettings, file_name: str, size: int = 0) -> None:
         if self.image_stats:
-            self.image_stats.record(ImageStats.upload_key(event_config.upload_name), file_name=file_name)
+            self.image_stats.record(ImageStats.upload_key(event_config.upload_name), file_name=file_name, size=size)
+
+    def record_removal(self, event_config: EventSettings, file_name: str, size: int = 0) -> None:
+        if self.image_stats:
+            self.image_stats.record(ImageStats.removed_key(event_config.upload_name), file_name=file_name, size=size)
 
     def state_posts(self, topic: str) -> int:
         """How many states have been published to a topic, to tell if handling an image published one"""
@@ -514,9 +531,6 @@ class HomeAssistantPublisher:
         """
         if not self.image_stats:
             return
-        for upload_topic, upload_config in list(self._uploads.items()):
-            if topic is None or upload_topic == topic:
-                self.post_upload_state(upload_topic, upload_config)
         for state_topic, (payload, event_config, camera) in list(self._last_state.items()):
             if topic is None or state_topic == topic:
                 try:

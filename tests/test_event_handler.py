@@ -842,4 +842,13 @@ def test_every_image_counted_even_when_not_published(tracker: Tracker, tmp_path:
     assert [s["images"]["total"] for s in states] == [1, 2, 3]
     assert all(s["event_time"] == states[0]["event_time"] for s in states), "later images only refresh the counts"
     assert states[-1]["images"]["today"] == 3
-    assert set(states[-1]["images"]) == {"today", "this_week", "total", "last_received"}, "no camera or overall counts"
+    assert set(states[-1]["images"]) == {
+        "today",
+        "today_bytes",
+        "this_week",
+        "this_week_bytes",
+        "total",
+        "total_bytes",
+        "last_received",
+    }, "no camera or overall counts"
+    assert states[-1]["images"]["total_bytes"] == sum(p.stat().st_size for p in tmp_path.glob("*.jpg"))

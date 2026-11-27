@@ -151,9 +151,10 @@ name, leave out `secondary_image_event`, and set `min_event_gap_seconds`, such a
 
 ## Uploads
 
-An event with `target_type: upload` counts every file arriving in its `watch_path`, without looking inside it, so it
-doesn't need a timestamp in the file name, or even to be an image. Nothing is published for each file, so nothing is
-notified, only a Home Assistant sensor of when the last file arrived, such as `sensor.upload_shed`, with its counts.
+An event with `target_type: upload` counts every file arriving in, or removed from, its `watch_path`, and the files
+there now, without looking inside them, so they don't need a timestamp in the file name, or even to be images. Nothing
+is published for each file, so nothing is notified, only a Home Assistant sensor of when the last file arrived, such as
+`sensor.upload_shed`, with its counts.
 
 It can be used on its own, as a general purpose monitor of an ftp landing zone, or alongside a directory's other
 events, to check there's been some activity, such as scene changes or snapshots, even when no plates have arrived.
@@ -176,15 +177,41 @@ events:
 The sensor's state is the time the last file arrived, with attributes:
 
 ```yaml
-today: 41
-this_week: 230
-total: 9120
-last_received: "2026-11-27T08:02:11.120000+00:00"
-last_file: Shed/10.180.10.30_01_20261127080211120_SCENE_CHANGE_DETECTION.jpg
 event: upload
 id: all
 watch_path: /ftp
+# files there now
+current: 2210
+current_bytes: 1385402880
+# files arrived
+today: 41
+today_bytes: 25690112
+this_week: 230
+this_week_bytes: 144179200
+total: 9120
+total_bytes: 5716836352
+last_received: "2026-11-27T08:02:11.120000+00:00"
+last_file: Shed/10.180.10.30_01_20261127080211120_SCENE_CHANGE_DETECTION.jpg
+# files removed
+removed_today: 0
+removed_today_bytes: 0
+removed_this_week: 1850
+removed_this_week_bytes: 1159725056
+removed_total: 6910
+removed_total_bytes: 4331433472
+last_removed: "2026-11-24T03:00:02.501000+00:00"
+last_removed_file: Shed/10.180.10.30_01_20261117061533114_SCENE_CHANGE_DETECTION.jpg
 ```
+
+- **Current**: the files in the `watch_path` now, found by a scan at startup, kept up to date as files arrive and are
+  removed, and scanned again each midnight. Arrivals and removals only count from when `anpr2mqtt` started watching,
+  so with files coming and going, such as a camera or NAS clearing out old images, it's `current` that says what's
+  there
+- **Arrivals**: counted when a file is closed after being written, as an ftp upload is, or renamed to a matching name,
+  such as from an ftp server's temporary upload name. A file moved in whole from elsewhere is in `current`, but not
+  counted as an arrival
+- **Removals**: a file deleted, moved out of the `watch_path`, or renamed to a name that no longer matches. Sizes are
+  as last seen, since the file has gone
 
 - **Which files**: any file by default, or only those matching `image_name_re`, such as `.*\.jpg`, which needs no
   `dt` group for an upload. With `watch_tree: true`, files in subdirectories count too, and `last_file` is relative to
@@ -197,7 +224,8 @@ watch_path: /ftp
   [individual or group sensors](homeassistant.md#individual-or-group-sensors), so integrations that take an anpr2mqtt
   device's sensors as plates, such as [Camera AutoNotify](https://camera-autonotify.rhizomatics.org.uk), don't see it
 - **Nothing else**: no image, camera or event entity, OCR, tracking or autoclear
-- **Counts**: as for [image counts](homeassistant.md#image-counts), kept across restarts and back to 0 at midnight
+- **Counts**: as for [image counts](homeassistant.md#image-counts), kept across restarts and back to 0 at midnight,
+  with sizes in bytes
 
 ## Other ANPR Cameras
 

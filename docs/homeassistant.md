@@ -137,8 +137,11 @@ are still sending them:
 ```yaml
 images:
   today: 3
+  today_bytes: 1204224
   this_week: 17
+  this_week_bytes: 6823936
   total: 412
+  total_bytes: 165376000
   last_received: "2026-11-27T07:10:34.596000+00:00"
 ```
 

@@ -1,4 +1,4 @@
-"""Counts of images received per event, and of files uploaded, for health checks such as no images today
+"""Counts, and sizes, of images received per event, and of files uploaded and removed, for health checks
 
 Counted as images arrive, whether or not they're published as an event, since a duplicate, an ignored plate or a
 face's background image still shows the camera is sending them. Counts across a camera, or everything landing in a
@@ -19,6 +19,7 @@ log = structlog.get_logger()
 
 EVENT_KEY_PREFIX: str = "event:"
 UPLOAD_KEY_PREFIX: str = "upload:"
+REMOVED_KEY_PREFIX: str = "removed:"
 
 
 def local_now() -> dt.datetime:
@@ -35,23 +36,33 @@ class Counts:
     week: str | None = None
     this_week: int = 0
     last_file: str | None = None
+    total_bytes: int = 0
+    today_bytes: int = 0
+    this_week_bytes: int = 0
 
-    def add(self, now: dt.datetime, file_name: str | None = None) -> None:
+    def add(self, now: dt.datetime, file_name: str | None = None, size: int = 0) -> None:
         day, week = _day(now), _week(now)
-        self.today = self.today + 1 if self.day == day else 1
-        self.this_week = self.this_week + 1 if self.week == week else 1
+        same_day, same_week = self.day == day, self.week == week
+        self.today = self.today + 1 if same_day else 1
+        self.today_bytes = self.today_bytes + size if same_day else size
+        self.this_week = self.this_week + 1 if same_week else 1
+        self.this_week_bytes = self.this_week_bytes + size if same_week else size
         self.day, self.week = day, week
         self.total += 1
+        self.total_bytes += size
         self.last_received = now.isoformat()
         self.last_file = file_name
 
-    def as_attributes(self, now: dt.datetime) -> dict[str, Any]:
+    def as_attributes(self, now: dt.datetime, prefix: str = "") -> dict[str, Any]:
         """Today's and this week's counts are 0 once the day or week has moved on without any images"""
+        same_day, same_week = self.day == _day(now), self.week == _week(now)
         return {
-            "today": self.today if self.day == _day(now) else 0,
-            "this_week": self.this_week if self.week == _week(now) else 0,
-            "total": self.total,
-            "last_received": self.last_received,
+            f"{prefix}today": self.today if same_day else 0,
+            f"{prefix}today_bytes": self.today_bytes if same_day else 0,
+            f"{prefix}this_week": self.this_week if same_week else 0,
+            f"{prefix}this_week_bytes": self.this_week_bytes if same_week else 0,
+            f"{prefix}total": self.total,
+            f"{prefix}total_bytes": self.total_bytes,
         }
 
 
@@ -80,10 +91,14 @@ class ImageStats:
         """By upload name, event and id, since a landing zone may be shared by several cameras, or belong to none"""
         return f"{UPLOAD_KEY_PREFIX}{upload_name}"
 
-    def record(self, key: str, now: dt.datetime | None = None, file_name: str | None = None) -> None:
+    @staticmethod
+    def removed_key(upload_name: str) -> str:
+        return f"{REMOVED_KEY_PREFIX}{upload_name}"
+
+    def record(self, key: str, now: dt.datetime | None = None, file_name: str | None = None, size: int = 0) -> None:
         now = now or local_now()
         with self._lock:
-            self._counts.setdefault(key, Counts()).add(now, file_name)
+            self._counts.setdefault(key, Counts()).add(now, file_name, size)
             self._save()
 
     def counts(self, key: str) -> Counts:
@@ -93,7 +108,8 @@ class ImageStats:
 
     def attributes(self, key: str, now: dt.datetime | None = None) -> dict[str, Any]:
         """Build the images attribute for an event's entities, counting its own images only"""
-        return self.counts(key).as_attributes(now or local_now())
+        counts: Counts = self.counts(key)
+        return {**counts.as_attributes(now or local_now()), "last_received": counts.last_received}
 
     def _load(self) -> None:
         if self.path is None or not self.path.exists():
@@ -105,7 +121,7 @@ class ImageStats:
                 self._counts = {
                     key: Counts(**{k: v for k, v in counts.items() if k in known})
                     for key, counts in json.load(f).items()
-                    if key.startswith((EVENT_KEY_PREFIX, UPLOAD_KEY_PREFIX))
+                    if key.startswith((EVENT_KEY_PREFIX, UPLOAD_KEY_PREFIX, REMOVED_KEY_PREFIX))
                 }
             log.info("Loaded image counts from %s", self.path)
         except Exception as e:
