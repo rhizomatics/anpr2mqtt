@@ -5,7 +5,7 @@ ARG BASE_IMAGE=python-base
 
 # Pinned base image, kept here in one place and updated by Dependabot, which moves the digest as well
 # as the tag, after its own cooldown, so a release build is reproducible.
-FROM ghcr.io/astral-sh/uv@sha256:da0f1f04404173d7d2fa158112e09624d5a80262efa86c89882b68389dfd44eb AS python-base
+FROM ghcr.io/astral-sh/uv@sha256:a3ea1357342c1a4bf9a0c53a3deb1b55379aefa037338d8113d5771efa01774f AS python-base
 
 # Build stage: resolve and install the app plus its dependencies into a venv
 FROM ${BASE_IMAGE} AS builder
